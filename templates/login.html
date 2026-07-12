@@ -2,65 +2,253 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Login Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Login Admin - Pechy Players</title>
+
   <style>
-    body {
-      background: #03060b;
-      color: white;
-      font-family: Arial, sans-serif;
-      display: grid;
-      place-items: center;
-      height: 100vh;
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:Arial,sans-serif;
     }
 
-    form {
-      background: #07101c;
-      padding: 35px;
-      border-radius: 18px;
-      width: 330px;
-      border: 1px solid #222;
+    body{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      color:white;
+
+      background:
+        radial-gradient(circle at 15% 20%, rgba(255,45,45,.25), transparent 30%),
+        radial-gradient(circle at 85% 80%, rgba(37,211,102,.15), transparent 28%),
+        linear-gradient(135deg,#02050a,#07101c 50%,#03060b);
+
+      overflow:hidden;
+      position:relative;
     }
 
-    h1 {
-      color: #ff2d2d;
-      text-align: center;
+    body::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+      background-size:35px 35px;
+      mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent);
     }
 
-    input, button {
-      width: 100%;
-      padding: 13px;
-      margin-top: 12px;
-      border-radius: 10px;
-      border: none;
+    .login-container{
+      width:100%;
+      max-width:440px;
+      position:relative;
+      z-index:2;
     }
 
-    button {
-      background: #25d366;
-      font-weight: bold;
-      cursor: pointer;
+    .login-logo{
+      text-align:center;
+      margin-bottom:22px;
     }
 
-    .error {
-      color: #ff4d4d;
-      text-align: center;
-      margin-top: 10px;
+    .login-logo img{
+      width:88px;
+      height:88px;
+      object-fit:cover;
+      border-radius:24px;
+      border:2px solid rgba(255,255,255,.15);
+      box-shadow:
+        0 0 35px rgba(255,45,45,.30),
+        0 16px 45px rgba(0,0,0,.60);
+    }
+
+    .login-logo h1{
+      margin-top:15px;
+      font-size:25px;
+      letter-spacing:1px;
+    }
+
+    .login-logo span{
+      color:#ff2d2d;
+    }
+
+    .login-card{
+      background:linear-gradient(
+        145deg,
+        rgba(13,23,38,.94),
+        rgba(5,11,20,.94)
+      );
+
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:26px;
+      padding:34px;
+      box-shadow:0 30px 80px rgba(0,0,0,.65);
+      backdrop-filter:blur(16px);
+    }
+
+    .login-card h2{
+      font-size:28px;
+      margin-bottom:7px;
+    }
+
+    .login-card .subtitulo{
+      color:#9ca3af;
+      margin-bottom:25px;
+    }
+
+    .campo{
+      margin-bottom:16px;
+    }
+
+    .campo label{
+      display:block;
+      margin-bottom:8px;
+      color:#d1d5db;
+      font-size:14px;
+      font-weight:bold;
+    }
+
+    .campo input{
+      width:100%;
+      border:1px solid rgba(255,255,255,.10);
+      background:#070d17;
+      color:white;
+      padding:15px;
+      border-radius:13px;
+      outline:none;
+      font-size:15px;
+      transition:.2s;
+    }
+
+    .campo input:focus{
+      border-color:#ff2d2d;
+      box-shadow:0 0 0 4px rgba(255,45,45,.10);
+    }
+
+    .btn-login{
+      width:100%;
+      border:none;
+      border-radius:13px;
+      padding:15px;
+      margin-top:6px;
+      cursor:pointer;
+
+      background:linear-gradient(135deg,#ff2d2d,#ff5b37);
+      color:white;
+      font-size:16px;
+      font-weight:900;
+
+      box-shadow:0 12px 30px rgba(255,45,45,.28);
+      transition:.25s;
+    }
+
+    .btn-login:hover{
+      transform:translateY(-2px);
+      box-shadow:0 16px 38px rgba(255,45,45,.40);
+    }
+
+    .error{
+      margin-bottom:18px;
+      background:rgba(255,45,45,.12);
+      border:1px solid rgba(255,45,45,.35);
+      color:#ff9a9a;
+      padding:12px;
+      border-radius:12px;
+      text-align:center;
+      font-size:14px;
+    }
+
+    .volver{
+      display:block;
+      margin-top:20px;
+      text-align:center;
+      color:#25d366;
+      text-decoration:none;
+      font-weight:bold;
+    }
+
+    .volver:hover{
+      text-decoration:underline;
+    }
+
+    @media(max-width:500px){
+      .login-card{
+        padding:26px 20px;
+        border-radius:22px;
+      }
+
+      .login-logo img{
+        width:72px;
+        height:72px;
+      }
+
+      .login-card h2{
+        font-size:24px;
+      }
     }
   </style>
 </head>
+
 <body>
 
-<form method="POST">
-  <h1>Admin</h1>
+  <div class="login-container">
 
-  <input type="text" name="usuario" placeholder="Usuario" required>
-  <input type="password" name="password" placeholder="Contraseña" required>
+    <div class="login-logo">
+      <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Pechy Players">
+      <h1>PECHY <span>PLAYERS</span></h1>
+    </div>
 
-  <button type="submit">Entrar</button>
+    <div class="login-card">
 
-  {% if error %}
-  <div class="error">{{ error }}</div>
-  {% endif %}
-</form>
+      <h2>Panel administrativo</h2>
+      <p class="subtitulo">Ingresa tus credenciales para continuar.</p>
+
+      {% if error %}
+        <div class="error">
+          {{ error }}
+        </div>
+      {% endif %}
+
+      <form method="POST">
+
+        <div class="campo">
+          <label>Usuario</label>
+          <input
+            type="text"
+            name="usuario"
+            placeholder="Escribe tu usuario"
+            autocomplete="username"
+            required
+          >
+        </div>
+
+        <div class="campo">
+          <label>Contraseña</label>
+          <input
+            type="password"
+            name="password"
+            placeholder="Escribe tu contraseña"
+            autocomplete="current-password"
+            required
+          >
+        </div>
+
+        <button class="btn-login" type="submit">
+          Entrar al panel →
+        </button>
+
+      </form>
+
+      <a class="volver" href="/">
+        ← Volver a la página principal
+      </a>
+
+    </div>
+
+  </div>
 
 </body>
 </html>

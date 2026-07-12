@@ -672,3 +672,126 @@ footer a {
     display:none;
   }
 }
+/* =====================================
+   VERSIÓN MÓVIL — NO AFECTA EL PC
+===================================== */
+@media (max-width: 768px){
+
+  body{
+    overflow-x:hidden;
+  }
+
+  /* Barra superior más limpia */
+  .nav{
+    padding:12px 14px;
+    gap:10px;
+  }
+
+  .brand{
+    gap:9px;
+  }
+
+  .brand img{
+    width:42px;
+    height:42px;
+  }
+
+  .brand span{
+    font-size:17px;
+    white-space:nowrap;
+  }
+
+  /* En celular ocultamos enlaces secundarios */
+  .links a:not(.wa){
+    display:none;
+  }
+
+  .links .wa{
+    padding:10px 14px;
+    font-size:14px;
+  }
+
+  /* Catálogo con buen margen */
+  .catalogo{
+    padding:30px 14px;
+  }
+
+  .top-section{
+    display:block;
+    margin-bottom:22px;
+  }
+
+  .top-section h2{
+    font-size:25px;
+    line-height:1.15;
+    margin-bottom:16px;
+  }
+
+  #buscador{
+    width:100%;
+    max-width:none;
+  }
+
+  /* Una tarjeta centrada por fila */
+  .grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:22px;
+  }
+
+  .card{
+    width:100%;
+    max-width:380px;
+    margin:0 auto;
+    border-radius:20px;
+    overflow:hidden;
+  }
+
+  /* Imagen menos alta y mejor proporcionada */
+  .cover{
+    height:auto;
+    aspect-ratio:16 / 9;
+  }
+
+  .cover-img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+  }
+
+  .cover-overlay h3{
+    font-size:28px;
+    line-height:1;
+  }
+
+  .plans{
+    padding:15px;
+  }
+
+  .plan{
+    gap:10px;
+    font-size:15px;
+  }
+
+  .buy{
+    margin:0 15px 16px;
+    width:calc(100% - 30px);
+    padding:14px;
+  }
+
+  /* Etiquetas más pequeñas */
+  .badge-oferta,
+  .badge-destacado{
+    font-size:11px;
+    padding:7px 10px;
+  }
+
+  /* WhatsApp flotante para que no tape botones */
+  .float-wa{
+    width:54px;
+    height:54px;
+    right:14px;
+    bottom:18px;
+    font-size:23px;
+  }
+}
