@@ -6,7 +6,7 @@ from werkzeug.utils import secure_filename
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones
 
 app = Flask(__name__)
-app.secret_key = "pechy_players_seguro_2026"
+app.secret_key = os.environ.get("SECRET_KEY", "clave-temporal-local")
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -36,8 +36,10 @@ def login():
         usuario = request.form["usuario"]
         password = request.form["password"]
 
-        flash("Producto agregado correctamente ✅")
-        if usuario == "admin" and password == "pechy123":
+        admin_usuario = os.environ.get("ADMIN_USER", "admin")
+        admin_password = os.environ.get("ADMIN_PASSWORD", "pechy123")
+
+        if usuario == admin_usuario and password == admin_password:
             session["admin"] = True
             return redirect("/admin")
 
