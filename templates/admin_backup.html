@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Pechy Players</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;font-family:Arial,sans-serif}
+    body{background:#03060b;color:white}
+    .layout{display:flex;min-height:100vh}
+    .sidebar{width:260px;background:#070c14;border-right:1px solid #1f2937;padding:25px;position:fixed;height:100vh}
+    .sidebar h2{color:#ff2d2d;margin-bottom:30px}
+    .sidebar a{display:block;color:white;text-decoration:none;padding:14px;border-radius:12px;margin-bottom:10px;font-weight:bold}
+    .sidebar a:hover,.sidebar .active{background:#ff2d2d}
+    .content{margin-left:260px;padding:35px;width:100%}
+    .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:25px}
+    .top h1{color:#ff2d2d}
+    .btn-link{color:#25d366;text-decoration:none;font-weight:bold;margin-left:15px}
+    .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:18px;margin-bottom:30px}
+    .box,.panel{background:#07101c;border:1px solid #1f2937;border-radius:18px;padding:22px;box-shadow:0 15px 40px rgba(0,0,0,.35)}
+    .box h3{color:#aaa;margin-bottom:10px}
+    .box h1{font-size:38px;color:#ffd700}
+    .section-title{margin:35px 0 18px;color:#ffd700}
+    form{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0}
+    input{padding:12px;border:none;border-radius:10px;background:white;color:#111}
+    button{background:#25d366;border:none;padding:12px 18px;border-radius:10px;font-weight:bold;cursor:pointer}
+    .delete{background:#ff2d2d;color:white}
+    .product-header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}
+    .product-header h2{color:#fff}
+    .tag{background:#111827;border:1px solid #374151;padding:8px 12px;border-radius:999px;color:#bbb;font-size:13px}
+    .row-box{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);padding:15px;border-radius:14px;margin-top:12px}
+    label{display:flex;align-items:center;gap:8px;font-weight:bold}
+    @media(max-width:850px){
+      .layout{display:block}
+      .sidebar{position:relative;width:100%;height:auto}
+      .content{margin-left:0;padding:20px}
+      .top{display:block}
+    }
+    .btn-guardar {
+  background: #25d366;
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:22px;
+  margin-bottom:35px;
+}
+
+.box{
+  position:relative;
+  overflow:hidden;
+  background:linear-gradient(135deg,#0b1220,#07101c);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:24px;
+  padding:28px;
+  box-shadow:0 18px 45px rgba(0,0,0,.45);
+  transition:.3s;
+}
+
+.box:hover{
+  transform:translateY(-6px);
+  border-color:#ffd700;
+  box-shadow:0 0 35px rgba(255,215,0,.15);
+}
+
+.box::after{
+  content:"";
+  position:absolute;
+  width:140px;
+  height:140px;
+  right:-50px;
+  top:-50px;
+  background:rgba(255,215,0,.12);
+  border-radius:50%;
+  filter:blur(10px);
+}
+
+.box h3{
+  color:#aaa;
+  font-size:15px;
+  margin-bottom:14px;
+}
+
+.box h1{
+  font-size:48px;
+  color:#ffd700;
+}
+
+.btn-editar {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-oferta {
+  background: #f59e0b;
+  color: #111;
+}
+
+.btn-destacado {
+  background: #8b5cf6;
+  color: white;
+}
+
+.btn-visible {
+  background: #06b6d4;
+  color: white;
+}
+
+.btn-eliminar {
+  background: #ff2d2d;
+  color: white;
+}
+#toast{
+    position:fixed;
+    top:25px;
+    right:25px;
+
+    background:#25d366;
+    color:#fff;
+
+    padding:18px 25px;
+
+    border-radius:14px;
+
+    font-weight:bold;
+
+    box-shadow:0 12px 35px rgba(0,0,0,.35);
+
+    z-index:9999;
+
+    animation:slideIn .35s ease;
+}
+
+@keyframes slideIn{
+
+    from{
+        transform:translateX(120%);
+        opacity:0;
+    }
+
+    to{
+        transform:translateX(0);
+        opacity:1;
+    }
+
+}
+  </style>
+</head>
+<body>
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <h2>PECHY ADMIN</h2>
+    <a class="active" href="#dashboard">🏠 Dashboard</a>
+    <a href="#agregar">➕ Agregar producto</a>
+    <a href="#configuracion">⚙️ Configuración</a>
+    <a href="#productos">📺 Productos</a>
+    <a href="/">🌐 Ver página</a>
+    <a href="/logout">🚪 Salir</a>
+  </aside>
+
+  <main class="content">
+
+{% with mensajes = get_flashed_messages() %}
+{% if mensajes %}
+
+<div id="toast">
+
+    {% for mensaje in mensajes %}
+        {{ mensaje }}
+    {% endfor %}
+
+</div>
+
+{% endif %}
+{% endwith %}
+
+    <div class="top" id="dashboard">
+  <div>
+    <h1>Panel de administración</h1>
+    <p style="color:#aaa;margin-top:6px;">
+      👤 Admin · 🕒 <span id="horaActual"></span>
+    </p>
+  </div>
+
+  <div>
+    <a class="btn-link" href="/">🌐 Ver página</a>
+    <a class="btn-link" href="/logout">🚪 Cerrar sesión</a>
+  </div>
+</div>
+
+    <div class="cards">
+      <div class="box">
+        <h3>📺 Plataformas</h3>
+        <h1>{{ stats.plataformas }}</h1>
+      </div>
+
+      <div class="box">
+        <h3>💰 Planes</h3>
+        <h1>{{ stats.planes }}</h1>
+      </div>
+
+      <div class="box">
+        <h3>🖼️ Imágenes</h3>
+        <h1>{{ stats.imagenes }}</h1>
+      </div>
+    </div>
+
+    <h2 class="section-title" id="agregar">➕ Agregar nuevo producto</h2>
+
+    <div class="panel">
+      <form action="/agregar-producto" method="POST" enctype="multipart/form-data">
+        <input type="text" name="nombre" placeholder="Nombre: Apple TV" required>
+        <input type="file" name="imagen" accept="image/*" required onchange="previewImagen(this, 'previewAgregar')">
+
+<img id="previewAgregar" style="width:120px;height:80px;object-fit:cover;border-radius:10px;display:none;border:2px solid #333;">
+        <input type="text" name="plan" placeholder="Plan: Cuenta completa" required>
+        <input type="text" name="precio" placeholder="Precio: 18 MIL" required>
+        <button type="submit">Agregar producto</button>
+      </form>
+    </div>
+
+    <h2 class="section-title" id="configuracion">⚙️ Configuración</h2>
+
+    <div class="panel">
+      <form action="/actualizar-config" method="POST">
+        <input type="text" name="whatsapp" value="{{ config.whatsapp }}" placeholder="573147735950" required>
+        <button type="submit">Guardar WhatsApp</button>
+      </form>
+<a href="/descargar-respaldo"
+   style="display:inline-block;background:#2563eb;color:white;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold;margin-top:12px;">
+  📥 Descargar respaldo
+</a>
+</a>
+    </div>
+
+    <h2 class="section-title" id="productos">📺 Administrar productos</h2>
+
+    <input
+  type="text"
+  id="buscadorAdmin"
+  placeholder="🔎 Buscar producto..."
+  style="width:100%;max-width:420px;margin-bottom:18px;">
+
+    {% for producto in productos %}
+
+<details class="panel product-accordion admin-producto" data-nombre="{{ producto.nombre | lower }}">
+  <summary class="accordion-title">
+
+    <div style="display:flex;align-items:center;gap:18px;">
+
+        <img
+            src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+            style="
+                width:80px;
+                height:80px;
+                object-fit:cover;
+                border-radius:14px;
+                border:2px solid #222;
+            ">
+
+        <div>
+
+            <h2>{{ producto.nombre }}</h2>
+
+            {% if producto.destacado == 1 %}
+                <span class="tag">⭐ Destacado</span>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</summary>
+
+      <form action="/editar-producto" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="nombre_actual" value="{{ producto.nombre }}">
+        <input type="text" name="nuevo_nombre" value="{{ producto.nombre }}" required>
+        <input type="file" name="imagen" accept="image/*" onchange="previewImagen(this, 'preview-{{ loop.index }}')">
+
+<img id="preview-{{ loop.index }}" style="width:120px;height:80px;object-fit:cover;border-radius:10px;display:none;border:2px solid #333;">
+        <button class="btn-editar" type="submit">✏️ Actualizar nombre/imagen</button>
+      </form>
+
+      <form action="/duplicar-producto" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <button class="btn-editar" type="submit">📄 Duplicar producto</button>
+      </form>
+
+      <form action="/actualizar-destacado" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <label>
+          <input type="checkbox" name="destacado" {% if producto.destacado == 1 %}checked{% endif %}>
+          ⭐ Producto destacado
+        </label>
+        <button class="btn-destacado" type="submit">Guardar destacado</button>
+      </form>
+
+      <form action="/actualizar-visible" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <label>
+          <input type="checkbox" name="visible" {% if producto.visible == 1 %}checked{% endif %}>
+          👁 Producto visible
+        </label>
+        <button class="btn-visible" type="submit">Guardar visibilidad</button>
+      </form>
+
+      {% for plan in producto.planes %}
+      <div class="row-box">
+        <strong>{{ plan.plan }}</strong>
+
+        <form action="/actualizar-precio" method="POST">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <input type="text" name="precio" value="{{ plan.precio }}">
+          <button class="btn-guardar" type="submit">💾 Guardar precio</button>
+        </form>
+
+        <form action="/actualizar-oferta" method="POST">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <input type="text" name="oferta_precio" value="{{ plan.oferta_precio }}" placeholder="Precio oferta">
+          <label>
+            <input type="checkbox" name="oferta_activa" {% if plan.oferta_activa == 1 %}checked{% endif %}>
+            🔥 Oferta activa
+          </label>
+          <button class="btn-oferta" type="submit">🔥 Guardar oferta</button>
+        </form>
+
+        <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <button class="btn-eliminar" type="submit">🗑 Eliminar plan</button>
+        </form>
+      </div>
+      {% endfor %}
+
+    </details>
+    {% endfor %}
+
+  </main>
+</div>
+
+<script>
+  const buscadorAdmin = document.getElementById("buscadorAdmin");
+  const productosAdmin = document.querySelectorAll(".admin-producto");
+
+  buscadorAdmin.addEventListener("input", function () {
+    const texto = this.value.toLowerCase();
+
+    productosAdmin.forEach(producto => {
+      const nombre = producto.dataset.nombre;
+
+      if (nombre.includes(texto)) {
+        producto.style.display = "block";
+      } else {
+        producto.style.display = "none";
+      }
+    });
+  });
+</script>
+
+<script>
+
+setTimeout(function(){
+
+    let toast = document.getElementById("toast");
+
+    if(toast){
+
+        toast.style.transition="0.5s";
+
+        toast.style.opacity="0";
+
+        toast.style.transform="translateX(120%)";
+
+        setTimeout(function(){
+
+            toast.remove();
+
+        },500);
+
+    }
+
+},3000);
+
+</script>
+
+<script>
+function previewImagen(input, previewId) {
+    const preview = document.getElementById(previewId);
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = "block";
+        }
+
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+
+<script>
+function actualizarHora() {
+  const ahora = new Date();
+
+  const opciones = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  };
+
+  document.getElementById("horaActual").textContent =
+    ahora.toLocaleDateString("es-CO", opciones);
+}
+
+actualizarHora();
+setInterval(actualizarHora, 60000);
+</script>
+
+</body>
+</html>

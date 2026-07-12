@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Pechy Players</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="brand">
+    <img src="{{ url_for('static', filename='img/logo.jpg') }}">
+    <span>PECHY PLAYERS</span>
+  </div>
+
+  <div class="links">
+    <a href="#">Inicio</a>
+    <a href="#catalogo">Catálogo</a>
+    <a href="#pagos">Pagos</a>
+    <a target="_blank" class="wa" href="https://wa.me/573147735950">WhatsApp</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-overlay"></div>
+
+  <div class="hero-content">
+    <h1>PECHY<br><span>PLAYERS</span></h1>
+    <p>Tu entretenimiento premium comienza aquí</p>
+    <a href="#catalogo" class="main-btn">Explorar catálogo →</a>
+  </div>
+</header>
+
+{% if promociones %}
+<section class="promociones-home">
+
+  <div class="promociones-titulo">
+    <small>OFERTAS ESPECIALES</small>
+    <h2>🔥 Promociones destacadas</h2>
+    <p>Desliza o espera unos segundos para ver todas las ofertas.</p>
+  </div>
+
+  <div class="promo-slider" id="promoSlider">
+
+    <div class="promo-track" id="promoTrack">
+
+      {% for promo in promociones %}
+      <a
+        class="promo-slide"
+        href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20información%20sobre%20esta%20promoción"
+        target="_blank"
+      >
+        <img
+          src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
+          alt="Promoción de Pechy Players"
+        >
+      </a>
+      {% endfor %}
+
+    </div>
+
+    {% if promociones|length > 1 %}
+    <button
+      class="promo-flecha promo-anterior"
+      id="promoAnterior"
+      type="button"
+      aria-label="Promoción anterior"
+    >
+      ‹
+    </button>
+
+    <button
+      class="promo-flecha promo-siguiente"
+      id="promoSiguiente"
+      type="button"
+      aria-label="Promoción siguiente"
+    >
+      ›
+    </button>
+
+    <div class="promo-puntos" id="promoPuntos">
+      {% for promo in promociones %}
+      <button
+        type="button"
+        class="promo-punto {% if loop.first %}activo{% endif %}"
+        data-posicion="{{ loop.index0 }}"
+        aria-label="Ver promoción {{ loop.index }}"
+      ></button>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+
+</section>
+{% endif %}
+
+<section class="benefits">
+  <div>⚡ <strong>Entrega inmediata</strong><span>Al instante por WhatsApp</span></div>
+  <div>🛡️ <strong>Cuentas seguras</strong><span>Privadas y estables</span></div>
+  <div>🎧 <strong>Soporte 24/7</strong><span>Siempre estamos contigo</span></div>
+  <div>🔥 <strong>Precios bajos</strong><span>Los mejores del mercado</span></div>
+</section>
+
+<section id="catalogo" class="catalogo">
+  <div class="top-section">
+    <div>
+      <small>CATÁLOGO PREMIUM</small>
+      <h2>Elige tu plataforma favorita</h2>
+    </div>
+
+    <input id="buscador" type="text" placeholder="Buscar plataforma...">
+  </div>
+
+  <div class="grid" id="productosGrid">
+  {% for producto in productos %}
+  <article class="card producto-item" data-nombre="{{ producto.nombre | lower }}">
+
+{% if producto.destacado == 1 %}
+  <div class="badge-destacado">⭐ MÁS VENDIDO</div>
+{% endif %}
+
+  {% set oferta = namespace(activa=false) %}
+{% for plan in producto.planes %}
+  {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+    {% set oferta.activa = true %}
+  {% endif %}
+{% endfor %}
+
+{% if oferta.activa %}
+  <div class="badge-oferta">🔥 OFERTA</div>
+{% endif %}
+
+    <div class="cover">
+      <img class="cover-img" src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}">
+      <div class="cover-overlay">
+        <h3>{{ producto.nombre }}</h3>
+      </div>
+    </div>
+
+    <div class="plans">
+      {% for plan in producto.planes %}
+      <div class="plan">
+        <span>{{ plan.plan }}</span>
+        {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+  <strong style="text-decoration: line-through; color:#777;">${{ plan.precio }}</strong>
+  <strong style="color:#ffd900;">${{ plan.oferta_precio }} 🔥</strong>
+{% else %}
+  {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+  <div>
+    <strong style="text-decoration: line-through; color:#777; display:block;">
+      ${{ plan.precio }}
+    </strong>
+    <strong style="color:#ffd900; display:block;">
+      ${{ plan.oferta_precio }} 🔥
+    </strong>
+  </div>
+{% else %}
+  <strong>${{ plan.precio }}</strong>
+{% endif %}
+{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <a class="buy" target="_blank"
+       href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20comprar%20{{ producto.nombre }}">
+      💬 Comprar ahora
+    </a>
+
+  </article>
+  {% endfor %}
+</div>
+
+</section>
+
+<section class="info">
+  <div>
+    <h3>¿Por qué comprar con nosotros?</h3>
+    <div class="info-grid">
+      <p>🚀 Entrega rápida</p>
+      <p>✅ Garantía</p>
+      <p>🎧 Soporte</p>
+      <p>👥 Clientes satisfechos</p>
+    </div>
+  </div>
+
+  <div id="pagos">
+    <h3>Métodos de pago</h3>
+    <div class="payments">
+      <span>Nequi</span>
+      <span>Daviplata</span>
+      <span>Bancolombia</span>
+      <span>Binance</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <img src="{{ url_for('static', filename='img/logo.jpg') }}">
+  <div>
+    <h3>PECHY PLAYERS</h3>
+    <p>Tu tienda premium de entretenimiento digital.</p>
+  </div>
+  <a target="_blank" href="https://wa.me/573147735950">314 773 5950</a>
+</footer>
+
+<a class="float-wa" target="_blank" href="https://wa.me/573147735950">💬</a>
+
+<script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>

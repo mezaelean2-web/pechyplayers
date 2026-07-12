@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin - Pechy Players</title>
+  <style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,Arial,sans-serif}
+
+body{
+  background:radial-gradient(circle at top,#111827,#03060b 55%);
+  color:white;
+}
+
+.layout{
+  display:flex;
+  min-height:100vh;
+}
+
+.sidebar{
+  width:280px;
+  background:linear-gradient(180deg,#080d16,#03060b);
+  border-right:1px solid rgba(255,255,255,.08);
+  padding:28px;
+  position:fixed;
+  height:100vh;
+}
+
+.sidebar h2{
+  color:#ff2d2d;
+  margin-bottom:35px;
+  font-size:24px;
+  font-weight:900;
+}
+
+.sidebar a{
+  display:block;
+  color:#d1d5db;
+  text-decoration:none;
+  padding:15px;
+  border-radius:14px;
+  margin-bottom:10px;
+  font-weight:800;
+  transition:.25s;
+}
+
+.sidebar a:hover,
+.sidebar .active{
+  background:linear-gradient(135deg,#ff2d2d,#991b1b);
+  color:white;
+  transform:translateX(4px);
+}
+
+.content{
+  margin-left:280px;
+  padding:35px;
+  width:100%;
+}
+
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:22px;
+  padding:24px;
+  margin-bottom:28px;
+  box-shadow:0 20px 45px rgba(0,0,0,.35);
+}
+
+.top h1{
+  color:white;
+  font-size:32px;
+}
+
+.btn-link{
+  color:#25d366;
+  text-decoration:none;
+  font-weight:900;
+  margin-left:15px;
+}
+
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:22px;
+  margin-bottom:35px;
+}
+
+.box,
+.panel{
+  background:linear-gradient(145deg,#0b1220,#07101c);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:24px;
+  padding:25px;
+  box-shadow:0 18px 45px rgba(0,0,0,.45);
+}
+
+.box{
+  position:relative;
+  overflow:hidden;
+  transition:.25s;
+}
+
+.box:hover{
+  transform:translateY(-6px);
+  border-color:#ffd700;
+}
+
+.box::after{
+  content:"";
+  position:absolute;
+  width:150px;
+  height:150px;
+  right:-55px;
+  top:-55px;
+  background:rgba(255,215,0,.14);
+  border-radius:50%;
+  filter:blur(12px);
+}
+
+.box h3{
+  color:#a1a1aa;
+  margin-bottom:12px;
+}
+
+.box h1{
+  color:#ffd700;
+  font-size:48px;
+}
+
+.section-title{
+  margin:38px 0 18px;
+  color:#ffd700;
+  font-size:26px;
+}
+
+input{
+  padding:13px;
+  border:none;
+  border-radius:12px;
+  background:#f8fafc;
+  color:#111;
+}
+
+form{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+  margin:13px 0;
+}
+
+button,
+.btn-respaldo{
+  border:none;
+  padding:12px 18px;
+  border-radius:12px;
+  font-weight:900;
+  cursor:pointer;
+  text-decoration:none;
+}
+
+.btn-guardar{background:#25d366;color:#07101c}
+.btn-editar{background:#2563eb;color:white}
+.btn-oferta{background:#f59e0b;color:#111}
+.btn-destacado{background:#8b5cf6;color:white}
+.btn-visible{background:#06b6d4;color:white}
+.btn-eliminar{background:#ff2d2d;color:white}
+
+.tag{
+  display:inline-block;
+  background:#111827;
+  border:1px solid #374151;
+  padding:8px 12px;
+  border-radius:999px;
+  color:#ffd700;
+  font-size:13px;
+  font-weight:900;
+  margin-top:6px;
+}
+
+.row-box{
+  background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.08);
+  padding:18px;
+  border-radius:18px;
+  margin-top:15px;
+}
+
+.product-accordion{
+  margin-bottom:20px;
+  transition:.25s;
+}
+
+.product-accordion:hover{
+  border-color:rgba(255,215,0,.35);
+}
+
+.accordion-title{
+  list-style:none;
+  cursor:pointer;
+}
+
+.accordion-title::-webkit-details-marker{
+  display:none;
+}
+
+.accordion-title::after{
+  content:"▼";
+  float:right;
+  color:#ffd700;
+  font-size:20px;
+}
+
+.product-accordion:not([open]) .accordion-title::after{
+  content:"▶";
+}
+
+label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-weight:900;
+}
+
+#toast{
+  position:fixed;
+  top:25px;
+  right:25px;
+  background:#25d366;
+  color:white;
+  padding:18px 25px;
+  border-radius:16px;
+  font-weight:900;
+  box-shadow:0 15px 40px rgba(0,0,0,.45);
+  z-index:9999;
+  animation:slideIn .35s ease;
+}
+
+@keyframes slideIn{
+  from{transform:translateX(120%);opacity:0}
+  to{transform:translateX(0);opacity:1}
+}
+
+@media(max-width:850px){
+  .layout{display:block}
+  .sidebar{position:relative;width:100%;height:auto}
+  .content{margin-left:0;padding:20px}
+  .top{display:block}
+}
+</style>
+</head>
+<body>
+
+  .action-buttons{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin:18px 0;
+}
+
+.action-buttons form{
+    margin:0;
+}
+
+.action-buttons button{
+    min-width:150px;
+}
+
+<div class="layout">
+
+  <aside class="sidebar">
+    <h2>PECHY ADMIN</h2>
+    <a class="active" href="#dashboard">🏠 Dashboard</a>
+    <a href="#agregar">➕ Agregar producto</a>
+    <a href="#configuracion">⚙️ Configuración</a>
+    <a href="#productos">📺 Productos</a>
+    <a href="/">🌐 Ver página</a>
+    <a href="/logout">🚪 Salir</a>
+  </aside>
+
+  <main class="content">
+
+{% with mensajes = get_flashed_messages() %}
+{% if mensajes %}
+
+<div id="toast">
+
+    {% for mensaje in mensajes %}
+        {{ mensaje }}
+    {% endfor %}
+
+</div>
+
+{% endif %}
+{% endwith %}
+
+    <div class="top" id="dashboard">
+  <div>
+    <h1>Panel de administración</h1>
+    <p style="color:#aaa;margin-top:6px;">
+      👤 Admin · 🕒 <span id="horaActual"></span>
+    </p>
+  </div>
+
+  <div>
+    <a class="btn-link" href="/">🌐 Ver página</a>
+    <a class="btn-link" href="/logout">🚪 Cerrar sesión</a>
+  </div>
+</div>
+
+    <div class="cards">
+      <div class="box">
+        <h3>📺 Plataformas</h3>
+        <h1>{{ stats.plataformas }}</h1>
+      </div>
+
+      <div class="box">
+        <h3>💰 Planes</h3>
+        <h1>{{ stats.planes }}</h1>
+      </div>
+
+      <div class="box">
+        <h3>🖼️ Imágenes</h3>
+        <h1>{{ stats.imagenes }}</h1>
+      </div>
+    </div>
+
+    <h2 class="section-title" id="agregar">➕ Agregar nuevo producto</h2>
+
+    <div class="panel">
+      <form action="/agregar-producto" method="POST" enctype="multipart/form-data">
+        <input type="text" name="nombre" placeholder="Nombre: Apple TV" required>
+        <input type="file" name="imagen" accept="image/*" required onchange="previewImagen(this, 'previewAgregar')">
+
+<img id="previewAgregar" style="width:120px;height:80px;object-fit:cover;border-radius:10px;display:none;border:2px solid #333;">
+        <input type="text" name="plan" placeholder="Plan: Cuenta completa" required>
+        <input type="text" name="precio" placeholder="Precio: 18 MIL" required>
+        <button type="submit">Agregar producto</button>
+      </form>
+    </div>
+
+    <h2 class="section-title" id="configuracion">⚙️ Configuración</h2>
+
+    <div class="panel">
+      <form action="/actualizar-config" method="POST">
+        <input type="text" name="whatsapp" value="{{ config.whatsapp }}" placeholder="573147735950" required>
+        <button type="submit">Guardar WhatsApp</button>
+      </form>
+<a href="/descargar-respaldo"
+   style="display:inline-block;background:#2563eb;color:white;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:bold;margin-top:12px;">
+  📥 Descargar respaldo
+</a>
+</a>
+    </div>
+
+    <h2 class="section-title" id="productos">📺 Administrar productos</h2>
+
+    <input
+  type="text"
+  id="buscadorAdmin"
+  placeholder="🔎 Buscar producto..."
+  style="width:100%;max-width:420px;margin-bottom:18px;">
+
+    {% for producto in productos %}
+
+<details class="panel product-accordion admin-producto" data-nombre="{{ producto.nombre | lower }}">
+  <summary class="accordion-title">
+
+    <div style="display:flex;align-items:center;gap:18px;">
+
+        <img
+            src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+            style="
+                width:80px;
+                height:80px;
+                object-fit:cover;
+                border-radius:14px;
+                border:2px solid #222;
+            ">
+
+        <div>
+
+            <h2>{{ producto.nombre }}</h2>
+
+            {% if producto.destacado == 1 %}
+                <span class="tag">⭐ Destacado</span>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</summary>
+
+      <form action="/editar-producto" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="nombre_actual" value="{{ producto.nombre }}">
+        <input type="text" name="nuevo_nombre" value="{{ producto.nombre }}" required>
+        <input type="file" name="imagen" accept="image/*" onchange="previewImagen(this, 'preview-{{ loop.index }}')">
+
+<img id="preview-{{ loop.index }}" style="width:120px;height:80px;object-fit:cover;border-radius:10px;display:none;border:2px solid #333;">
+        <button class="btn-editar" type="submit">✏️ Actualizar nombre/imagen</button>
+      </form>
+
+      <form action="/duplicar-producto" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <button class="btn-editar" type="submit">📄 Duplicar producto</button>
+      </form>
+
+      <form action="/actualizar-destacado" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <label>
+          <input type="checkbox" name="destacado" {% if producto.destacado == 1 %}checked{% endif %}>
+          ⭐ Producto destacado
+        </label>
+        <button class="btn-destacado" type="submit">Guardar destacado</button>
+      </form>
+
+      <form action="/actualizar-visible" method="POST">
+        <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+        <label>
+          <input type="checkbox" name="visible" {% if producto.visible == 1 %}checked{% endif %}>
+          👁 Producto visible
+        </label>
+        <button class="btn-visible" type="submit">Guardar visibilidad</button>
+      </form>
+
+      {% for plan in producto.planes %}
+      <div class="row-box">
+        <strong>{{ plan.plan }}</strong>
+
+        <form action="/actualizar-precio" method="POST">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <input type="text" name="precio" value="{{ plan.precio }}">
+          <button class="btn-guardar" type="submit">💾 Guardar precio</button>
+        </form>
+
+        <form action="/actualizar-oferta" method="POST">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <input type="text" name="oferta_precio" value="{{ plan.oferta_precio }}" placeholder="Precio oferta">
+          <label>
+            <input type="checkbox" name="oferta_activa" {% if plan.oferta_activa == 1 %}checked{% endif %}>
+            🔥 Oferta activa
+          </label>
+          <button class="btn-oferta" type="submit">🔥 Guardar oferta</button>
+        </form>
+
+        <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')">
+          <input type="hidden" name="id" value="{{ plan.id }}">
+          <button class="btn-eliminar" type="submit">🗑 Eliminar plan</button>
+        </form>
+      </div>
+      {% endfor %}
+
+    </details>
+    {% endfor %}
+
+  </main>
+</div>
+
+<script>
+  const buscadorAdmin = document.getElementById("buscadorAdmin");
+  const productosAdmin = document.querySelectorAll(".admin-producto");
+
+  buscadorAdmin.addEventListener("input", function () {
+    const texto = this.value.toLowerCase();
+
+    productosAdmin.forEach(producto => {
+      const nombre = producto.dataset.nombre;
+
+      if (nombre.includes(texto)) {
+        producto.style.display = "block";
+      } else {
+        producto.style.display = "none";
+      }
+    });
+  });
+</script>
+
+<script>
+
+setTimeout(function(){
+
+    let toast = document.getElementById("toast");
+
+    if(toast){
+
+        toast.style.transition="0.5s";
+
+        toast.style.opacity="0";
+
+        toast.style.transform="translateX(120%)";
+
+        setTimeout(function(){
+
+            toast.remove();
+
+        },500);
+
+    }
+
+},3000);
+
+</script>
+
+<script>
+function previewImagen(input, previewId) {
+    const preview = document.getElementById(previewId);
+
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            preview.src = e.target.result;
+            preview.style.display = "block";
+        }
+
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+</script>
+
+<script>
+function actualizarHora() {
+  const ahora = new Date();
+
+  const opciones = {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  };
+
+  document.getElementById("horaActual").textContent =
+    ahora.toLocaleDateString("es-CO", opciones);
+}
+
+actualizarHora();
+setInterval(actualizarHora, 60000);
+</script>
+
+</body>
+</html>
