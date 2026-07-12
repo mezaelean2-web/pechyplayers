@@ -175,6 +175,18 @@
 
 </section>
 
+<div class="catalogo-contador" id="catalogoContador">
+  <strong id="catalogoActual">1</strong>
+  <span>/</span>
+  <span id="catalogoTotal">{{ productos|length }}</span>
+</div>
+
+<div class="catalogo-puntos" id="catalogoPuntos">
+  {% for producto in productos %}
+    <span class="catalogo-punto {% if loop.first %}activo{% endif %}"></span>
+  {% endfor %}
+</div>
+
 <section class="info">
   <div>
     <h3>¿Por qué comprar con nosotros?</h3>

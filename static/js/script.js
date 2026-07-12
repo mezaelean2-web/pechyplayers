@@ -83,3 +83,50 @@ if (promoTrack && promoSlides.length > 0) {
   mostrarPromocion(0);
   iniciarCarruselPromociones();
 }
+const productosGridMovil = document.getElementById("productosGrid");
+const tarjetasMovil = document.querySelectorAll(".producto-item");
+const contadorActual = document.getElementById("catalogoActual");
+const puntosCatalogo = document.querySelectorAll(".catalogo-punto");
+
+function actualizarCarruselMovil() {
+  if (window.innerWidth > 768 || !productosGridMovil || tarjetasMovil.length === 0) {
+    return;
+  }
+
+  const centro = productosGridMovil.scrollLeft + productosGridMovil.clientWidth / 2;
+
+  let indiceActivo = 0;
+  let menorDistancia = Infinity;
+
+  tarjetasMovil.forEach((tarjeta, index) => {
+    const centroTarjeta = tarjeta.offsetLeft + tarjeta.offsetWidth / 2;
+    const distancia = Math.abs(centro - centroTarjeta);
+
+    if (distancia < menorDistancia) {
+      menorDistancia = distancia;
+      indiceActivo = index;
+    }
+  });
+
+  tarjetasMovil.forEach((tarjeta, index) => {
+    tarjeta.classList.toggle("card-activa", index === indiceActivo);
+  });
+
+  if (contadorActual) {
+    contadorActual.textContent = indiceActivo + 1;
+  }
+
+  puntosCatalogo.forEach((punto, index) => {
+    punto.classList.toggle("activo", index === indiceActivo);
+  });
+}
+
+if (productosGridMovil) {
+  productosGridMovil.addEventListener("scroll", actualizarCarruselMovil, {
+    passive: true
+  });
+
+  window.addEventListener("resize", actualizarCarruselMovil);
+
+  setTimeout(actualizarCarruselMovil, 150);
+}
