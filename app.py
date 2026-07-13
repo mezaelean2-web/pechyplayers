@@ -4,9 +4,11 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones
+from datetime import timedelta
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "clave-temporal-local")
+app.permanent_session_lifetime = timedelta(minutes=30)
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -30,7 +32,7 @@ def inicio():
         promociones=promociones
     )
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route("/pechy-panel-seguro", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
         usuario = request.form["usuario"]
@@ -40,6 +42,7 @@ def login():
         admin_password = os.environ.get("ADMIN_PASSWORD", "pechy123")
 
         if usuario == admin_usuario and password == admin_password:
+            session.permanent = True
             session["admin"] = True
             return redirect("/admin")
 
@@ -47,15 +50,19 @@ def login():
 
     return render_template("login.html")
 
+@app.route("/login")
+def login_bloqueado():
+    return redirect("/")
+
 @app.route("/logout")
 def logout():
     session.pop("admin", None)
-    return redirect("/login")
+    return redirect("/pechy-panel-seguro")
 
 @app.route("/admin")
 def admin():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     productos = obtener_productos()
     stats = obtener_estadisticas()
@@ -75,7 +82,7 @@ def admin():
 @app.route("/actualizar-precio", methods=["POST"])
 def actualizar_precio():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     id_plan = request.form["id"]
     precio = request.form["precio"]
@@ -93,7 +100,7 @@ def actualizar_precio():
 @app.route("/agregar-producto", methods=["POST"])
 def agregar_producto():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     nombre = request.form["nombre"]
     plan = request.form["plan"]
@@ -120,7 +127,7 @@ def agregar_producto():
 @app.route("/eliminar-plan", methods=["POST"])
 def eliminar_plan():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     id_plan = request.form["id"]
 
@@ -137,7 +144,7 @@ def eliminar_plan():
 @app.route("/editar-producto", methods=["POST"])
 def editar_producto():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     nombre_actual = request.form["nombre_actual"]
     nuevo_nombre = request.form["nuevo_nombre"]
@@ -171,7 +178,7 @@ def editar_producto():
 @app.route("/actualizar-oferta", methods=["POST"])
 def actualizar_oferta():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     id_plan = request.form["id"]
     oferta_precio = request.form["oferta_precio"]
@@ -195,7 +202,7 @@ def actualizar_oferta():
 @app.route("/actualizar-destacado", methods=["POST"])
 def actualizar_destacado():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     nombre = request.form["nombre"]
     destacado = 1 if request.form.get("destacado") == "on" else 0
@@ -216,7 +223,7 @@ def actualizar_destacado():
 @app.route("/actualizar-visible", methods=["POST"])
 def actualizar_visible():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     nombre = request.form["nombre"]
     visible = 1 if request.form.get("visible") == "on" else 0
@@ -237,7 +244,7 @@ def actualizar_visible():
 @app.route("/actualizar-config", methods=["POST"])
 def actualizar_configuracion():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     whatsapp = request.form["whatsapp"]
     actualizar_config("whatsapp", whatsapp)
@@ -249,7 +256,7 @@ def actualizar_configuracion():
 @app.route("/descargar-respaldo")
 def descargar_respaldo():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     conn = conectar()
     cursor = conn.cursor()
@@ -294,7 +301,7 @@ def descargar_respaldo():
 @app.route("/duplicar-producto", methods=["POST"])
 def duplicar_producto():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     nombre = request.form["nombre"]
     nuevo_nombre = nombre + " (Copia)"
@@ -349,7 +356,7 @@ def guardar_orden():
 def actualizar_db():
 
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     inicializar_db()
 
@@ -360,7 +367,7 @@ def actualizar_db():
 @app.route("/agregar-promocion", methods=["POST"])
 def agregar_promocion():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     imagen_file = request.files["imagen"]
     activa = 1 if request.form.get("activa") == "on" else 0
@@ -386,7 +393,7 @@ def agregar_promocion():
 @app.route("/actualizar-promocion", methods=["POST"])
 def actualizar_promocion():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     promo_id = request.form["id"]
     activa = 1 if request.form.get("activa") == "on" else 0
@@ -407,7 +414,7 @@ def actualizar_promocion():
 @app.route("/eliminar-promocion", methods=["POST"])
 def eliminar_promocion():
     if not session.get("admin"):
-        return redirect("/login")
+        return redirect("/pechy-panel-seguro")
 
     promo_id = request.form["id"]
 

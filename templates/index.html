@@ -5,8 +5,66 @@
   <title>Pechy Players</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
 </head>
 <body>
+
+<div id="splashMobile">
+  <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Pechy Players">
+  <h1>PECHY <span>PLAYERS</span></h1>
+  <div class="splash-loader"></div>
+</div>
+
+<div id="recordatoriosScreen" class="recordatorios-screen">
+
+  <div class="recordatorios-overlay"></div>
+
+  <div class="recordatorios-slider">
+
+    <small>TE LO RECORDAMOS ❤️</small>
+
+    <h2>Guardaste estos productos para después</h2>
+
+    <div class="swipe-ayuda" id="ayudaRecordatorios">
+  <span>←</span>
+  Desliza para ver más
+  <span>→</span>
+</div>
+
+    <div id="recordatoriosTrack"></div>
+
+  </div>
+
+</div>
+
+{% if promociones %}
+<section class="mobile-featured">
+
+  <div class="mobile-featured-bg"
+       style="background-image:url('{{ url_for('static', filename='img/promociones/' + promociones[0][1]) }}');">
+  </div>
+
+  <div class="mobile-featured-overlay"></div>
+
+  <div class="mobile-featured-content">
+    <span class="mobile-featured-tag">🔥 OFERTA DESTACADA</span>
+
+    <h2>Entretenimiento premium</h2>
+
+    <p>
+      Toca la promoción y recibe toda la información directamente por WhatsApp.
+    </p>
+
+    <a
+      href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20la%20promoción%20destacada"
+      target="_blank"
+      class="mobile-featured-btn">
+      💬 Ver promoción
+    </a>
+  </div>
+
+</section>
+{% endif %}
 
 <nav class="nav">
   <div class="brand">
@@ -113,6 +171,12 @@
     <input id="buscador" type="text" placeholder="Buscar plataforma...">
   </div>
 
+  <div class="swipe-ayuda" id="ayudaCatalogo">
+  <span>←</span>
+  Desliza para ver más
+  <span>→</span>
+</div>
+
   <div class="grid" id="productosGrid">
   {% for producto in productos %}
   <article class="card producto-item" data-nombre="{{ producto.nombre | lower }}">
@@ -166,7 +230,7 @@
 
     <a class="buy" target="_blank"
        href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20comprar%20{{ producto.nombre }}">
-      💬 Comprar ahora
+      ✨ Ver planes
     </a>
 
   </article>
@@ -218,8 +282,110 @@
   <a target="_blank" href="https://wa.me/573147735950">314 773 5950</a>
 </footer>
 
+<div id="productoModal" class="producto-modal">
+
+  <div class="producto-modal-fondo"></div>
+
+  <div class="producto-modal-contenido">
+
+    <button
+      id="cerrarProductoModal"
+      class="cerrar-producto-modal"
+      type="button">
+      ✕
+    </button>
+
+    <div class="modal-topbar">
+  <div>
+    <small>DISPONIBLE AHORA</small>
+    <strong id="modalProductoTopNombre"></strong>
+  </div>
+
+  <span>● ACTIVO</span>
+</div>
+
+    <img
+      id="modalProductoImagen"
+      class="modal-producto-imagen"
+      src=""
+      alt="Plataforma">
+
+    <div class="modal-producto-info">
+
+      <span class="modal-producto-etiqueta">
+        PECHY PLAYERS PREMIUM
+      </span>
+
+      <h2 id="modalProductoNombre"></h2>
+
+      <button
+  id="modalFavorito"
+  class="modal-favorito"
+  type="button">
+  ♡ Guardar en favoritos
+</button>
+
+      <div id="modalProductoPlanes"></div>
+
+      <div class="modal-beneficios">
+  <div>⚡ Entrega inmediata</div>
+  <div>🛡️ Cuenta segura y estable</div>
+  <div>🎧 Soporte rápido</div>
+</div>
+
+      <a
+        id="modalProductoComprar"
+        class="modal-producto-comprar"
+        href="#"
+        target="_blank">
+        💬 Comprar por WhatsApp
+      </a>
+
+      <section class="modal-recomendaciones">
+  <div class="modal-recomendaciones-titulo">
+    <div>
+      <small>DESCUBRE MÁS</small>
+      <h3>También te puede interesar</h3>
+    </div>
+
+    <span>Desliza →</span>
+  </div>
+
+  <div
+    id="modalRecomendacionesLista"
+    class="modal-recomendaciones-lista">
+  </div>
+</section>
+
+    </div>
+
+  </div>
+
+</div>
+
 <a class="float-wa" target="_blank" href="https://wa.me/573147735950">💬</a>
 
+<div id="pechyToast" class="pechy-toast">
+
+  <div class="pechy-toast-icono">
+    🔔
+  </div>
+
+  <div class="pechy-toast-texto">
+
+    <strong>¡Perfecto!</strong>
+
+    <span>
+      El Pechy ya lo dejó guardado.<br>
+      Te lo recordaremos cuando vuelvas.
+    </span>
+
+  </div>
+
+</div>
+
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
+<script src="{{ url_for('static', filename='js/mobile-carousel.js') }}"></script>
 </body>
 </html>
