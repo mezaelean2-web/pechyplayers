@@ -59,8 +59,10 @@ function detenerCarruselPromociones() {
   }
 }
 
-if (promoTrack && promoSlides.length > 0) {
-  promoSiguiente?.addEventListener("click", () => {
+const esMovilPromociones = window.innerWidth <= 768;
+
+if (promoTrack && promoSlides.length > 0 && !esMovilPromociones) {
+    promoSiguiente?.addEventListener("click", () => {
     mostrarPromocion(promoActual + 1);
     iniciarCarruselPromociones();
   });
@@ -130,3 +132,99 @@ if (productosGridMovil) {
 
   setTimeout(actualizarCarruselMovil, 150);
 }
+/* ==========================================
+   CARRUSEL DE PROMOCIONES EN PC
+========================================== */
+
+document.addEventListener("DOMContentLoaded", function () {
+  if (window.innerWidth <= 768) return;
+
+  const track = document.getElementById("promoTrack");
+  const anterior = document.getElementById("promoPcAnterior");
+  const siguiente = document.getElementById("promoPcSiguiente");
+  const contador = document.getElementById("promocionActual");
+
+  if (!track || !anterior || !siguiente) return;
+
+  function obtenerTarjetas() {
+    return [...track.querySelectorAll(".promo-card")];
+  }
+
+  function obtenerIndiceActual() {
+    const tarjetas = obtenerTarjetas();
+
+    if (tarjetas.length === 0) return 0;
+
+    let indice = 0;
+    let distanciaMenor = Infinity;
+
+    tarjetas.forEach(function (tarjeta, posicion) {
+      const distancia =
+        Math.abs(tarjeta.offsetLeft - track.scrollLeft);
+
+      if (distancia < distanciaMenor) {
+        distanciaMenor = distancia;
+        indice = posicion;
+      }
+    });
+
+    return indice;
+  }
+
+  function moverPromocion(direccion) {
+    const tarjetas = obtenerTarjetas();
+
+    if (tarjetas.length === 0) return;
+
+    const actual = obtenerIndiceActual();
+
+    let nuevoIndice = actual + direccion;
+
+    if (nuevoIndice < 0) {
+      nuevoIndice = tarjetas.length - 1;
+    }
+
+    if (nuevoIndice >= tarjetas.length) {
+      nuevoIndice = 0;
+    }
+
+    track.scrollTo({
+      left: tarjetas[nuevoIndice].offsetLeft,
+      behavior: "smooth"
+    });
+  }
+
+  function actualizarEstado() {
+    const tarjetas = obtenerTarjetas();
+    const indice = obtenerIndiceActual();
+
+    if (contador) {
+      contador.textContent = indice + 1;
+    }
+
+    document
+      .querySelectorAll(".promocion-punto")
+      .forEach(function (punto, posicion) {
+        punto.classList.toggle(
+          "activo",
+          posicion === indice
+        );
+      });
+  }
+
+  anterior.addEventListener("click", function () {
+    moverPromocion(-1);
+  });
+
+  siguiente.addEventListener("click", function () {
+    moverPromocion(1);
+  });
+
+  track.addEventListener(
+    "scroll",
+    actualizarEstado,
+    { passive:true }
+  );
+
+  setTimeout(actualizarEstado, 150);
+});

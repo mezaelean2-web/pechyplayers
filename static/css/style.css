@@ -953,3 +953,198 @@ footer a {
     display:none;
   }
 }
+.promo-slide-footer{
+
+padding:16px;
+
+display:flex;
+
+justify-content:space-between;
+
+align-items:center;
+
+background:#0a1019;
+
+}
+
+.promo-slide-footer span{
+
+color:#fff;
+
+font-size:14px;
+
+font-weight:800;
+
+}
+
+.promo-slide-footer button{
+
+padding:10px 16px;
+
+border:none;
+
+border-radius:999px;
+
+background:#25d366;
+
+color:#04110a;
+
+font-weight:900;
+
+cursor:pointer;
+
+transition:.25s;
+
+}
+
+.promo-slide-footer button:hover{
+
+transform:scale(1.05);
+
+}
+/* ==========================================
+   PROMOCIONES EN COMPUTADOR
+========================================== */
+
+@media (min-width:769px){
+
+  /* Esto solo se necesita en celular */
+  #ayudaPromociones{
+    display:none !important;
+  }
+
+  .promociones-home{
+    width:100%;
+    max-width:1100px;
+    margin:0 auto;
+    padding:55px 24px;
+  }
+
+  .promociones-titulo{
+    margin-bottom:24px;
+  }
+
+  .promociones-titulo h2{
+    margin:6px 0 8px;
+    font-size:34px;
+  }
+
+  .promo-slider{
+    position:relative;
+    width:100%;
+    overflow:hidden;
+
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:24px;
+
+    background:#07101c;
+
+    box-shadow:
+      0 25px 60px rgba(0,0,0,.45);
+  }
+
+  .promo-track{
+    display:flex;
+    width:100%;
+
+    transition:
+      transform .55s cubic-bezier(.22,.61,.36,1);
+  }
+
+  .promo-slide{
+    flex:0 0 100%;
+    width:100%;
+
+    display:flex;
+    flex-direction:column;
+
+    color:white;
+    text-decoration:none;
+  }
+
+  .promo-slide img{
+    display:block;
+
+    width:100%;
+    height:520px;
+
+    object-fit:contain;
+    object-position:center;
+
+    background:#03060b;
+  }
+
+  .promo-card-info{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:20px;
+
+    padding:18px 22px;
+
+    border-top:1px solid rgba(255,255,255,.08);
+    background:#0a111d;
+  }
+
+  .promo-card-info strong{
+    color:white;
+    font-size:16px;
+    font-weight:900;
+  }
+
+  .promo-card-info span{
+    padding:11px 18px;
+
+    border-radius:999px;
+
+    background:#25d366;
+    color:#04110a;
+
+    font-size:14px;
+    font-weight:900;
+
+    box-shadow:
+      0 8px 22px rgba(37,211,102,.25);
+  }
+
+  .promociones-contador{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:8px;
+
+    margin-top:16px;
+
+    color:#9ca3af;
+    font-weight:900;
+  }
+
+  .promociones-contador strong{
+    color:white;
+  }
+
+  .promociones-puntos{
+    display:flex;
+    justify-content:center;
+    gap:8px;
+
+    margin-top:10px;
+  }
+
+  .promocion-punto{
+    width:8px;
+    height:8px;
+
+    border-radius:50%;
+
+    background:rgba(255,255,255,.25);
+  }
+
+  .promocion-punto.activo{
+    width:28px;
+    border-radius:999px;
+
+    background:#ff2d2d;
+    box-shadow:0 0 14px rgba(255,45,45,.55);
+  }
+}

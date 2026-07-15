@@ -4,253 +4,10 @@ document.addEventListener("DOMContentLoaded", function () {
   /* ==========================
      SPLASH
   ========================== */
-  const splash = document.getElementById("splashMobile");
 
-  if (splash && esMovil) {
-    setTimeout(function () {
-      splash.classList.add("oculto");
-    }, 1800);
-
-    setTimeout(function () {
-  splash.remove();
-  mostrarPantallaRecordatorios();
-}, 2500);
-  }
+  iniciarSplash();
 
   if (!esMovil) return;
-
-  const pantallaRecordatorios =
-  document.getElementById("recordatoriosScreen");
-
-const trackRecordatorios =
-  document.getElementById("recordatoriosTrack");
-
-  function mostrarPantallaRecordatorios() {
-  if (!pantallaRecordatorios || !trackRecordatorios) return;
-
-  const recordatorios = obtenerRecordatorios();
-
-  if (recordatorios.length === 0) {
-    pantallaRecordatorios.classList.remove("mostrar");
-    return;
-  }
-
-  trackRecordatorios.innerHTML = "";
-
-  pantallaRecordatorios
-  .querySelector(".recordatorios-contador")
-  ?.remove();
-
-pantallaRecordatorios
-  .querySelector(".recordatorios-puntos")
-  ?.remove();
-
-  recordatorios.forEach(function (item) {
-    const tarjeta = document.createElement("article");
-    tarjeta.className = "recordatorio-card";
-    tarjeta.style.setProperty(
-      "--recordatorio-color",
-      item.color || "#ff2d2d"
-    );
-
-    const planesHTML = item.planes
-      .map(function (plan) {
-        return `<div class="recordatorio-plan">${plan}</div>`;
-      })
-      .join("");
-
-    tarjeta.innerHTML = `
-      <img
-        src="${item.imagen}"
-        alt="${item.nombreVisible}"
-        class="recordatorio-imagen"
-      >
-
-      <div class="recordatorio-contenido">
-        <small>TE LO RECORDAMOS ❤️</small>
-
-        <h3>${item.nombreVisible}</h3>
-
-        <div class="recordatorio-planes">
-          ${planesHTML}
-        </div>
-
-        <a
-          href="${item.comprar}"
-          target="_blank"
-          class="recordatorio-comprar">
-          💬 Comprar ahora
-        </a>
-
-        <button
-          type="button"
-          class="recordatorio-explorar">
-          Explorar catálogo
-        </button>
-      </div>
-    `;
-
-    const botonComprar =
-      tarjeta.querySelector(".recordatorio-comprar");
-
-    const botonExplorar =
-      tarjeta.querySelector(".recordatorio-explorar");
-
-    function eliminarRecordatorioActual() {
-      const nuevos = obtenerRecordatorios().filter(function (guardado) {
-        return guardado.nombre !== item.nombre;
-      });
-
-      guardarRecordatorios(nuevos);
-      actualizarEstadoRecordatorios();
-    }
-
-    botonComprar?.addEventListener("click", function () {
-      eliminarRecordatorioActual();
-    });
-
-    botonExplorar?.addEventListener("click", function () {
-      eliminarRecordatorioActual();
-
-      pantallaRecordatorios.classList.remove("mostrar");
-
-      document.getElementById("catalogo")?.scrollIntoView({
-        behavior: "smooth"
-      });
-    });
-
-    trackRecordatorios.appendChild(tarjeta);
-  });
-
-  const contador = document.createElement("div");
-contador.className = "recordatorios-contador";
-contador.innerHTML = `
-  <strong id="recordatorioActual">1</strong>
-  <span>/</span>
-  <span>${recordatorios.length}</span>
-`;
-
-const puntos = document.createElement("div");
-puntos.className = "recordatorios-puntos";
-
-recordatorios.forEach(function (_, index) {
-  const punto = document.createElement("span");
-  punto.className =
-    "recordatorio-punto" + (index === 0 ? " activo" : "");
-  puntos.appendChild(punto);
-});
-
-pantallaRecordatorios
-  .querySelector(".recordatorios-slider")
-  ?.appendChild(contador);
-
-pantallaRecordatorios
-  .querySelector(".recordatorios-slider")
-  ?.appendChild(puntos);
-
-const tarjetasRecordatorio = [
-  ...trackRecordatorios.querySelectorAll(".recordatorio-card")
-];
-
-const puntosRecordatorio = [
-  ...puntos.querySelectorAll(".recordatorio-punto")
-];
-
-function actualizarCarruselRecordatorios() {
-  const centro =
-    trackRecordatorios.scrollLeft +
-    trackRecordatorios.clientWidth / 2;
-
-  let indiceActivo = 0;
-  let menorDistancia = Infinity;
-
-  tarjetasRecordatorio.forEach(function (tarjeta, index) {
-    const centroTarjeta =
-      tarjeta.offsetLeft + tarjeta.offsetWidth / 2;
-
-    const distancia = Math.abs(centro - centroTarjeta);
-
-    if (distancia < menorDistancia) {
-      menorDistancia = distancia;
-      indiceActivo = index;
-    }
-  });
-
-  tarjetasRecordatorio.forEach(function (tarjeta, index) {
-    tarjeta.classList.toggle(
-      "recordatorio-activo",
-      index === indiceActivo
-    );
-  });
-
-  puntosRecordatorio.forEach(function (punto, index) {
-    punto.classList.toggle(
-      "activo",
-      index === indiceActivo
-    );
-  });
-
-  const actual =
-    document.getElementById("recordatorioActual");
-
-  if (actual) {
-    actual.textContent = indiceActivo + 1;
-  }
-
-  const activa = tarjetasRecordatorio[indiceActivo];
-
-  if (activa) {
-    const color =
-      getComputedStyle(activa)
-        .getPropertyValue("--recordatorio-color")
-        .trim() || "#ff2d2d";
-
-    pantallaRecordatorios.style.setProperty(
-      "--recordatorio-fondo",
-      color
-    );
-  }
-}
-
-trackRecordatorios.addEventListener(
-  "scroll",
-  actualizarCarruselRecordatorios,
-  { passive:true }
-);
-
-setTimeout(
-  actualizarCarruselRecordatorios,
-  120
-);
-
-const ayuda = document.getElementById("ayudaRecordatorios");
-
-if (ayuda) {
-  ayuda.classList.remove("oculta");
-}
-
-  pantallaRecordatorios.classList.add("mostrar");
-}
-
-setTimeout(function () {
-
-  const ayuda = document.getElementById("ayudaRecordatorios");
-
-  if (!ayuda) return;
-
-  const track = document.getElementById("recordatoriosTrack");
-
-  function ocultar() {
-
-    ayuda.classList.add("oculta");
-
-    track.removeEventListener("scroll", ocultar);
-
-  }
-
-  track.addEventListener("scroll", ocultar, { passive:true });
-
-},200);
 
   /* ==========================
      MODAL DE PRODUCTO
@@ -265,42 +22,12 @@ setTimeout(function () {
   const modalTopNombre = document.getElementById("modalProductoTopNombre");
   const modalPlanes = document.getElementById("modalProductoPlanes");
   const modalComprar = document.getElementById("modalProductoComprar");
+  const modalCompartir = document.getElementById("modalProductoCompartir");
   const modalFavorito = document.getElementById("modalFavorito");
   const modalRecomendacionesLista =
   document.getElementById("modalRecomendacionesLista");
 
   let tarjetaActual = null;
-
-function obtenerRecordatorios() {
-  try {
-    return JSON.parse(
-      localStorage.getItem("pechyRecordatorios")
-    ) || [];
-  } catch {
-    return [];
-  }
-}
-
-function guardarRecordatorios(recordatorios) {
-  localStorage.setItem(
-    "pechyRecordatorios",
-    JSON.stringify(recordatorios)
-  );
-}
-
-function actualizarEstadoRecordatorios() {
-  const recordatorios = obtenerRecordatorios();
-
-  document.querySelectorAll(".producto-item").forEach(function (card) {
-    const nombre = card.dataset.nombre || "";
-
-    const guardado = recordatorios.some(function (item) {
-      return item.nombre === nombre;
-    });
-
-    card.classList.toggle("card-favorita", guardado);
-  });
-}
 
   if (!modal) return;
 
@@ -424,6 +151,17 @@ function actualizarEstadoRecordatorios() {
   });
 }
 
+if(typeof actualizarActividadModal==="function"){
+    actualizarActividadModal(nombre);
+}
+
+if (
+  typeof actualizarOfertaInteligente ===
+  "function"
+) {
+  actualizarOfertaInteligente(nombre);
+}
+
       modal.classList.add("abierto");
       document.body.classList.add("modal-abierto");
     }
@@ -438,6 +176,51 @@ function actualizarEstadoRecordatorios() {
 
   cerrar?.addEventListener("click", cerrarModal);
   fondo?.addEventListener("click", cerrarModal);
+
+  modalCompartir?.addEventListener("click", async function () {
+  if (!tarjetaActual) return;
+
+  const nombre =
+    tarjetaActual.querySelector(".cover-overlay h3")
+      ?.textContent.trim() || "Plataforma";
+
+  const enlace = window.location.href.split("#")[0];
+
+  const texto =
+    `Mira los planes de ${nombre} en PECHY PLAYERS: ${enlace}`;
+
+  try {
+    /* En HTTPS abre el menú nativo del teléfono */
+    if (navigator.share) {
+      await navigator.share({
+        title: `PECHY PLAYERS - ${nombre}`,
+        text: texto,
+        url: enlace
+      });
+
+      return;
+    }
+
+    /* Si permite copiar, copia el mensaje */
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(texto);
+
+      if (typeof mostrarToast === "function") {
+        mostrarToast("Enlace copiado para compartir.");
+      }
+
+      return;
+    }
+  } catch (error) {
+    console.log("Compartir nativo no disponible:", error);
+  }
+
+  /* Respaldo para pruebas locales: abre WhatsApp */
+  const enlaceWhatsApp =
+    `https://wa.me/?text=${encodeURIComponent(texto)}`;
+
+  window.open(enlaceWhatsApp, "_blank");
+});
 
   modalFavorito?.addEventListener("click", function () {
   if (!tarjetaActual) return;
@@ -488,20 +271,7 @@ function actualizarEstadoRecordatorios() {
     guardarRecordatorios(recordatorios);
   }
 
-  const toast =
-document.getElementById("pechyToast");
-
-if(toast){
-
-toast.classList.add("mostrar");
-
-setTimeout(function(){
-
-toast.classList.remove("mostrar");
-
-},2200);
-
-}
+mostrarToast("¡Perfecto! El Pechy ya lo dejó guardado.");
 
   modalFavorito.classList.add("activo");
 modalFavorito.textContent =
@@ -516,55 +286,86 @@ modalFavorito.classList.add("confirmado");
 
 actualizarEstadoRecordatorios();
 
-  /* ==========================
-     DESLIZAR MODAL HACIA ABAJO
-  ========================== */
-  if (contenido) {
-    let inicioY = 0;
-    let movimientoY = 0;
-    let arrastrando = false;
+/* ==========================
+   DESLIZAR MODAL HACIA ABAJO
+   Solo cierra estando arriba
+========================== */
 
-    contenido.addEventListener(
-      "touchstart",
-      function (e) {
-        if (!modal.classList.contains("abierto")) return;
+if (contenido) {
+  let inicioY = 0;
+  let movimientoY = 0;
+  let arrastrando = false;
+  let puedeCerrar = false;
 
-        inicioY = e.touches[0].clientY;
-        movimientoY = 0;
-        arrastrando = true;
+  contenido.addEventListener(
+    "touchstart",
+    function (e) {
+      if (!modal.classList.contains("abierto")) return;
 
+      inicioY = e.touches[0].clientY;
+      movimientoY = 0;
+
+      /*
+       Solo permite arrastrar el modal cuando
+       el contenido ya está completamente arriba.
+      */
+      puedeCerrar = contenido.scrollTop <= 2;
+      arrastrando = puedeCerrar;
+
+      if (puedeCerrar) {
         contenido.style.transition = "none";
-      },
-      { passive: true }
-    );
-
-    contenido.addEventListener(
-      "touchmove",
-      function (e) {
-        if (!arrastrando) return;
-
-        movimientoY = e.touches[0].clientY - inicioY;
-
-        if (movimientoY > 0) {
-          contenido.style.transform = `translateY(${movimientoY}px)`;
-        }
-      },
-      { passive: true }
-    );
-
-    contenido.addEventListener("touchend", function () {
-      if (!arrastrando) return;
-
-      arrastrando = false;
-
-      contenido.style.transition =
-        "transform .4s cubic-bezier(.22,.61,.36,1)";
-
-      if (movimientoY > 120) {
-        cerrarModal();
-      } else {
-        contenido.style.transform = "translateY(0)";
       }
-    });
-  }
+    },
+    { passive: true }
+  );
+
+  contenido.addEventListener(
+    "touchmove",
+    function (e) {
+      if (!arrastrando || !puedeCerrar) return;
+
+      movimientoY = e.touches[0].clientY - inicioY;
+
+      /*
+       Solo mueve el modal si el dedo baja.
+       Si el dedo sube, deja funcionar el scroll normal.
+      */
+      if (movimientoY > 0) {
+        contenido.style.transform =
+          `translateY(${movimientoY}px)`;
+      }
+    },
+    { passive: true }
+  );
+
+  contenido.addEventListener("touchend", function () {
+    if (!arrastrando || !puedeCerrar) return;
+
+    arrastrando = false;
+    puedeCerrar = false;
+
+    contenido.style.transition =
+      "transform .4s cubic-bezier(.22,.61,.36,1)";
+
+    if (movimientoY > 140) {
+      cerrarModal();
+    } else {
+      contenido.style.transform = "translateY(0)";
+    }
+
+    movimientoY = 0;
+  });
+
+    contenido.addEventListener("touchcancel", function () {
+    arrastrando = false;
+    puedeCerrar = false;
+    movimientoY = 0;
+
+    contenido.style.transform = "translateY(0)";
+    contenido.style.transition =
+      "transform .4s cubic-bezier(.22,.61,.36,1)";
+  });
+}
+
+/* Cierra DOMContentLoaded */
 });

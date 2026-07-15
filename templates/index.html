@@ -6,6 +6,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/recordatorios.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/pc-v2.css') }}">
 </head>
 <body>
 
@@ -25,10 +28,9 @@
 
     <h2>Guardaste estos productos para después</h2>
 
-    <div class="swipe-ayuda" id="ayudaRecordatorios">
-  <span>←</span>
-  Desliza para ver más
-  <span>→</span>
+<div id="flechaRecordatorios" class="flecha-deslizar">
+  <span>Desliza</span>
+  <strong>→</strong>
 </div>
 
     <div id="recordatoriosTrack"></div>
@@ -47,21 +49,21 @@
   <div class="mobile-featured-overlay"></div>
 
   <div class="mobile-featured-content">
-    <span class="mobile-featured-tag">🔥 OFERTA DESTACADA</span>
 
-    <h2>Entretenimiento premium</h2>
-
-    <p>
-      Toca la promoción y recibe toda la información directamente por WhatsApp.
-    </p>
+    <span class="mobile-featured-tag">
+        🔥 OFERTA DESTACADA
+    </span>
 
     <a
-      href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20la%20promoción%20destacada"
-      target="_blank"
-      class="mobile-featured-btn">
-      💬 Ver promoción
+        href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20la%20promoción%20destacada"
+        target="_blank"
+        class="mobile-featured-btn">
+
+        💬 Ver promoción
+
     </a>
-  </div>
+
+</div>
 
 </section>
 {% endif %}
@@ -80,75 +82,222 @@
   </div>
 </nav>
 
-<header class="hero">
-  <div class="hero-overlay"></div>
+<section class="hero-pc-v2">
 
-  <div class="hero-content">
-    <h1>PECHY<br><span>PLAYERS</span></h1>
-    <p>Tu entretenimiento premium comienza aquí</p>
-    <a href="#catalogo" class="main-btn">Explorar catálogo →</a>
+  <div class="hero-pc-fondo"></div>
+  <div class="hero-pc-overlay"></div>
+
+  <div class="hero-pc-contenido">
+
+    <div class="hero-pc-texto">
+
+      <span class="hero-pc-badge">
+        🛡️ COMPRA SEGURA Y PROTEGIDA
+      </span>
+
+      <h1>
+        EL MEJOR
+        <span>ENTRETENIMIENTO</span>
+        EN TUS MANOS
+      </h1>
+
+      <p>
+        Plataformas premium al mejor precio, entrega inmediata,
+        cuentas seguras y soporte rápido.
+      </p>
+
+      <div class="hero-pc-botones">
+
+        <a href="#catalogo" class="hero-pc-catalogo">
+          Explorar catálogo →
+        </a>
+
+        <a
+          href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20las%20plataformas"
+          target="_blank"
+          class="hero-pc-whatsapp">
+          💬 Comprar por WhatsApp
+        </a>
+
+      </div>
+
+    </div>
+
+    <div class="hero-pc-plataformas">
+
+      <div class="hero-pc-glow"></div>
+
+      <div class="hero-pc-logo hero-netflix" data-color="#e50914">
+        <img
+          src="{{ url_for('static', filename='img/platforms/netflix.jpg') }}"
+          alt="Netflix">
+        <strong>NETFLIX</strong>
+        <span>Series y películas</span>
+      </div>
+
+      <div class="hero-pc-logo hero-disney" data-color="#1464f4">
+        <img
+          src="{{ url_for('static', filename='img/platforms/disney.jpg') }}"
+          alt="Disney Premium">
+        <strong>DISNEY+</strong>
+        <span>Entretenimiento familiar</span>
+      </div>
+
+      <div class="hero-pc-logo hero-max" data-color="#7c3aed">
+        <img
+          src="{{ url_for('static', filename='img/platforms/max.jpg') }}"
+          alt="Max Premium">
+        <strong>MAX</strong>
+        <span>Estrenos premium</span>
+      </div>
+
+      <div class="hero-pc-logo hero-prime" data-color="#00a8e1">
+        <img
+          src="{{ url_for('static', filename='img/platforms/prime.jpg') }}"
+          alt="Prime Video">
+        <strong>PRIME VIDEO</strong>
+        <span>Contenido exclusivo</span>
+      </div>
+
+    </div>
+
   </div>
-</header>
+
+  <div class="hero-pc-beneficios">
+
+  <div class="hero-beneficio-item">
+    <span>⚡</span>
+    <div>
+      <strong>ENTREGA INMEDIATA</strong>
+      <small>Al instante por WhatsApp</small>
+    </div>
+  </div>
+
+  <div class="hero-beneficio-item">
+    <span>🛡️</span>
+    <div>
+      <strong>CUENTAS SEGURAS</strong>
+      <small>Privadas y estables</small>
+    </div>
+  </div>
+
+  <div class="hero-beneficio-item">
+    <span>🎧</span>
+    <div>
+      <strong>SOPORTE 24/7</strong>
+      <small>Siempre estamos contigo</small>
+    </div>
+  </div>
+
+  <div class="hero-beneficio-item">
+    <span>🔥</span>
+    <div>
+      <strong>PRECIOS BAJOS</strong>
+      <small>Los mejores del mercado</small>
+    </div>
+  </div>
+
+</div>
+
+</section>    
 
 {% if promociones %}
+<section class="promo-destacada-pc">
+
+  <div class="promo-destacada-pc-imagen">
+    <img
+      src="{{ url_for('static', filename='img/promociones/' + promociones[0][1]) }}"
+      alt="Promoción destacada">
+  </div>
+
+  <div class="promo-destacada-pc-info">
+
+    <small>🔥 PROMOCIÓN DESTACADA</small>
+
+    <h2>La mejor oferta del momento</h2>
+
+    <p>
+      Aprovecha esta promoción especial y recibe toda la información directamente por WhatsApp.
+    </p>
+
+    <a
+      href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20la%20promoción%20destacada"
+      target="_blank">
+      💬 Ver promoción completa
+    </a>
+
+  </div>
+
+</section>
+{% endif %}
+
+{% if promociones|length > 1 %}
 <section class="promociones-home">
 
   <div class="promociones-titulo">
-    <small>OFERTAS ESPECIALES</small>
-    <h2>🔥 Promociones destacadas</h2>
-    <p>Desliza o espera unos segundos para ver todas las ofertas.</p>
+    <small>MÁS OFERTAS</small>
+    <h2>🔥 Más ofertas para ti</h2>
+    <p>Desliza hacia los lados para descubrir todas las promociones.</p>
+  </div>
+
+  <div class="swipe-ayuda" id="ayudaPromociones">
+    <span>←</span>
+    Desliza para ver más
+    <span>→</span>
   </div>
 
   <div class="promo-slider" id="promoSlider">
 
+    <button
+  id="promoPcAnterior"
+  class="promo-pc-flecha promo-pc-anterior"
+  type="button"
+  aria-label="Promoción anterior">
+  ‹
+</button>
+
+<button
+  id="promoPcSiguiente"
+  class="promo-pc-flecha promo-pc-siguiente"
+  type="button"
+  aria-label="Promoción siguiente">
+  ›
+</button>
+
     <div class="promo-track" id="promoTrack">
 
-      {% for promo in promociones %}
+      {% for promo in promociones[1:] %}
       <a
-        class="promo-slide"
-        href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20información%20sobre%20esta%20promoción"
+        class="promo-slide promo-card"
+        href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20esta%20promoción"
         target="_blank"
       >
         <img
           src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
-          alt="Promoción de Pechy Players"
+          alt="Promoción especial"
         >
+
+        <div class="promo-card-info">
+          <strong>🔥 Promoción especial</strong>
+          <span>💬 Ver promoción</span>
+        </div>
       </a>
       {% endfor %}
 
     </div>
 
-    {% if promociones|length > 1 %}
-    <button
-      class="promo-flecha promo-anterior"
-      id="promoAnterior"
-      type="button"
-      aria-label="Promoción anterior"
-    >
-      ‹
-    </button>
+  </div>
 
-    <button
-      class="promo-flecha promo-siguiente"
-      id="promoSiguiente"
-      type="button"
-      aria-label="Promoción siguiente"
-    >
-      ›
-    </button>
+  <div class="promociones-contador">
+    <strong id="promocionActual">1</strong>
+    <span>/</span>
+    <span>{{ promociones|length - 1 }}</span>
+  </div>
 
-    <div class="promo-puntos" id="promoPuntos">
-      {% for promo in promociones %}
-      <button
-        type="button"
-        class="promo-punto {% if loop.first %}activo{% endif %}"
-        data-posicion="{{ loop.index0 }}"
-        aria-label="Ver promoción {{ loop.index }}"
-      ></button>
-      {% endfor %}
-    </div>
-    {% endif %}
-
+  <div class="promociones-puntos" id="promocionesPuntos">
+    {% for promo in promociones[1:] %}
+      <span class="promocion-punto {% if loop.first %}activo{% endif %}"></span>
+    {% endfor %}
   </div>
 
 </section>
@@ -327,11 +476,42 @@
 
       <div id="modalProductoPlanes"></div>
 
+      <div id="modalActividad" class="modal-actividad">
+    👀 18 personas interesadas hoy
+</div>
+
       <div class="modal-beneficios">
   <div>⚡ Entrega inmediata</div>
   <div>🛡️ Cuenta segura y estable</div>
   <div>🎧 Soporte rápido</div>
 </div>
+
+<section class="modal-incluye">
+  <small>TODO LISTO PARA TI</small>
+  <h3>¿Qué recibirás?</h3>
+
+  <div class="modal-incluye-lista">
+    <div>✓ Acceso inmediato</div>
+    <div>✓ Instrucciones paso a paso</div>
+    <div>✓ Soporte por WhatsApp</div>
+    <div>✓ Garantía durante tu servicio</div>
+  </div>
+</section>
+
+<section class="modal-seguridad">
+  <div class="modal-seguridad-titulo">
+    <span>🛡️ Compra segura</span>
+    <strong>Protegida</strong>
+  </div>
+
+  <div class="modal-seguridad-barra">
+    <div class="modal-seguridad-progreso"></div>
+  </div>
+
+  <p>
+    Atención directa por WhatsApp, soporte y garantía durante tu servicio.
+  </p>
+</section>
 
       <a
         id="modalProductoComprar"
@@ -340,6 +520,30 @@
         target="_blank">
         💬 Comprar por WhatsApp
       </a>
+
+      <button
+  id="modalProductoCompartir"
+  class="modal-producto-compartir"
+  type="button">
+  📤 Compartir plataforma
+</button>
+
+      <section id="modalOfertaInteligente" class="modal-oferta-inteligente">
+  <small>💡 RECOMENDACIÓN DEL PECHY</small>
+
+  <h3 id="ofertaInteligenteTitulo">
+    Completa tu entretenimiento
+  </h3>
+
+  <p id="ofertaInteligenteTexto"></p>
+
+  <button
+    id="ofertaInteligenteBoton"
+    class="oferta-inteligente-boton"
+    type="button">
+    Ver recomendación →
+  </button>
+</section>
 
       <section class="modal-recomendaciones">
   <div class="modal-recomendaciones-titulo">
@@ -385,7 +589,12 @@
 </div>
 
 <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+<script src="{{ url_for('static', filename='js/recordatorios.js') }}"></script>
+<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/splash.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
 <script src="{{ url_for('static', filename='js/mobile-carousel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pc-v2.js') }}"></script>
 </body>
 </html>

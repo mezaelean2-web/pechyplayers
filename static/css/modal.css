@@ -1,0 +1,878 @@
+/* ==========================================
+   PECHY PLAYERS — MODAL MÓVIL
+========================================== */
+
+@media (max-width:768px){
+
+  #productosGrid .cover{
+    cursor:pointer;
+  }
+
+  .producto-modal{
+    --modal-color:#ff2d2d;
+
+    position:fixed;
+    inset:0;
+    z-index:99990;
+
+    display:flex;
+    align-items:flex-end;
+
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+
+    transition:
+      opacity .3s ease,
+      visibility .3s ease;
+  }
+
+  .producto-modal.abierto{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+  }
+
+  .producto-modal-fondo{
+    position:absolute;
+    inset:0;
+
+    background:rgba(0,0,0,.82);
+    backdrop-filter:blur(8px);
+  }
+
+  .producto-modal-contenido{
+    position:relative;
+    z-index:2;
+
+    width:100%;
+    max-height:92dvh;
+    overflow-y:auto;
+
+    border-radius:28px 28px 0 0;
+    border-top:2px solid var(--modal-color);
+
+    background:
+      radial-gradient(
+        circle at 50% 15%,
+        color-mix(in srgb, var(--modal-color) 28%, transparent),
+        transparent 38%
+      ),
+      linear-gradient(180deg,#101827,#03060b);
+
+    transform:translateY(105%);
+    transition:transform .4s cubic-bezier(.22,.61,.36,1);
+
+    box-shadow:0 -25px 70px rgba(0,0,0,.75);
+  }
+
+  .producto-modal-contenido::before{
+    content:"";
+    display:block;
+
+    width:52px;
+    height:5px;
+
+    margin:10px auto 4px;
+
+    border-radius:999px;
+    background:rgba(255,255,255,.28);
+  }
+
+  .producto-modal.abierto .producto-modal-contenido{
+    transform:translateY(0);
+  }
+
+  .cerrar-producto-modal{
+    position:absolute;
+    top:15px;
+    right:15px;
+    z-index:7;
+
+    width:42px;
+    height:42px;
+
+    border:1px solid
+      color-mix(
+        in srgb,
+        var(--modal-color) 55%,
+        transparent
+      );
+
+    border-radius:50%;
+
+    background:rgba(0,0,0,.70);
+    color:white;
+
+    font-size:18px;
+    cursor:pointer;
+  }
+
+  .modal-topbar{
+    position:absolute;
+    top:14px;
+    left:16px;
+    right:68px;
+    z-index:6;
+
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+
+    padding:11px 13px;
+
+    border-radius:15px;
+
+    background:rgba(3,6,11,.72);
+    border:1px solid rgba(255,255,255,.12);
+
+    backdrop-filter:blur(12px);
+  }
+
+  .modal-topbar > div{
+    min-width:0;
+  }
+
+  .modal-topbar small{
+    display:block;
+
+    color:var(--modal-color);
+
+    font-size:9px;
+    font-weight:900;
+    letter-spacing:1.3px;
+  }
+
+  .modal-topbar strong{
+    display:block;
+
+    margin-top:3px;
+
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+
+    color:white;
+
+    font-size:14px;
+    text-transform:uppercase;
+  }
+
+  .modal-topbar > span{
+    flex-shrink:0;
+
+    color:#6ee7b7;
+
+    font-size:10px;
+    font-weight:900;
+  }
+
+  .modal-producto-imagen{
+    display:block;
+
+    width:100%;
+    height:360px;
+
+    object-fit:cover;
+    object-position:center;
+
+    border-radius:28px 28px 0 0;
+  }
+
+  .modal-producto-info{
+    position:relative;
+
+    padding:24px 20px 32px;
+
+    background:
+      linear-gradient(
+        to bottom,
+        rgba(3,6,11,.45),
+        #03060b 30%
+      );
+  }
+
+  .modal-producto-etiqueta{
+    color:var(--modal-color);
+
+    font-size:11px;
+    font-weight:900;
+    letter-spacing:1.5px;
+  }
+
+  .modal-producto-info h2{
+    margin:8px 0 20px;
+
+    font-size:34px;
+    line-height:1;
+    text-transform:uppercase;
+
+    text-shadow:
+      0 0 22px
+      color-mix(
+        in srgb,
+        var(--modal-color) 55%,
+        transparent
+      );
+  }
+
+  .modal-plan{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+
+    padding:15px 0;
+
+    border-bottom:1px solid rgba(255,255,255,.09);
+  }
+
+  .modal-plan span{
+    color:#e5e7eb;
+  }
+
+  .modal-plan strong{
+    color:#ffd700;
+    font-size:19px;
+  }
+
+  .modal-beneficios{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:10px;
+
+    margin-top:20px;
+  }
+
+  .modal-beneficios div{
+    padding:13px 14px;
+
+    border-radius:13px;
+
+    background:rgba(255,255,255,.05);
+    border:1px solid rgba(255,255,255,.08);
+
+    color:#e5e7eb;
+
+    font-size:14px;
+    font-weight:800;
+  }
+
+  .producto-modal.abierto .modal-beneficios div{
+    animation:beneficioEntrada .4s ease both;
+  }
+
+  .producto-modal.abierto .modal-beneficios div:nth-child(2){
+    animation-delay:.08s;
+  }
+
+  .producto-modal.abierto .modal-beneficios div:nth-child(3){
+    animation-delay:.16s;
+  }
+
+  @keyframes beneficioEntrada{
+    from{
+      opacity:0;
+      transform:translateY(12px);
+    }
+
+    to{
+      opacity:1;
+      transform:translateY(0);
+    }
+  }
+
+  .modal-producto-comprar{
+    display:block;
+
+    margin-top:24px;
+    padding:17px;
+
+    border-radius:15px;
+
+    background:
+      linear-gradient(
+        135deg,
+        var(--modal-color),
+        color-mix(
+          in srgb,
+          var(--modal-color) 72%,
+          white
+        )
+      );
+
+    color:white;
+
+    text-align:center;
+    text-decoration:none;
+    font-weight:900;
+    font-size:17px;
+
+    box-shadow:
+      0 0 28px
+      color-mix(
+        in srgb,
+        var(--modal-color) 48%,
+        transparent
+      );
+  }
+
+  .modal-recomendaciones{
+    margin-top:30px;
+    padding-top:24px;
+
+    border-top:1px solid rgba(255,255,255,.09);
+  }
+
+  .modal-recomendaciones-titulo{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    gap:15px;
+
+    margin-bottom:15px;
+  }
+
+  .modal-recomendaciones-titulo small{
+    display:block;
+
+    margin-bottom:4px;
+
+    color:var(--modal-color);
+
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:1.4px;
+  }
+
+  .modal-recomendaciones-titulo h3{
+    margin:0;
+
+    color:white;
+    font-size:20px;
+  }
+
+  .modal-recomendaciones-titulo > span{
+    flex-shrink:0;
+
+    color:#9ca3af;
+
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .modal-recomendaciones-lista{
+    display:flex;
+    gap:12px;
+
+    overflow-x:auto;
+
+    padding:3px 2px 12px;
+
+    scroll-snap-type:x mandatory;
+    scrollbar-width:none;
+  }
+
+  .modal-recomendaciones-lista::-webkit-scrollbar{
+    display:none;
+  }
+
+  .modal-recomendacion{
+    flex:0 0 145px;
+
+    padding:0;
+    overflow:hidden;
+
+    scroll-snap-align:start;
+
+    border:1px solid rgba(255,255,255,.11);
+    border-radius:17px;
+
+    background:#0a111d;
+    color:white;
+
+    text-align:left;
+    cursor:pointer;
+
+    transition:
+      transform .2s ease,
+      border-color .2s ease;
+  }
+
+  .modal-recomendacion:active{
+    transform:scale(.96);
+    border-color:var(--modal-color);
+  }
+
+  .modal-recomendacion img{
+    display:block;
+
+    width:100%;
+    height:112px;
+
+    object-fit:cover;
+  }
+
+  .modal-recomendacion-info{
+    padding:11px;
+  }
+
+  .modal-recomendacion-info strong{
+    display:block;
+
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+
+    color:white;
+
+    font-size:13px;
+    text-transform:uppercase;
+  }
+
+  .modal-recomendacion-info span{
+    display:block;
+
+    margin-top:5px;
+
+    color:var(--modal-color);
+
+    font-size:11px;
+    font-weight:900;
+  }
+
+  .modal-favorito{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+
+    margin:0 0 18px;
+    padding:10px 14px;
+
+    border:1px solid rgba(255,255,255,.15);
+    border-radius:999px;
+
+    background:rgba(255,255,255,.06);
+    color:white;
+
+    font-size:13px;
+    font-weight:900;
+    cursor:pointer;
+
+    transition:
+      transform .2s ease,
+      background .2s ease,
+      border-color .2s ease;
+  }
+
+  .modal-favorito:active{
+    transform:scale(.96);
+  }
+
+  .modal-favorito.activo{
+    background:
+      color-mix(
+        in srgb,
+        var(--modal-color) 22%,
+        rgba(255,255,255,.05)
+      );
+
+    border-color:var(--modal-color);
+    color:var(--modal-color);
+  }
+
+  .modal-favorito.confirmado{
+    animation:recordatorioConfirmado .55s ease;
+  }
+
+  @keyframes recordatorioConfirmado{
+    0%{
+      transform:scale(1);
+    }
+
+    35%{
+      transform:scale(.94);
+    }
+
+    70%{
+      transform:scale(1.06);
+    }
+
+    100%{
+      transform:scale(1);
+    }
+  }
+
+  body.modal-abierto{
+    overflow:hidden;
+  }
+}
+
+@media (min-width:769px){
+  .producto-modal{
+    display:none !important;
+  }
+}
+.modal-actividad{
+
+display:inline-flex;
+align-items:center;
+gap:8px;
+
+margin:0 0 18px;
+
+padding:10px 14px;
+
+border-radius:999px;
+
+background:rgba(255,255,255,.06);
+
+border:1px solid rgba(255,255,255,.10);
+
+font-size:13px;
+font-weight:800;
+
+color:#fff;
+
+backdrop-filter:blur(10px);
+
+animation:actividadEntrada .45s ease;
+
+}
+
+@keyframes actividadEntrada{
+
+from{
+
+opacity:0;
+transform:translateY(10px);
+
+}
+
+to{
+
+opacity:1;
+transform:translateY(0);
+
+}
+
+}
+@media (max-width:768px){
+
+  .modal-incluye{
+    margin-top:24px;
+    padding:18px;
+
+    border-radius:18px;
+    border:1px solid rgba(255,255,255,.10);
+
+    background:
+      linear-gradient(
+        145deg,
+        color-mix(
+          in srgb,
+          var(--modal-color) 12%,
+          rgba(255,255,255,.04)
+        ),
+        rgba(255,255,255,.025)
+      );
+  }
+
+  .modal-incluye small{
+    display:block;
+
+    color:var(--modal-color);
+
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:1.4px;
+  }
+
+  .modal-incluye h3{
+    margin:7px 0 15px;
+
+    color:white;
+
+    font-size:21px;
+    line-height:1.1;
+  }
+
+  .modal-incluye-lista{
+    display:grid;
+    gap:10px;
+  }
+
+  .modal-incluye-lista div{
+    padding:11px 12px;
+
+    border-radius:12px;
+
+    background:rgba(3,6,11,.42);
+    border:1px solid rgba(255,255,255,.07);
+
+    color:#e5e7eb;
+
+    font-size:14px;
+    font-weight:800;
+  }
+
+  .modal-incluye-lista div::first-letter{
+    color:var(--modal-color);
+  }
+
+  .producto-modal.abierto .modal-incluye{
+    animation:incluyeEntrada .45s ease both;
+  }
+
+  @keyframes incluyeEntrada{
+    from{
+      opacity:0;
+      transform:translateY(12px);
+    }
+
+    to{
+      opacity:1;
+      transform:translateY(0);
+    }
+  }
+}
+@media (max-width:768px){
+
+  .modal-seguridad{
+    margin-top:22px;
+    padding:16px;
+
+    border-radius:17px;
+    border:1px solid rgba(255,255,255,.10);
+
+    background:rgba(255,255,255,.045);
+  }
+
+  .modal-seguridad-titulo{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+  }
+
+  .modal-seguridad-titulo span{
+    color:white;
+    font-size:14px;
+    font-weight:900;
+  }
+
+  .modal-seguridad-titulo strong{
+    color:var(--modal-color);
+    font-size:12px;
+    font-weight:900;
+  }
+
+  .modal-seguridad-barra{
+    width:100%;
+    height:7px;
+
+    margin-top:13px;
+    overflow:hidden;
+
+    border-radius:999px;
+    background:rgba(255,255,255,.10);
+  }
+
+  .modal-seguridad-progreso{
+    width:100%;
+    height:100%;
+
+    border-radius:999px;
+
+    background:
+      linear-gradient(
+        90deg,
+        var(--modal-color),
+        color-mix(
+          in srgb,
+          var(--modal-color) 60%,
+          white
+        )
+      );
+
+    transform:scaleX(0);
+    transform-origin:left;
+
+    box-shadow:
+      0 0 16px
+      color-mix(
+        in srgb,
+        var(--modal-color) 55%,
+        transparent
+      );
+  }
+
+  .producto-modal.abierto .modal-seguridad-progreso{
+    animation:seguridadCarga .9s .15s ease forwards;
+  }
+
+  .modal-seguridad p{
+    margin:12px 0 0;
+
+    color:#cbd5e1;
+    font-size:12px;
+    line-height:1.45;
+  }
+
+  @keyframes seguridadCarga{
+    from{
+      transform:scaleX(0);
+    }
+
+    to{
+      transform:scaleX(1);
+    }
+  }
+}
+@media (max-width:768px){
+
+  .modal-oferta-inteligente{
+    margin-top:24px;
+    padding:18px;
+
+    border-radius:18px;
+    border:1px solid
+      color-mix(
+        in srgb,
+        var(--modal-color) 35%,
+        rgba(255,255,255,.10)
+      );
+
+    background:
+      radial-gradient(
+        circle at top right,
+        color-mix(
+          in srgb,
+          var(--modal-color) 18%,
+          transparent
+        ),
+        transparent 48%
+      ),
+      rgba(255,255,255,.045);
+  }
+
+  .modal-oferta-inteligente small{
+    display:block;
+
+    color:var(--modal-color);
+
+    font-size:10px;
+    font-weight:900;
+    letter-spacing:1.4px;
+  }
+
+  .modal-oferta-inteligente h3{
+    margin:8px 0 9px;
+
+    color:white;
+
+    font-size:21px;
+    line-height:1.1;
+  }
+
+  .modal-oferta-inteligente p{
+    margin:0 0 16px;
+
+    color:#cbd5e1;
+
+    font-size:13px;
+    line-height:1.45;
+  }
+
+  .oferta-inteligente-boton{
+    width:100%;
+
+    padding:13px 15px;
+
+    border:none;
+    border-radius:13px;
+
+    background:
+      linear-gradient(
+        135deg,
+        var(--modal-color),
+        color-mix(
+          in srgb,
+          var(--modal-color) 68%,
+          white
+        )
+      );
+
+    color:white;
+
+    font-size:14px;
+    font-weight:900;
+
+    cursor:pointer;
+
+    box-shadow:
+      0 0 22px
+      color-mix(
+        in srgb,
+        var(--modal-color) 38%,
+        transparent
+      );
+  }
+
+  .oferta-inteligente-boton:active{
+    transform:scale(.97);
+  }
+
+  .producto-modal.abierto .modal-oferta-inteligente{
+    animation:ofertaInteligenteEntrada .45s ease both;
+  }
+
+  @keyframes ofertaInteligenteEntrada{
+    from{
+      opacity:0;
+      transform:translateY(12px);
+    }
+
+    to{
+      opacity:1;
+      transform:translateY(0);
+    }
+  }
+}
+@media (max-width:768px){
+
+  .modal-producto-compartir{
+    display:block;
+    width:100%;
+
+    margin-top:10px;
+    padding:15px;
+
+    border-radius:15px;
+    border:1px solid rgba(255,255,255,.13);
+
+    background:rgba(255,255,255,.06);
+    color:white;
+
+    font-size:15px;
+    font-weight:900;
+
+    cursor:pointer;
+    transition:
+      transform .2s ease,
+      border-color .2s ease,
+      background .2s ease;
+  }
+
+  .modal-producto-compartir:active{
+    transform:scale(.97);
+    border-color:var(--modal-color);
+
+    background:
+      color-mix(
+        in srgb,
+        var(--modal-color) 16%,
+        rgba(255,255,255,.05)
+      );
+  }
+}

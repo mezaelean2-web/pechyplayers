@@ -290,4 +290,59 @@ ocultarAyudaAlMover(
   document.getElementById("recordatoriosTrack"),
   ayudaRecordatorios
 );
+
+const promoTrackMovil =
+  document.getElementById("promoTrack");
+
+if (promoTrackMovil) {
+  const promociones = [
+    ...promoTrackMovil.querySelectorAll(".promo-card")
+  ];
+
+  function actualizarPromocionesMovil() {
+    if (promociones.length === 0) return;
+
+    const rectTrack =
+      promoTrackMovil.getBoundingClientRect();
+
+    const centroTrack =
+      rectTrack.left + rectTrack.width / 2;
+
+    let indiceActivo = 0;
+    let menorDistancia = Infinity;
+
+    promociones.forEach(function (promo, index) {
+      const rectPromo = promo.getBoundingClientRect();
+
+      const centroPromo =
+        rectPromo.left + rectPromo.width / 2;
+
+      const distancia =
+        Math.abs(centroTrack - centroPromo);
+
+      if (distancia < menorDistancia) {
+        menorDistancia = distancia;
+        indiceActivo = index;
+      }
+    });
+
+    promociones.forEach(function (promo, index) {
+      promo.classList.toggle(
+        "promo-activa",
+        index === indiceActivo
+      );
+    });
+  }
+
+  promoTrackMovil.addEventListener(
+    "scroll",
+    actualizarPromocionesMovil,
+    { passive:true }
+  );
+
+  setTimeout(
+    actualizarPromocionesMovil,
+    150
+  );
+}
 });
