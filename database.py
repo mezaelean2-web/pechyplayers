@@ -2827,7 +2827,8 @@ def actualizar_perfil_nube(
     cursor.execute(
         """
         SELECT
-            c.estado AS estado_cuenta
+            c.estado AS estado_cuenta,
+            p.estado AS estado_perfil
 
         FROM nube_perfiles AS p
 
@@ -2850,6 +2851,22 @@ def actualizar_perfil_nube(
         if fila_cuenta
         else ""
     ) or ""
+
+
+    estado_perfil = (
+        fila_cuenta["estado_perfil"]
+        if fila_cuenta
+        else ""
+    ) or ""
+
+
+    if estado_perfil in {
+        "reemplazada",
+        "papelera"
+    }:
+
+        conn.close()
+        return False
 
 
 
@@ -3047,7 +3064,12 @@ def renovar_perfil_nube(
     # No renovamos perfiles libres
     if (
         not perfil["nombre_cliente"] or
-        perfil["estado"] == "disponible"
+        perfil["estado"] in {
+            "disponible",
+            "caida",
+            "reemplazada",
+            "papelera"
+        }
     ):
 
         conn.close()
@@ -3513,6 +3535,11 @@ def reemplazar_perfil_nube(
     ).strip()
 
 
+    # Bloquea escritores concurrentes durante toda la
+    # validacion y transferencia del reemplazo.
+    conn.execute("BEGIN IMMEDIATE")
+
+
     # ==========================================
     # BUSCAR PERFIL ANTERIOR
     # ==========================================
@@ -3520,22 +3547,26 @@ def reemplazar_perfil_nube(
     cursor.execute(
         """
         SELECT
-            id,
-            cuenta_id,
-            nombre_perfil,
-            pin,
-            nombre_cliente,
-            telefono,
-            fecha_entrega,
-            dias_cuenta,
-            fecha_vencimiento,
-            estado,
-            cantidad_garantias,
-            notas
+            p.id,
+            p.cuenta_id,
+            p.nombre_perfil,
+            p.pin,
+            p.nombre_cliente,
+            p.telefono,
+            p.fecha_entrega,
+            p.dias_cuenta,
+            p.fecha_vencimiento,
+            p.estado,
+            p.cantidad_garantias,
+            p.notas,
+            c.plataforma
 
-        FROM nube_perfiles
+        FROM nube_perfiles AS p
 
-        WHERE id = ?
+        INNER JOIN nube_cuentas AS c
+            ON c.id = p.cuenta_id
+
+        WHERE p.id = ?
         """,
         (
             perfil_anterior_id,
@@ -3593,15 +3624,21 @@ def reemplazar_perfil_nube(
     cursor.execute(
         """
         SELECT
-            id,
-            cuenta_id,
-            nombre_perfil,
-            pin,
-            estado
+            p.id,
+            p.cuenta_id,
+            p.nombre_perfil,
+            p.pin,
+            p.estado,
+            c.plataforma,
+            c.estado AS estado_cuenta,
+            c.modalidad
 
-        FROM nube_perfiles
+        FROM nube_perfiles AS p
 
-        WHERE id = ?
+        INNER JOIN nube_cuentas AS c
+            ON c.id = p.cuenta_id
+
+        WHERE p.id = ?
         """,
         (
             perfil_nuevo_id,
@@ -3636,6 +3673,34 @@ def reemplazar_perfil_nube(
             "ok": False,
             "mensaje":
                 "El perfil de reemplazo ya está ocupado o no está disponible."
+        }
+
+
+    if (
+        perfil_nuevo["cuenta_id"] ==
+        perfil_anterior["cuenta_id"] or
+        (
+            perfil_nuevo["plataforma"] or ""
+        ).strip().lower() !=
+        (
+            perfil_anterior["plataforma"] or ""
+        ).strip().lower() or
+        perfil_nuevo["modalidad"] !=
+        "perfiles" or
+        perfil_nuevo["estado_cuenta"] in {
+            "caida",
+            "reemplazada",
+            "papelera",
+            "garantia"
+        }
+    ):
+
+        conn.close()
+
+        return {
+            "ok": False,
+            "mensaje":
+                "La cuenta destino ya no es elegible para el reemplazo."
         }
 
 
@@ -3685,13 +3750,12 @@ def reemplazar_perfil_nube(
     )
 
 
+    # La garantia conserva literalmente el vencimiento
+    # original; no se recalcula para acomodarlo al destino.
     nueva_fecha_vencimiento = (
-        hoy +
-        timedelta(
-            days=dias_restantes
-        )
-    ).strftime(
-        "%Y-%m-%d"
+        perfil_anterior[
+            "fecha_vencimiento"
+        ] or ""
     )
 
 
@@ -3715,7 +3779,9 @@ def reemplazar_perfil_nube(
                 COALESCE(cantidad_garantias, 0) + 1,
             fecha_actualizacion = CURRENT_TIMESTAMP
 
-        WHERE id = ?
+        WHERE
+            id = ?
+            AND estado = 'disponible'
         """,
         (
             perfil_anterior[
@@ -3735,6 +3801,18 @@ def reemplazar_perfil_nube(
             perfil_nuevo_id
         )
     )
+
+
+    if cursor.rowcount != 1:
+
+        conn.rollback()
+        conn.close()
+
+        return {
+            "ok": False,
+            "mensaje":
+                "El perfil destino acaba de dejar de estar disponible."
+        }
 
 
     # ==========================================
@@ -3919,6 +3997,36 @@ def reemplazar_perfil_nube(
 # NUBE — PERFILES DISPONIBLES PARA REEMPLAZO
 # ==========================================
 
+def _mediana_fechas_nube(fechas):
+
+    fechas_ordenadas = sorted(fechas)
+
+    if not fechas_ordenadas:
+        return None
+
+    # Para una cantidad par usamos la mediana inferior:
+    # mantiene una fecha real y evita introducir medios días.
+    indice = (len(fechas_ordenadas) - 1) // 2
+
+    return fechas_ordenadas[indice]
+
+
+def _nivel_recomendacion_nube(diferencia_dias):
+
+    if diferencia_dias is None:
+        return "cuenta_nueva"
+    if diferencia_dias <= 1:
+        return "excelente"
+    if diferencia_dias <= 3:
+        return "muy_buena"
+    if diferencia_dias <= 7:
+        return "buena"
+    if diferencia_dias <= 15:
+        return "aceptable"
+
+    return "lejana"
+
+
 def obtener_perfiles_disponibles_reemplazo(
     perfil_anterior_id
 ):
@@ -3926,32 +4034,18 @@ def obtener_perfiles_disponibles_reemplazo(
     conn = conectar()
     cursor = conn.cursor()
 
-
     try:
-
-        perfil_anterior_id = int(
-            perfil_anterior_id
-        )
-
-    except (
-        ValueError,
-        TypeError
-    ):
-
+        perfil_anterior_id = int(perfil_anterior_id)
+    except (ValueError, TypeError):
         conn.close()
-
         return []
-
-
-    # ==========================================
-    # SABER DE QUÉ PLATAFORMA ES EL CAÍDO
-    # ==========================================
 
     cursor.execute(
         """
         SELECT
             p.id,
             p.cuenta_id,
+            p.fecha_vencimiento,
             c.plataforma
 
         FROM nube_perfiles AS p
@@ -3961,55 +4055,40 @@ def obtener_perfiles_disponibles_reemplazo(
 
         WHERE p.id = ?
         """,
-        (
-            perfil_anterior_id,
-        )
+        (perfil_anterior_id,)
     )
 
-
-    perfil_anterior = (
-        cursor.fetchone()
-    )
-
+    perfil_anterior = cursor.fetchone()
 
     if not perfil_anterior:
-
         conn.close()
-
         return []
 
-
     plataforma = (
-        perfil_anterior[
-            "plataforma"
-        ] or ""
+        perfil_anterior["plataforma"] or ""
+    ).strip()
+    fecha_cliente_texto = (
+        perfil_anterior["fecha_vencimiento"] or ""
     ).strip()
 
-
-    # ==========================================
-    # BUSCAR PERFILES DISPONIBLES
-    # DE LA MISMA PLATAFORMA
-    # ==========================================
+    try:
+        fecha_cliente = datetime.strptime(
+            fecha_cliente_texto,
+            "%Y-%m-%d"
+        ).date()
+    except ValueError:
+        conn.close()
+        return []
 
     cursor.execute(
         """
         SELECT
-
             p.id AS perfil_id,
-
             p.cuenta_id,
-
             p.nombre_perfil,
-
             p.pin,
-
-            p.estado,
-
             c.plataforma,
-
-            c.correo,
-
-            c.tipo_cuenta
+            c.correo
 
         FROM nube_perfiles AS p
 
@@ -4018,33 +4097,149 @@ def obtener_perfiles_disponibles_reemplazo(
 
         WHERE
             p.estado = 'disponible'
-
             AND p.id != ?
-
-            AND LOWER(
-                TRIM(c.plataforma)
-            ) = LOWER(
-                TRIM(?)
+            AND p.cuenta_id != ?
+            AND c.modalidad = 'perfiles'
+            AND c.estado NOT IN (
+                'caida',
+                'reemplazada',
+                'papelera',
+                'garantia'
             )
+            AND LOWER(TRIM(c.plataforma)) =
+                LOWER(TRIM(?))
 
         ORDER BY
-            c.id DESC,
+            c.id ASC,
             p.orden ASC,
             p.id ASC
         """,
         (
             perfil_anterior_id,
+            perfil_anterior["cuenta_id"],
             plataforma
         )
     )
 
+    candidatos = [
+        dict(fila)
+        for fila in cursor.fetchall()
+    ]
+    cuentas_ids = sorted({
+        candidato["cuenta_id"]
+        for candidato in candidatos
+    })
+    resumen_cuentas = {}
 
-    filas = cursor.fetchall()
+    for cuenta_id in cuentas_ids:
+
+        cursor.execute(
+            """
+            SELECT
+                estado,
+                nombre_cliente,
+                fecha_vencimiento
+
+            FROM nube_perfiles
+
+            WHERE cuenta_id = ?
+            """,
+            (cuenta_id,)
+        )
+
+        fechas_ocupadas = []
+        disponibles = 0
+
+        for perfil in cursor.fetchall():
+
+            estado_perfil = (
+                perfil["estado"] or ""
+            ).strip()
+
+            if estado_perfil == "disponible":
+                disponibles += 1
+                continue
+
+            if (
+                not (
+                    perfil["nombre_cliente"] or ""
+                ).strip() or
+                not perfil["fecha_vencimiento"]
+            ):
+                continue
+
+            estado_calculado = estado_perfil
+
+            if estado_perfil in {
+                "activa",
+                "por_vencer",
+                "vencida"
+            }:
+                estado_calculado = calcular_estado_nube(
+                    perfil["fecha_vencimiento"],
+                    estado_actual=estado_perfil
+                )
+
+            if estado_calculado not in {
+                "activa",
+                "por_vencer"
+            }:
+                continue
+
+            try:
+                fechas_ocupadas.append(
+                    datetime.strptime(
+                        perfil["fecha_vencimiento"],
+                        "%Y-%m-%d"
+                    ).date()
+                )
+            except ValueError:
+                continue
+
+        fecha_referencia = _mediana_fechas_nube(
+            fechas_ocupadas
+        )
+        diferencia = (
+            abs((fecha_cliente - fecha_referencia).days)
+            if fecha_referencia
+            else None
+        )
+
+        resumen_cuentas[cuenta_id] = {
+            "fecha_referencia_cuenta": (
+                fecha_referencia.strftime("%Y-%m-%d")
+                if fecha_referencia
+                else ""
+            ),
+            "diferencia_dias": diferencia,
+            "cantidad_perfiles_ocupados": len(
+                fechas_ocupadas
+            ),
+            "cantidad_perfiles_disponibles": disponibles,
+            "nivel_recomendacion": (
+                _nivel_recomendacion_nube(diferencia)
+            )
+        }
 
     conn.close()
 
+    for candidato in candidatos:
+        candidato.update(
+            resumen_cuentas[candidato["cuenta_id"]]
+        )
+        candidato["fecha_vencimiento_cliente"] = (
+            fecha_cliente_texto
+        )
 
-    return [
-        dict(fila)
-        for fila in filas
-    ]
+    candidatos.sort(
+        key=lambda candidato: (
+            candidato["diferencia_dias"] is None,
+            candidato["diferencia_dias"]
+            if candidato["diferencia_dias"] is not None
+            else 999999,
+            candidato["cuenta_id"],
+            candidato["perfil_id"]
+        )
+    )
+
+    return candidatos

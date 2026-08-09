@@ -1993,8 +1993,27 @@ abrirReemplazoPerfil?.addEventListener(
                 }
 
 
+                const etiquetasNivel = {
+                    excelente: "Excelente",
+                    muy_buena: "Muy buena",
+                    buena: "Buena",
+                    aceptable: "Aceptable",
+                    lejana: "Lejana",
+                    cuenta_nueva: "Cuenta nueva"
+                };
+
+
+                const escaparHtml = valor =>
+                    String(valor ?? "")
+                        .replaceAll("&", "&amp;")
+                        .replaceAll("<", "&lt;")
+                        .replaceAll(">", "&gt;")
+                        .replaceAll('"', "&quot;")
+                        .replaceAll("'", "&#039;");
+
+
                 resultado.perfiles.forEach(
-                    perfil => {
+                    (perfil, indice) => {
 
                         const item =
                             document.createElement(
@@ -2014,29 +2033,59 @@ abrirReemplazoPerfil?.addEventListener(
                             perfil.perfil_id;
 
 
+                        const diferenciaTexto =
+                            perfil.diferencia_dias === null
+                                ? "Sin ciclo previo"
+                                : `${perfil.diferencia_dias} días de diferencia`;
+
+
+                        const referenciaTexto =
+                            perfil.fecha_referencia_cuenta ||
+                            "Cuenta sin ventas activas";
+
+
+                        const nivelTexto =
+                            etiquetasNivel[
+                                perfil.nivel_recomendacion
+                            ] || perfil.nivel_recomendacion;
+
+
                         item.innerHTML =
                             `
                                 <div class="nube-reemplazo-item-principal">
 
+                                    ${indice === 0 ? `
+                                        <span class="nube-reemplazo-mejor">
+                                            MEJOR OPCIÓN
+                                        </span>
+                                    ` : ""}
+
                                     <strong>
-                                        ${perfil.plataforma}
+                                        ${escaparHtml(perfil.correo)}
                                     </strong>
 
                                     <span>
-                                        ${perfil.correo}
+                                        ${escaparHtml(perfil.nombre_perfil)} ·
+                                        PIN ${escaparHtml(perfil.pin || "—")}
                                     </span>
+
+                                    <small>
+                                        Ciclo ${escaparHtml(referenciaTexto)} ·
+                                        ${perfil.cantidad_perfiles_ocupados} ocupados ·
+                                        ${perfil.cantidad_perfiles_disponibles} disponibles
+                                    </small>
 
                                 </div>
 
 
                                 <div class="nube-reemplazo-item-meta">
 
-                                    <span>
-                                        ${perfil.nombre_perfil}
+                                    <span class="nube-reemplazo-nivel nube-reemplazo-nivel-${escaparHtml(perfil.nivel_recomendacion)}">
+                                        ${escaparHtml(nivelTexto)}
                                     </span>
 
                                     <span>
-                                        PIN ${perfil.pin || "—"}
+                                        ${escaparHtml(diferenciaTexto)}
                                     </span>
 
                                 </div>

@@ -3376,3 +3376,57 @@ body.nube-modal-abierto{
 
     font-size:9px;
 }
+
+
+.nube-reemplazo-item-principal small{
+    color:#656d7a;
+    font-size:8px;
+    line-height:1.4;
+}
+
+
+.nube-reemplazo-mejor{
+    width:max-content;
+    padding:3px 6px;
+    border:1px solid rgba(96,165,250,.28);
+    border-radius:5px;
+    background:rgba(59,130,246,.12);
+    color:#9bc3ff !important;
+    font-size:7px !important;
+    font-weight:850;
+    letter-spacing:.08em;
+}
+
+
+.nube-reemplazo-nivel{
+    padding:3px 6px;
+    border-radius:5px;
+    background:rgba(255,255,255,.05);
+    font-weight:750;
+}
+
+
+.nube-reemplazo-nivel-excelente,
+.nube-reemplazo-nivel-muy_buena{
+    background:rgba(52,211,153,.10);
+    color:#9ee8cb;
+}
+
+
+.nube-reemplazo-nivel-buena,
+.nube-reemplazo-nivel-aceptable{
+    background:rgba(245,174,45,.10);
+    color:#e8b85d;
+}
+
+
+.nube-reemplazo-nivel-lejana{
+    background:rgba(239,68,68,.09);
+    color:#ff9d9d;
+}
+
+
+.nube-reemplazo-nivel-cuenta_nueva{
+    background:rgba(148,163,184,.10);
+    color:#b8c0cc;
+}
