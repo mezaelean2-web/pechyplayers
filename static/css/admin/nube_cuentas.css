@@ -3430,3 +3430,95 @@ body.nube-modal-abierto{
     background:rgba(148,163,184,.10);
     color:#b8c0cc;
 }
+
+.nube-entrega-panel[hidden]{
+    display:none;
+}
+
+.nube-entrega-panel{
+    grid-column:1 / -1;
+    margin-top:14px;
+    padding:16px;
+    border:1px solid rgba(245,174,45,.24);
+    border-radius:12px;
+    background:linear-gradient(145deg, rgba(245,174,45,.09), rgba(12,17,27,.96));
+    box-shadow:0 16px 36px rgba(0,0,0,.22);
+}
+
+.nube-entrega-header,
+.nube-entrega-acciones{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.nube-entrega-header span{
+    color:#e8b85d;
+    font-size:8px;
+    font-weight:850;
+    letter-spacing:.16em;
+}
+
+.nube-entrega-header h3{
+    margin:3px 0 0;
+    color:#f3f5f8;
+    font-size:14px;
+}
+
+.nube-entrega-header svg{
+    width:19px;
+    color:#e8b85d;
+}
+
+.nube-entrega-preview{
+    max-height:310px;
+    margin:14px 0;
+    padding:14px;
+    overflow:auto;
+    white-space:pre-wrap;
+    overflow-wrap:anywhere;
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:9px;
+    background:rgba(3,7,14,.62);
+    color:#d9dee7;
+    font:500 11px/1.65 inherit;
+}
+
+.nube-entrega-acciones{
+    justify-content:flex-end;
+}
+
+.nube-entrega-acciones button{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    padding:9px 12px;
+    border:1px solid rgba(245,174,45,.25);
+    border-radius:8px;
+    background:rgba(245,174,45,.10);
+    color:#f1ca7e;
+    cursor:pointer;
+    font-size:9px;
+    font-weight:800;
+}
+
+.nube-entrega-acciones button:disabled{
+    opacity:.4;
+    cursor:not-allowed;
+}
+
+.nube-entrega-acciones svg{
+    width:14px;
+}
+
+@media (max-width:640px){
+    .nube-entrega-acciones{
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .nube-entrega-acciones button{
+        justify-content:center;
+    }
+}

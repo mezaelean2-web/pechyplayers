@@ -2761,6 +2761,42 @@ def calcular_estado_pago_nube(
 # NUBE — ACTUALIZAR / ASIGNAR PERFIL
 # ==========================================
 
+def _obtener_datos_entrega_perfil_nube(cursor, perfil_id):
+
+    cursor.execute(
+        """
+        SELECT
+            c.plataforma,
+            c.correo,
+            c.contrasena,
+            p.nombre_perfil,
+            p.pin,
+            p.nombre_cliente AS cliente,
+            p.telefono,
+            p.fecha_vencimiento
+        FROM nube_perfiles AS p
+        INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+        WHERE p.id = ?
+        """,
+        (perfil_id,)
+    )
+
+    fila = cursor.fetchone()
+    if not fila:
+        return None
+
+    return {
+        "plataforma": fila["plataforma"] or "",
+        "correo": fila["correo"] or "",
+        "contrasena": fila["contrasena"] or "",
+        "nombre_perfil": fila["nombre_perfil"] or "",
+        "pin": fila["pin"] or "",
+        "cliente": fila["cliente"] or "",
+        "telefono": fila["telefono"] or "",
+        "fecha_vencimiento": fila["fecha_vencimiento"] or ""
+    }
+
+
 def actualizar_perfil_nube(
     perfil_id,
     pin="",
@@ -2982,11 +3018,24 @@ def actualizar_perfil_nube(
     )
 
 
+    datos_entrega = (
+        _obtener_datos_entrega_perfil_nube(cursor, perfil_id)
+        if actualizado and perfil_asignado
+        else None
+    )
+
     conn.commit()
     conn.close()
 
+    if not actualizado:
+        return False
 
-    return actualizado
+    return {
+        "ok": True,
+        "estado": estado,
+        "fecha_vencimiento": fecha_vencimiento,
+        "datos_entrega": datos_entrega
+    }
 
 # ==========================================
 # NUBE — RENOVAR PERFIL
@@ -3161,6 +3210,11 @@ def renovar_perfil_nube(
         cursor.rowcount > 0
     )
 
+    datos_entrega = (
+        _obtener_datos_entrega_perfil_nube(cursor, perfil_id)
+        if actualizado
+        else None
+    )
 
     conn.commit()
     conn.close()
@@ -3174,7 +3228,8 @@ def renovar_perfil_nube(
     return {
         "ok": True,
         "fecha_vencimiento": nueva_fecha_texto,
-        "estado": nuevo_estado
+        "estado": nuevo_estado,
+        "datos_entrega": datos_entrega
 }
 
 
@@ -3964,6 +4019,11 @@ def reemplazar_perfil_nube(
     )
 
 
+    datos_entrega = _obtener_datos_entrega_perfil_nube(
+        cursor,
+        perfil_nuevo_id
+    )
+
     conn.commit()
     conn.close()
 
@@ -3989,7 +4049,10 @@ def reemplazar_perfil_nube(
         "cliente":
             perfil_anterior[
                 "nombre_cliente"
-            ]
+            ],
+
+        "datos_entrega":
+            datos_entrega
     }
 
 

@@ -1152,6 +1152,9 @@ const precio =
                 "modalGestionarPerfil"
             );
 
+        const formGestionPerfil =
+            document.getElementById("formGestionPerfil");
+
         const botonesGestionPerfil =
             document.querySelectorAll(
                 ".nube-gestionar-perfil"
@@ -1292,6 +1295,177 @@ const confirmarReemplazoPerfil =
 
 
 let perfilReemplazoSeleccionado = null;
+
+const panelMensajeCliente =
+    document.getElementById("panelMensajeCliente");
+const vistaPreviaMensajeCliente =
+    document.getElementById("vistaPreviaMensajeCliente");
+const copiarMensajeCliente =
+    document.getElementById("copiarMensajeCliente");
+const abrirWhatsappCliente =
+    document.getElementById("abrirWhatsappCliente");
+
+let mensajeClienteActual = "";
+let telefonoClienteActual = "";
+
+function datoEntrega(valor){
+    const texto = String(valor ?? "").trim();
+    return texto || "—";
+}
+
+function construirMensajeCliente(tipo, datos = {}){
+    const cliente = datoEntrega(datos.cliente);
+    const plataforma = datoEntrega(datos.plataforma);
+    const correo = datoEntrega(datos.correo);
+    const contrasena = datoEntrega(datos.contrasena);
+    const perfil = datoEntrega(datos.nombre_perfil);
+    const pin = datoEntrega(datos.pin);
+    const vencimiento = datoEntrega(datos.fecha_vencimiento);
+
+    if (tipo === "reemplazo"){
+        return `🛡️ GARANTÍA REALIZADA
+PECHY PLAYERS
+
+Hola ${cliente} 👋
+
+Tu perfil anterior presentó un inconveniente y realizamos el reemplazo.
+
+✅ No perdiste tus días de servicio.
+
+🎬 ${plataforma}
+
+📧 Nuevo correo:
+${correo}
+
+🔐 Nueva contraseña:
+${contrasena}
+
+👤 Nuevo perfil:
+${perfil}
+
+🔢 Nuevo PIN:
+${pin}
+
+📅 Tu servicio continúa hasta:
+${vencimiento}
+
+⚠️ Desde ahora utiliza únicamente estos nuevos datos.
+
+Si tienes alguna duda o inconveniente, escríbenos y con gusto te ayudamos.
+
+PECHY PLAYERS 🔥`;
+    }
+
+    if (tipo === "renovacion"){
+        return `♻️ RENOVACIÓN CONFIRMADA
+PECHY PLAYERS
+
+Hola ${cliente} 👋
+
+Tu servicio de ${plataforma} fue renovado correctamente.
+
+📧 Correo:
+${correo}
+
+🔐 Contraseña:
+${contrasena}
+
+👤 Perfil:
+${perfil}
+
+🔢 PIN:
+${pin}
+
+📅 Nuevo vencimiento:
+${vencimiento}
+
+✅ Tu servicio continúa activo.
+
+⚠️ Recuerda:
+No cambies el correo, contraseña ni PIN del perfil.
+
+Si tienes alguna duda o inconveniente, escríbenos y con gusto te ayudamos.
+
+Gracias por seguir confiando en PECHY PLAYERS 🔥`;
+    }
+
+    return `🔥 PECHY PLAYERS
+
+Hola ${cliente} 👋
+Tu servicio ya está listo.
+
+🎬 ${plataforma}
+
+📧 Correo:
+${correo}
+
+🔐 Contraseña:
+${contrasena}
+
+👤 Perfil:
+${perfil}
+
+🔢 PIN:
+${pin}
+
+📅 Vencimiento:
+${vencimiento}
+
+📱 Uso permitido:
+1 dispositivo
+
+⚠️ IMPORTANTE
+No cambies el correo, contraseña ni PIN del perfil.
+
+Si tienes alguna duda o inconveniente, escríbenos y estaremos atentos para ayudarte.
+
+Gracias por confiar en PECHY PLAYERS 🔥
+Agréganos a tus contactos para que puedas ver nuestras promociones y novedades.`;
+}
+
+function normalizarTelefonoWhatsapp(telefono){
+    let numero = String(telefono ?? "").replace(/\D/g, "");
+    if (/^3\d{9}$/.test(numero)) numero = `57${numero}`;
+    return numero;
+}
+
+function mostrarPanelMensajeCliente(tipo, datos){
+    if (!panelMensajeCliente || !vistaPreviaMensajeCliente) return;
+    mensajeClienteActual = construirMensajeCliente(tipo, datos);
+    telefonoClienteActual = normalizarTelefonoWhatsapp(datos?.telefono);
+    vistaPreviaMensajeCliente.textContent = mensajeClienteActual;
+    abrirWhatsappCliente.disabled = !telefonoClienteActual;
+    panelMensajeCliente.hidden = false;
+}
+
+copiarMensajeCliente?.addEventListener("click", async () => {
+    try {
+        if (navigator.clipboard?.writeText){
+            await navigator.clipboard.writeText(mensajeClienteActual);
+        } else {
+            const auxiliar = document.createElement("textarea");
+            auxiliar.value = mensajeClienteActual;
+            auxiliar.setAttribute("readonly", "");
+            auxiliar.style.position = "fixed";
+            auxiliar.style.opacity = "0";
+            document.body.appendChild(auxiliar);
+            auxiliar.select();
+            const copiado = document.execCommand("copy");
+            auxiliar.remove();
+            if (!copiado) throw new Error("Copia no disponible");
+        }
+        mostrarMensajePerfil("Mensaje copiado al portapapeles.");
+    } catch (error) {
+        console.error(error);
+        mostrarMensajePerfil("No se pudo copiar el mensaje.", "error");
+    }
+});
+
+abrirWhatsappCliente?.addEventListener("click", () => {
+    if (!telefonoClienteActual || !mensajeClienteActual) return;
+    const url = `https://wa.me/${telefonoClienteActual}?text=${encodeURIComponent(mensajeClienteActual)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+});
 
 
 function mostrarMensajePerfil(
@@ -1437,6 +1611,12 @@ if (
 
 }
 
+if (panelMensajeCliente){
+    panelMensajeCliente.hidden = true;
+    mensajeClienteActual = "";
+    telefonoClienteActual = "";
+}
+
 
 if (panelCaidaPerfil){
     panelCaidaPerfil.hidden = true;
@@ -1523,6 +1703,58 @@ if (motivoCaidaPerfil){
         cerrarPerfilBackdrop?.addEventListener(
             "click",
             cerrarModalPerfil
+        );
+
+
+        formGestionPerfil?.addEventListener(
+            "submit",
+            event => {
+                event.preventDefault();
+
+                const botonGuardar =
+                    formGestionPerfil.querySelector("button[type='submit']");
+
+                if (botonGuardar) botonGuardar.disabled = true;
+
+                fetch(formGestionPerfil.action, {
+                    method: "POST",
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: new FormData(formGestionPerfil)
+                })
+                .then(async respuesta => {
+                    const resultado = await respuesta.json();
+                    if (!respuesta.ok || !resultado.ok){
+                        throw new Error(
+                            resultado.mensaje ||
+                            "No se pudo guardar el perfil."
+                        );
+                    }
+                    return resultado;
+                })
+                .then(resultado => {
+                    if (perfilGestionVencimiento){
+                        perfilGestionVencimiento.value =
+                            resultado.fecha_vencimiento || "Sin vencimiento";
+                    }
+
+                    mostrarMensajePerfil(resultado.mensaje);
+
+                    if (resultado.datos_entrega){
+                        mostrarPanelMensajeCliente(
+                            "venta",
+                            resultado.datos_entrega
+                        );
+                    }
+                })
+                .catch(error => {
+                    mostrarMensajePerfil(error.message, "error");
+                })
+                .finally(() => {
+                    if (botonGuardar) botonGuardar.disabled = false;
+                });
+            }
         );
 
 
@@ -1657,6 +1889,13 @@ if (
 mostrarMensajePerfil(
     resultado.mensaje
 );
+
+if (resultado.datos_entrega){
+    mostrarPanelMensajeCliente(
+        "renovacion",
+        resultado.datos_entrega
+    );
+}
 
 
 // ==========================================
@@ -2323,19 +2562,17 @@ confirmarReemplazoPerfil?.addEventListener(
                     `${resultado.mensaje} El cliente conserva ${resultado.dias_restantes} días.`
                 );
 
+                if (resultado.datos_entrega){
+                    mostrarPanelMensajeCliente(
+                        "reemplazo",
+                        resultado.datos_entrega
+                    );
+                }
+
 
                 // ==========================================
                 // RECARGAR LA NUBE
                 // ==========================================
-
-                setTimeout(
-                    () => {
-
-                        window.location.reload();
-
-                    },
-                    1400
-                );
 
             }
         )

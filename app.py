@@ -807,7 +807,18 @@ def crear_nueva_cuenta_nube():
 )
 def guardar_perfil_nube():
 
+    es_ajax = (
+        request.headers.get("X-Requested-With") ==
+        "XMLHttpRequest"
+    )
+
     if not session.get("admin"):
+
+        if es_ajax:
+            return jsonify({
+                "ok": False,
+                "mensaje": "No autorizado"
+            }), 401
 
         return redirect(
             "/pechy-panel-seguro"
@@ -858,6 +869,12 @@ def guardar_perfil_nube():
 
     except ValueError:
 
+        if es_ajax:
+            return jsonify({
+                "ok": False,
+                "mensaje": "No se pudo identificar el perfil."
+            }), 400
+
         flash(
             "No se pudo identificar el perfil."
         )
@@ -895,6 +912,27 @@ def guardar_perfil_nube():
         notas=notas
     )
 
+
+    if actualizado and es_ajax:
+
+        return jsonify({
+            "ok": True,
+            "mensaje": "Perfil actualizado correctamente.",
+            "fecha_vencimiento": actualizado[
+                "fecha_vencimiento"
+            ],
+            "estado": actualizado["estado"],
+            "datos_entrega": actualizado[
+                "datos_entrega"
+            ]
+        })
+
+    if not actualizado and es_ajax:
+
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se encontró el perfil."
+        }), 404
 
     if actualizado:
 
@@ -1009,6 +1047,11 @@ def renovar_perfil_nube_route():
     "estado":
         actualizado[
             "estado"
+        ],
+
+    "datos_entrega":
+        actualizado[
+            "datos_entrega"
         ]
 })
 
