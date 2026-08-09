@@ -1339,6 +1339,44 @@ def calcular_estado_nube(
 
     return "activa"
 
+
+def calcular_estado_efectivo_cuenta_nube(
+    fecha_vencimiento,
+    estado_actual="disponible",
+    modalidad="cuenta_completa",
+    perfiles_disponibles=0,
+    perfiles_ocupados=0
+):
+
+    estado_actual = estado_actual or "disponible"
+
+    if estado_actual in {
+        "caida",
+        "papelera",
+        "reemplazada"
+    }:
+        return estado_actual
+
+    if modalidad == "perfiles":
+
+        if perfiles_disponibles > 0:
+            return "disponible"
+
+        if perfiles_ocupados > 0:
+            return "activa"
+
+    if estado_actual in {
+        "activa",
+        "por_vencer",
+        "vencida"
+    }:
+        return calcular_estado_nube(
+            fecha_vencimiento,
+            estado_actual=estado_actual
+        )
+
+    return estado_actual
+
 # ==========================================
 # NUBE DE CUENTAS — CREAR CUENTA
 # ==========================================
@@ -1769,27 +1807,15 @@ def preparar_cuenta_nube(fila):
         )
 
 
-    estados_automaticos = {
-        "activa",
-        "por_vencer",
-        "vencida"
-    }
-
-
-    if estado_actual in estados_automaticos:
-
-        estado_calculado = (
-            calcular_estado_nube(
-                fecha_vencimiento,
-                estado_actual=estado_actual
-            )
+    estado_calculado = (
+        calcular_estado_efectivo_cuenta_nube(
+            fecha_vencimiento=fecha_vencimiento,
+            estado_actual=estado_actual,
+            modalidad=cuenta.get(
+                "modalidad"
+            ) or "cuenta_completa"
         )
-
-    else:
-
-        estado_calculado = (
-            estado_actual
-        )
+    )
 
 
     cuenta[
@@ -1932,6 +1958,27 @@ def obtener_cuentas_nube(
         )
 
 
+        cuenta["estado_calculado"] = (
+            calcular_estado_efectivo_cuenta_nube(
+                fecha_vencimiento=cuenta.get(
+                    "fecha_vencimiento"
+                ) or "",
+                estado_actual=cuenta.get(
+                    "estado"
+                ) or "disponible",
+                modalidad=cuenta.get(
+                    "modalidad"
+                ) or "cuenta_completa",
+                perfiles_disponibles=cuenta[
+                    "perfiles_disponibles"
+                ],
+                perfiles_ocupados=cuenta[
+                    "perfiles_ocupados"
+                ]
+            )
+        )
+
+
         cuentas.append(
             cuenta
         )
@@ -1951,10 +1998,21 @@ def obtener_estadisticas_nube():
 
     cursor.execute("""
         SELECT
-            id,
-            fecha_vencimiento,
-            estado
-        FROM nube_cuentas
+            c.id,
+            c.fecha_vencimiento,
+            c.estado,
+            c.modalidad,
+            COUNT(p.id) AS perfiles_totales,
+            COALESCE(SUM(
+                CASE
+                    WHEN p.estado = 'disponible' THEN 1
+                    ELSE 0
+                END
+            ), 0) AS perfiles_disponibles
+        FROM nube_cuentas AS c
+        LEFT JOIN nube_perfiles AS p
+            ON p.cuenta_id = c.id
+        GROUP BY c.id
     """)
 
 
@@ -1993,20 +2051,23 @@ def obtener_estadisticas_nube():
         )
 
 
-        if estado_actual in {
-            "activa",
-            "por_vencer",
-            "vencida"
-        }:
+        perfiles_totales = (
+            fila["perfiles_totales"] or 0
+        )
 
-            estado = calcular_estado_nube(
-                fecha_vencimiento,
-                estado_actual=estado_actual
+        perfiles_disponibles = (
+            fila["perfiles_disponibles"] or 0
+        )
+
+        estado = calcular_estado_efectivo_cuenta_nube(
+            fecha_vencimiento=fecha_vencimiento,
+            estado_actual=estado_actual,
+            modalidad=fila["modalidad"] or "cuenta_completa",
+            perfiles_disponibles=perfiles_disponibles,
+            perfiles_ocupados=(
+                perfiles_totales - perfiles_disponibles
             )
-
-        else:
-
-            estado = estado_actual
+        )
 
 
         if estado == "activa":
