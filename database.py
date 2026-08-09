@@ -1,3 +1,5 @@
+import json
+import re
 import sqlite3
 
 DB = "pechy.db"
@@ -618,6 +620,22 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
         )
     """)
 
+    try:
+        cursor.execute("""
+            ALTER TABLE nube_clientes
+            ADD COLUMN telefono_normalizado TEXT
+        """)
+    except sqlite3.OperationalError:
+        pass
+
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS
+        idx_nube_clientes_telefono_normalizado
+        ON nube_clientes(telefono_normalizado)
+        WHERE telefono_normalizado IS NOT NULL
+          AND telefono_normalizado != ''
+    """)
+
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS nube_cuentas (
@@ -918,6 +936,41 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
         CREATE INDEX IF NOT EXISTS
         idx_nube_perfiles_estado
         ON nube_perfiles(estado)
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS nube_transferencias_servicios (
+
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            operacion_uuid TEXT NOT NULL UNIQUE,
+            tipo_operacion TEXT NOT NULL,
+            perfil_origen_id INTEGER NOT NULL,
+            cuenta_origen_id INTEGER NOT NULL,
+            cliente_id INTEGER,
+            dias_disponibles INTEGER DEFAULT 0,
+            dias_trasladados INTEGER DEFAULT 0,
+            destino_tipo TEXT DEFAULT '',
+            perfil_destino_id INTEGER,
+            cuenta_destino_id INTEGER,
+            motivo TEXT DEFAULT '',
+            venta_origen_snapshot TEXT NOT NULL,
+            destino_antes_snapshot TEXT,
+            destino_despues_snapshot TEXT,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+        )
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS
+        idx_nube_transferencias_origen
+        ON nube_transferencias_servicios(perfil_origen_id)
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS
+        idx_nube_transferencias_cliente
+        ON nube_transferencias_servicios(cliente_id)
     """)
 
     # ==========================================
@@ -1299,6 +1352,206 @@ def calcular_dias_restantes(
     return (
         fecha_final - hoy
     ).days
+
+
+def normalizar_telefono_nube(telefono):
+
+    digitos = re.sub(
+        r"\D",
+        "",
+        str(telefono or "")
+    )
+
+    if (
+        len(digitos) == 10 and
+        digitos.startswith("3")
+    ):
+        return "57" + digitos
+
+    if (
+        len(digitos) == 12 and
+        digitos.startswith("573")
+    ):
+        return digitos
+
+    return digitos
+
+
+def _obtener_o_crear_cliente_nube(
+    cursor,
+    nombre_cliente,
+    telefono
+):
+
+    nombre_cliente = (nombre_cliente or "").strip()
+    telefono = (telefono or "").strip()
+    telefono_normalizado = normalizar_telefono_nube(
+        telefono
+    )
+
+    if not telefono_normalizado:
+        return None
+
+    cursor.execute(
+        """
+        SELECT id
+        FROM nube_clientes
+        WHERE telefono_normalizado = ?
+        LIMIT 1
+        """,
+        (telefono_normalizado,)
+    )
+    cliente = cursor.fetchone()
+
+    if cliente:
+        cliente_id = cliente["id"]
+        cursor.execute(
+            """
+            UPDATE nube_clientes
+            SET
+                nombre = CASE
+                    WHEN ? != '' THEN ?
+                    ELSE nombre
+                END,
+                telefono = CASE
+                    WHEN ? != '' THEN ?
+                    ELSE telefono
+                END,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                nombre_cliente,
+                nombre_cliente,
+                telefono,
+                telefono,
+                cliente_id
+            )
+        )
+        return cliente_id
+
+    # Compatibilidad sin backfill: se adopta un cliente antiguo
+    # solamente cuando el teléfono coincide y no es ambiguo.
+    cursor.execute(
+        """
+        SELECT id, telefono
+        FROM nube_clientes
+        WHERE telefono_normalizado IS NULL
+           OR telefono_normalizado = ''
+        """
+    )
+    coincidencias = [
+        fila
+        for fila in cursor.fetchall()
+        if normalizar_telefono_nube(fila["telefono"]) ==
+           telefono_normalizado
+    ]
+
+    if len(coincidencias) == 1:
+        cliente_id = coincidencias[0]["id"]
+        cursor.execute(
+            """
+            UPDATE nube_clientes
+            SET
+                telefono_normalizado = ?,
+                nombre = CASE
+                    WHEN ? != '' THEN ?
+                    ELSE nombre
+                END,
+                telefono = CASE
+                    WHEN ? != '' THEN ?
+                    ELSE telefono
+                END,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND (
+                    telefono_normalizado IS NULL
+                    OR telefono_normalizado = ''
+              )
+            """,
+            (
+                telefono_normalizado,
+                nombre_cliente,
+                nombre_cliente,
+                telefono,
+                telefono,
+                cliente_id
+            )
+        )
+        return cliente_id
+
+    if len(coincidencias) > 1:
+        return None
+
+    cursor.execute(
+        """
+        INSERT INTO nube_clientes (
+            nombre,
+            telefono,
+            telefono_normalizado
+        )
+        VALUES (?, ?, ?)
+        """,
+        (
+            nombre_cliente,
+            telefono,
+            telefono_normalizado
+        )
+    )
+    return cursor.lastrowid
+
+
+def _crear_snapshot_servicio_nube(cursor, perfil_id):
+
+    cursor.execute(
+        """
+        SELECT
+            p.id AS perfil_id,
+            p.cuenta_id,
+            c.plataforma,
+            c.correo,
+            p.nombre_perfil,
+            p.pin,
+            p.cliente_id,
+            p.nombre_cliente,
+            p.telefono,
+            p.fecha_entrega,
+            p.dias_cuenta,
+            p.fecha_vencimiento,
+            p.estado,
+            p.notas,
+            p.garantia_usada,
+            p.cantidad_garantias
+        FROM nube_perfiles AS p
+        INNER JOIN nube_cuentas AS c
+            ON c.id = p.cuenta_id
+        WHERE p.id = ?
+        """,
+        (perfil_id,)
+    )
+    fila = cursor.fetchone()
+
+    if not fila:
+        return None
+
+    snapshot = dict(fila)
+    snapshot["dias_restantes"] = max(
+        calcular_dias_restantes(
+            snapshot.get("fecha_vencimiento")
+        ),
+        0
+    )
+    snapshot["fecha_snapshot"] = (
+        datetime.now().astimezone().isoformat(
+            timespec="seconds"
+        )
+    )
+
+    return json.dumps(
+        snapshot,
+        ensure_ascii=False,
+        sort_keys=True
+    )
 
 
 def calcular_estado_nube(
@@ -2915,6 +3168,7 @@ def actualizar_perfil_nube(
 
         dias_cuenta = 0
 
+    conn.execute("BEGIN IMMEDIATE")
 
 
     # ==========================================
@@ -2925,7 +3179,8 @@ def actualizar_perfil_nube(
         """
         SELECT
             c.estado AS estado_cuenta,
-            p.estado AS estado_perfil
+            p.estado AS estado_perfil,
+            p.cliente_id AS cliente_id_actual
 
         FROM nube_perfiles AS p
 
@@ -2976,6 +3231,18 @@ def actualizar_perfil_nube(
         fecha_entrega and
         dias_cuenta > 0
     )
+
+    cliente_id = None
+
+    if perfil_asignado:
+        cliente_id = _obtener_o_crear_cliente_nube(
+            cursor,
+            nombre_cliente,
+            telefono
+        )
+
+        if cliente_id is None and fila_cuenta:
+            cliente_id = fila_cuenta["cliente_id_actual"]
 
 
     # ==========================================
@@ -3049,6 +3316,7 @@ def actualizar_perfil_nube(
 
         SET
             pin = ?,
+            cliente_id = ?,
             nombre_cliente = ?,
             telefono = ?,
             fecha_entrega = ?,
@@ -3062,6 +3330,7 @@ def actualizar_perfil_nube(
         """,
         (
             pin,
+            cliente_id,
             nombre_cliente,
             telefono,
             fecha_entrega,
