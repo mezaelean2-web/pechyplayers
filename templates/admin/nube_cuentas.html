@@ -1815,8 +1815,8 @@ Nube de cuentas
     >
         <div id="contenidoLiberacionPerfil">
             <div class="nube-liberacion-titulo">
-                <span>SERVICIO ACTUAL</span>
-                <strong>Liberar sin trasladar días</strong>
+                <span>CAMBIAR / LIBERAR SERVICIO</span>
+                <strong>¿Qué deseas hacer?</strong>
             </div>
 
             <dl class="nube-liberacion-resumen">
@@ -1825,6 +1825,44 @@ Nube de cuentas
                 <div><dt>Vencimiento</dt><dd id="liberacionVencimiento">—</dd></div>
                 <div><dt>Días restantes</dt><dd id="liberacionDias">0</dd></div>
             </dl>
+
+            <div class="nube-liberacion-opciones">
+                <button type="button" id="elegirLiberarPerfil" class="seleccionado">
+                    Liberar sin trasladar días
+                </button>
+                <button type="button" id="elegirTrasladarPerfil">
+                    Liberar y trasladar días
+                </button>
+            </div>
+
+            <div id="panelTrasladoPerfil" class="nube-traslado-panel" hidden>
+                <div class="nube-traslado-campos">
+                    <label>
+                        <span>Días disponibles</span>
+                        <strong id="trasladoDiasDisponibles">0</strong>
+                    </label>
+                    <label>
+                        <span>Días a trasladar</span>
+                        <input type="number" id="diasTrasladarPerfil" min="1">
+                    </label>
+                    <label>
+                        <span>Plataforma destino</span>
+                        <select id="plataformaDestinoPerfil">
+                            <option value="">Selecciona una plataforma</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div id="listaDestinosTraslado" class="nube-reemplazo-lista"></div>
+
+                <dl id="resumenTrasladoPerfil" class="nube-liberacion-resumen nube-traslado-resumen" hidden>
+                    <div><dt>Origen</dt><dd id="trasladoResumenOrigen">—</dd></div>
+                    <div><dt>Destino</dt><dd id="trasladoResumenDestino">—</dd></div>
+                    <div><dt>Cliente</dt><dd id="trasladoResumenCliente">—</dd></div>
+                    <div><dt>Días trasladados</dt><dd id="trasladoResumenDias">0</dd></div>
+                    <div><dt>Nuevo vencimiento</dt><dd id="trasladoResumenVencimiento">—</dd></div>
+                </dl>
+            </div>
 
             <label class="nube-liberacion-motivo">
                 <span>Motivo (opcional)</span>
@@ -1837,7 +1875,7 @@ Nube de cuentas
 
             <div class="nube-liberacion-advertencia">
                 <i data-lucide="shield-alert"></i>
-                <p>
+                <p id="advertenciaLiberacionPerfil">
                     Este perfil volverá a disponible.<br>
                     La venta anterior quedará guardada en el historial.<br>
                     No se trasladarán días a otro servicio.

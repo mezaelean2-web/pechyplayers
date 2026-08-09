@@ -3515,6 +3515,78 @@ body.nube-modal-abierto{
     font-weight:650;
 }
 
+.nube-liberacion-opciones{
+    margin:12px 0;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+}
+
+.nube-liberacion-opciones button{
+    min-height:42px;
+    padding:9px 11px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:9px;
+    background:#17181d;
+    color:#aeb3bd;
+    font-size:9px;
+    font-weight:750;
+    cursor:pointer;
+}
+
+.nube-liberacion-opciones button.seleccionado{
+    border-color:rgba(167,139,250,.45);
+    background:rgba(124,58,237,.18);
+    color:#ddd6fe;
+}
+
+.nube-traslado-panel{
+    margin:12px 0;
+    padding:12px;
+    border:1px solid rgba(167,139,250,.16);
+    border-radius:10px;
+    background:rgba(8,9,13,.35);
+}
+
+.nube-traslado-campos{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:9px;
+}
+
+.nube-traslado-campos label:last-child{
+    grid-column:1 / -1;
+}
+
+.nube-traslado-campos span,
+.nube-traslado-campos strong{
+    display:block;
+    margin-bottom:5px;
+    color:#b8bdc7;
+    font-size:9px;
+    font-weight:700;
+}
+
+.nube-traslado-campos input,
+.nube-traslado-campos select{
+    width:100%;
+    min-height:36px;
+    padding:8px 10px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:8px;
+    background:#15161a;
+    color:#fff;
+    outline:none;
+}
+
+.nube-traslado-panel .nube-reemplazo-lista{
+    margin-top:11px;
+}
+
+.nube-traslado-resumen{
+    margin-bottom:0;
+}
+
 .nube-liberacion-motivo span{
     display:block;
     color:#b8bdc7;

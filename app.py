@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_perfil_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -993,13 +993,11 @@ def liberar_trasladar_perfil_nube_route():
 
     datos = request.get_json(silent=True) or {}
 
-    if datos.get("accion") != "liberar":
+    accion = datos.get("accion")
+    if accion not in {"liberar", "trasladar_nuevo"}:
         return jsonify({
             "ok": False,
-            "mensaje": (
-                "La acción solicitada todavía no está implementada. "
-                "En esta fase solo se permite ‘liberar’."
-            )
+            "mensaje": "La acción solicitada no es válida."
         }), 400
 
     try:
@@ -1013,8 +1011,11 @@ def liberar_trasladar_perfil_nube_route():
             "mensaje": "No se pudo identificar el perfil de origen."
         }), 400
 
-    resultado = liberar_perfil_nube(
+    resultado = liberar_o_trasladar_perfil_nube(
         perfil_origen_id=perfil_origen_id,
+        accion=accion,
+        perfil_destino_id=datos.get("perfil_destino_id"),
+        dias_trasladar=datos.get("dias_trasladar"),
         motivo=datos.get("motivo", ""),
         operacion_uuid=datos.get("operacion_uuid", "")
     )

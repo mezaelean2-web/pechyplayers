@@ -1305,9 +1305,26 @@ const liberacionCliente = document.getElementById("liberacionCliente");
 const liberacionServicio = document.getElementById("liberacionServicio");
 const liberacionVencimiento = document.getElementById("liberacionVencimiento");
 const liberacionDias = document.getElementById("liberacionDias");
+const elegirLiberarPerfil = document.getElementById("elegirLiberarPerfil");
+const elegirTrasladarPerfil = document.getElementById("elegirTrasladarPerfil");
+const panelTrasladoPerfil = document.getElementById("panelTrasladoPerfil");
+const trasladoDiasDisponibles = document.getElementById("trasladoDiasDisponibles");
+const diasTrasladarPerfil = document.getElementById("diasTrasladarPerfil");
+const plataformaDestinoPerfil = document.getElementById("plataformaDestinoPerfil");
+const listaDestinosTraslado = document.getElementById("listaDestinosTraslado");
+const resumenTrasladoPerfil = document.getElementById("resumenTrasladoPerfil");
+const trasladoResumenOrigen = document.getElementById("trasladoResumenOrigen");
+const trasladoResumenDestino = document.getElementById("trasladoResumenDestino");
+const trasladoResumenCliente = document.getElementById("trasladoResumenCliente");
+const trasladoResumenDias = document.getElementById("trasladoResumenDias");
+const trasladoResumenVencimiento = document.getElementById("trasladoResumenVencimiento");
+const advertenciaLiberacionPerfil = document.getElementById("advertenciaLiberacionPerfil");
 const grupoRenovacionPerfil = document.querySelector(".nube-renovacion-rapida");
 
 let operacionLiberacionUuid = "";
+let accionLiberacionPerfil = "liberar";
+let contextoLiberacionPerfil = null;
+let perfilDestinoTraslado = null;
 
 function crearOperacionUuid(){
     if (window.crypto?.randomUUID) return window.crypto.randomUUID();
@@ -1350,6 +1367,44 @@ function construirMensajeCliente(tipo, datos = {}){
     const perfil = datoEntrega(datos.nombre_perfil);
     const pin = datoEntrega(datos.pin);
     const vencimiento = datoEntrega(datos.fecha_vencimiento);
+
+    if (tipo === "cambio_servicio"){
+        return `🔄 CAMBIO DE SERVICIO
+PECHY PLAYERS
+
+Hola ${cliente} 👋
+
+Tu servicio fue cambiado correctamente.
+
+Servicio anterior:
+${datoEntrega(datos.plataforma_origen)}
+
+Nuevo servicio:
+${datoEntrega(datos.plataforma_destino)}
+
+📧 Correo:
+${correo}
+
+🔐 Contraseña:
+${contrasena}
+
+👤 Perfil:
+${perfil}
+
+🔢 PIN:
+${pin}
+
+📅 Vencimiento:
+${vencimiento}
+
+✅ Se trasladaron ${datoEntrega(datos.dias_trasladados)} días.
+
+⚠️ Desde ahora utiliza únicamente estos nuevos datos.
+
+Si tienes alguna duda o inconveniente, escríbenos y con gusto te ayudamos.
+
+PECHY PLAYERS 🔥`;
+    }
 
     if (tipo === "reemplazo"){
         return `🛡️ GARANTÍA REALIZADA
@@ -1539,6 +1594,130 @@ const renovarPerfil =
     );
 
 
+function fechaTrasladoCalculada(dias){
+    const fecha = new Date();
+    fecha.setHours(12, 0, 0, 0);
+    fecha.setDate(fecha.getDate() + Number(dias || 0));
+    const ano = fecha.getFullYear();
+    const mes = String(fecha.getMonth() + 1).padStart(2, "0");
+    const dia = String(fecha.getDate()).padStart(2, "0");
+    return `${ano}-${mes}-${dia}`;
+}
+
+function escaparHtmlTraslado(valor){
+    return String(valor ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+function actualizarResumenTraslado(){
+    if (!resumenTrasladoPerfil) return;
+    const dias = Number(diasTrasladarPerfil?.value || 0);
+    const maximo = Number(contextoLiberacionPerfil?.dias_restantes || 0);
+    const valido = perfilDestinoTraslado && dias >= 1 && dias <= maximo;
+    resumenTrasladoPerfil.hidden = !valido;
+    if (!valido) return;
+
+    trasladoResumenOrigen.textContent =
+        `${contextoLiberacionPerfil.plataforma} · ${contextoLiberacionPerfil.perfil}`;
+    trasladoResumenDestino.textContent =
+        `${perfilDestinoTraslado.plataforma} · ${perfilDestinoTraslado.nombre_perfil}`;
+    trasladoResumenCliente.textContent = contextoLiberacionPerfil.cliente || "—";
+    trasladoResumenDias.textContent = String(dias);
+    trasladoResumenVencimiento.textContent = fechaTrasladoCalculada(dias);
+}
+
+function renderizarDestinosTraslado(){
+    if (!listaDestinosTraslado) return;
+    const plataforma = plataformaDestinoPerfil?.value || "";
+    perfilDestinoTraslado = null;
+    actualizarResumenTraslado();
+    listaDestinosTraslado.innerHTML = "";
+    if (!plataforma) return;
+
+    const candidatos = (contextoLiberacionPerfil?.perfiles_destino || [])
+        .filter(perfil => perfil.plataforma === plataforma);
+    if (!candidatos.length){
+        listaDestinosTraslado.innerHTML =
+            '<div class="nube-reemplazo-vacio">No hay perfiles disponibles.</div>';
+        return;
+    }
+
+    candidatos.forEach((perfil, indice) => {
+        const diferencia = perfil.diferencia_dias == null
+            ? "Cuenta nueva"
+            : `${perfil.diferencia_dias} días de diferencia`;
+        const ciclo = perfil.fecha_referencia_cuenta || "Sin ciclo activo";
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "nube-reemplazo-item";
+        item.innerHTML = `
+            <div class="nube-reemplazo-item-principal">
+                <strong>${escaparHtmlTraslado(perfil.correo)}</strong>
+                ${indice === 0 ? '<span class="nube-reemplazo-mejor">MEJOR OPCIÓN</span>' : ""}
+                <span>${escaparHtmlTraslado(perfil.nombre_perfil)} · PIN ${escaparHtmlTraslado(perfil.pin || "—")}</span>
+            </div>
+            <div class="nube-reemplazo-item-meta">
+                <span>Ciclo ${escaparHtmlTraslado(ciclo)}</span>
+                <span>${escaparHtmlTraslado(diferencia)}</span>
+                <span class="nube-reemplazo-nivel nube-reemplazo-nivel-${escaparHtmlTraslado(perfil.nivel_recomendacion)}">
+                    ${escaparHtmlTraslado(String(perfil.nivel_recomendacion || "").replaceAll("_", " "))}
+                </span>
+            </div>`;
+        item.addEventListener("click", () => {
+            listaDestinosTraslado
+                .querySelectorAll(".nube-reemplazo-item")
+                .forEach(elemento => elemento.classList.remove("seleccionado"));
+            item.classList.add("seleccionado");
+            perfilDestinoTraslado = perfil;
+            actualizarResumenTraslado();
+        });
+        listaDestinosTraslado.appendChild(item);
+    });
+}
+
+function seleccionarAccionLiberacion(accion){
+    accionLiberacionPerfil = accion;
+    const trasladar = accion === "trasladar_nuevo";
+    elegirLiberarPerfil?.classList.toggle("seleccionado", !trasladar);
+    elegirTrasladarPerfil?.classList.toggle("seleccionado", trasladar);
+    if (panelTrasladoPerfil) panelTrasladoPerfil.hidden = !trasladar;
+    if (advertenciaLiberacionPerfil){
+        advertenciaLiberacionPerfil.innerHTML = trasladar
+            ? "El perfil origen volverá a disponible y el cliente pasará al nuevo servicio."
+            : "Este perfil volverá a disponible.<br>La venta anterior quedará guardada en el historial.<br>No se trasladarán días a otro servicio.";
+    }
+}
+
+function resetearTrasladoPerfil(){
+    contextoLiberacionPerfil = null;
+    perfilDestinoTraslado = null;
+    seleccionarAccionLiberacion("liberar");
+    if (diasTrasladarPerfil) diasTrasladarPerfil.value = "";
+    if (trasladoDiasDisponibles) trasladoDiasDisponibles.textContent = "0";
+    if (plataformaDestinoPerfil){
+        plataformaDestinoPerfil.innerHTML =
+            '<option value="">Selecciona una plataforma</option>';
+    }
+    if (listaDestinosTraslado) listaDestinosTraslado.innerHTML = "";
+    if (resumenTrasladoPerfil) resumenTrasladoPerfil.hidden = true;
+}
+
+elegirLiberarPerfil?.addEventListener(
+    "click",
+    () => seleccionarAccionLiberacion("liberar")
+);
+elegirTrasladarPerfil?.addEventListener(
+    "click",
+    () => seleccionarAccionLiberacion("trasladar_nuevo")
+);
+plataformaDestinoPerfil?.addEventListener("change", renderizarDestinosTraslado);
+diasTrasladarPerfil?.addEventListener("input", actualizarResumenTraslado);
+
+
         function abrirGestionPerfil(
             boton
         ){
@@ -1588,10 +1767,17 @@ const renovarPerfil =
             if (panelLiberacionPerfil) panelLiberacionPerfil.hidden = true;
             if (contenidoLiberacionPerfil) contenidoLiberacionPerfil.hidden = false;
             if (exitoLiberacionPerfil) exitoLiberacionPerfil.hidden = true;
+            if (exitoLiberacionPerfil){
+                exitoLiberacionPerfil.querySelector("strong").textContent =
+                    "Perfil liberado";
+                exitoLiberacionPerfil.querySelector("span").textContent =
+                    "La venta quedó protegida en el historial y no se trasladaron días.";
+            }
             if (motivoLiberacionPerfil) motivoLiberacionPerfil.value = "";
             if (abrirLiberacionPerfil) abrirLiberacionPerfil.hidden = false;
             if (grupoRenovacionPerfil) grupoRenovacionPerfil.hidden = false;
             operacionLiberacionUuid = "";
+            resetearTrasladoPerfil();
 
 
             tituloGestionPerfil.textContent =
@@ -1700,6 +1886,8 @@ if (motivoCaidaPerfil){
             if (!modalPerfil) return;
 
             operacionCompletada = false;
+            operacionLiberacionUuid = "";
+            resetearTrasladoPerfil();
 
 
             modalPerfil.classList.remove(
@@ -1836,6 +2024,24 @@ if (motivoCaidaPerfil){
                     `${resultado.plataforma || "—"} · ${resultado.perfil || "—"}`;
                 liberacionVencimiento.textContent = resultado.vencimiento || "—";
                 liberacionDias.textContent = String(resultado.dias_restantes ?? 0);
+                contextoLiberacionPerfil = resultado;
+                perfilDestinoTraslado = null;
+                seleccionarAccionLiberacion("liberar");
+                trasladoDiasDisponibles.textContent = String(
+                    resultado.dias_restantes ?? 0
+                );
+                diasTrasladarPerfil.value = String(resultado.dias_restantes ?? 0);
+                diasTrasladarPerfil.max = String(resultado.dias_restantes ?? 0);
+                plataformaDestinoPerfil.innerHTML =
+                    '<option value="">Selecciona una plataforma</option>';
+                (resultado.plataformas_destino || []).forEach(plataforma => {
+                    const opcion = document.createElement("option");
+                    opcion.value = plataforma;
+                    opcion.textContent = plataforma;
+                    plataformaDestinoPerfil.appendChild(opcion);
+                });
+                listaDestinosTraslado.innerHTML = "";
+                resumenTrasladoPerfil.hidden = true;
                 operacionLiberacionUuid = crearOperacionUuid();
                 panelLiberacionPerfil.hidden = false;
                 contenidoLiberacionPerfil.hidden = false;
@@ -1852,12 +2058,38 @@ if (motivoCaidaPerfil){
             panelLiberacionPerfil.hidden = true;
             motivoLiberacionPerfil.value = "";
             operacionLiberacionUuid = "";
+            resetearTrasladoPerfil();
         });
 
 
         confirmarLiberacionPerfil?.addEventListener("click", async () => {
             const perfilId = perfilGestionId?.value || "";
             if (!perfilId || !operacionLiberacionUuid) return;
+
+            const diasTrasladar = Number(diasTrasladarPerfil?.value || 0);
+            const diasDisponibles = Number(
+                contextoLiberacionPerfil?.dias_restantes || 0
+            );
+            if (accionLiberacionPerfil === "trasladar_nuevo"){
+                if (!perfilDestinoTraslado){
+                    mostrarMensajePerfil(
+                        "Selecciona un perfil disponible de destino.",
+                        "error"
+                    );
+                    return;
+                }
+                if (
+                    !Number.isInteger(diasTrasladar) ||
+                    diasTrasladar < 1 ||
+                    diasTrasladar > diasDisponibles
+                ){
+                    mostrarMensajePerfil(
+                        `Los días a trasladar deben estar entre 1 y ${diasDisponibles}.`,
+                        "error"
+                    );
+                    return;
+                }
+            }
 
             confirmarLiberacionPerfil.disabled = true;
             try {
@@ -1868,7 +2100,9 @@ if (motivoCaidaPerfil){
                         headers: {"Content-Type": "application/json"},
                         body: JSON.stringify({
                             perfil_origen_id: perfilId,
-                            accion: "liberar",
+                            accion: accionLiberacionPerfil,
+                            perfil_destino_id: perfilDestinoTraslado?.perfil_id,
+                            dias_trasladar: diasTrasladar,
                             motivo: motivoLiberacionPerfil?.value || "",
                             operacion_uuid: operacionLiberacionUuid
                         })
@@ -1884,7 +2118,6 @@ if (motivoCaidaPerfil){
                 contenidoLiberacionPerfil.hidden = true;
                 exitoLiberacionPerfil.hidden = false;
                 abrirLiberacionPerfil.hidden = true;
-                if (panelMensajeCliente) panelMensajeCliente.hidden = true;
                 if (abrirCaidaPerfil) abrirCaidaPerfil.hidden = true;
                 if (grupoReemplazoPerfil) grupoReemplazoPerfil.hidden = true;
                 if (grupoRenovacionPerfil) grupoRenovacionPerfil.hidden = true;
@@ -1897,7 +2130,23 @@ if (motivoCaidaPerfil){
                 mostrarMensajePerfil(resultado.mensaje);
                 if (window.lucide) window.lucide.createIcons();
 
-                window.setTimeout(() => window.location.reload(), 2200);
+                if (
+                    accionLiberacionPerfil === "trasladar_nuevo" &&
+                    resultado.datos_entrega
+                ){
+                    exitoLiberacionPerfil.querySelector("strong").textContent =
+                        "Servicio cambiado";
+                    exitoLiberacionPerfil.querySelector("span").textContent =
+                        "El cliente quedó asignado al nuevo perfil.";
+                    mostrarPanelMensajeCliente(
+                        "cambio_servicio",
+                        resultado.datos_entrega
+                    );
+                    confirmarLiberacionPerfil.disabled = false;
+                } else {
+                    if (panelMensajeCliente) panelMensajeCliente.hidden = true;
+                    window.setTimeout(() => window.location.reload(), 2200);
+                }
             } catch (error) {
                 mostrarMensajePerfil(error.message, "error");
                 confirmarLiberacionPerfil.disabled = false;
