@@ -1836,6 +1836,17 @@ Nube de cuentas
             </div>
 
             <div id="panelTrasladoPerfil" class="nube-traslado-panel" hidden>
+                <div class="nube-liberacion-titulo">
+                    <span>¿Dónde trasladar?</span>
+                </div>
+                <div class="nube-liberacion-opciones nube-destino-opciones">
+                    <button type="button" id="elegirDestinoNuevo" class="seleccionado">
+                        Nuevo servicio
+                    </button>
+                    <button type="button" id="elegirDestinoActivo">
+                        Servicio activo del cliente
+                    </button>
+                </div>
                 <div class="nube-traslado-campos">
                     <label>
                         <span>Días disponibles</span>
@@ -1845,7 +1856,7 @@ Nube de cuentas
                         <span>Días a trasladar</span>
                         <input type="number" id="diasTrasladarPerfil" min="1">
                     </label>
-                    <label>
+                    <label id="campoPlataformaDestino">
                         <span>Plataforma destino</span>
                         <select id="plataformaDestinoPerfil">
                             <option value="">Selecciona una plataforma</option>
@@ -1860,6 +1871,7 @@ Nube de cuentas
                     <div><dt>Destino</dt><dd id="trasladoResumenDestino">—</dd></div>
                     <div><dt>Cliente</dt><dd id="trasladoResumenCliente">—</dd></div>
                     <div><dt>Días trasladados</dt><dd id="trasladoResumenDias">0</dd></div>
+                    <div id="filaVencimientoActual" hidden><dt>Vence actualmente</dt><dd id="trasladoResumenVencimientoActual">—</dd></div>
                     <div><dt>Nuevo vencimiento</dt><dd id="trasladoResumenVencimiento">—</dd></div>
                 </dl>
             </div>

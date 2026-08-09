@@ -1629,6 +1629,70 @@ def _crear_snapshot_servicio_nube(cursor, perfil_id):
     )
 
 
+def _identidad_cliente_servicio_nube(cursor, perfil):
+    """Devuelve una identidad segura: cliente_id o teléfono único legado."""
+
+    if perfil["cliente_id"] is not None:
+        return {"tipo": "cliente_id", "valor": perfil["cliente_id"]}
+
+    telefono_normalizado = normalizar_telefono_nube(perfil["telefono"])
+    if not telefono_normalizado:
+        return None
+
+    cursor.execute(
+        "SELECT id, telefono, telefono_normalizado FROM nube_clientes"
+    )
+    clientes = {
+        fila["id"]
+        for fila in cursor.fetchall()
+        if normalizar_telefono_nube(
+            fila["telefono_normalizado"] or fila["telefono"]
+        ) == telefono_normalizado
+    }
+    if len(clientes) > 1:
+        return None
+
+    return {
+        "tipo": "telefono",
+        "valor": telefono_normalizado,
+        "cliente_id_unico": next(iter(clientes), None)
+    }
+
+
+def _servicio_pertenece_a_identidad_nube(cursor, perfil, identidad):
+    if not identidad:
+        return False
+
+    if identidad["tipo"] == "cliente_id":
+        return perfil["cliente_id"] == identidad["valor"]
+
+    telefono_destino = normalizar_telefono_nube(perfil["telefono"])
+    if telefono_destino != identidad["valor"]:
+        return False
+
+    cliente_id_unico = identidad.get("cliente_id_unico")
+    return (
+        perfil["cliente_id"] is None or
+        perfil["cliente_id"] == cliente_id_unico
+    )
+
+
+def _nuevo_vencimiento_extension_nube(fecha_vencimiento, dias):
+    fecha_actual = datetime.strptime(fecha_vencimiento, "%Y-%m-%d").date()
+    base = max(fecha_actual, datetime.now().date())
+    return (base + timedelta(days=dias)).strftime("%Y-%m-%d")
+
+
+def _estado_destino_extension_nube(fecha_vencimiento):
+    try:
+        fecha = datetime.strptime(fecha_vencimiento, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return "vencida"
+    if fecha == datetime.now().date():
+        return "por_vencer"
+    return calcular_estado_nube(fecha_vencimiento, estado_actual="activa")
+
+
 def obtener_contexto_liberacion_perfil_nube(perfil_id):
 
     conn = conectar()
@@ -1675,6 +1739,7 @@ def obtener_contexto_liberacion_perfil_nube(perfil_id):
         )
         contexto["perfiles_destino"] = []
         contexto["plataformas_destino"] = []
+        contexto["servicios_activos_cliente"] = []
 
         if contexto["asignado"] and contexto["dias_restantes"] > 0:
             cursor.execute(
@@ -1719,6 +1784,65 @@ def obtener_contexto_liberacion_perfil_nube(perfil_id):
                 },
                 key=lambda plataforma: plataforma.casefold()
             )
+
+            identidad = _identidad_cliente_servicio_nube(cursor, contexto)
+            if identidad:
+                cursor.execute(
+                    """
+                    SELECT
+                        p.id AS perfil_id,
+                        p.cuenta_id,
+                        p.cliente_id,
+                        p.telefono,
+                        p.nombre_perfil,
+                        p.pin,
+                        p.fecha_entrega,
+                        p.dias_cuenta,
+                        p.fecha_vencimiento,
+                        p.estado,
+                        c.plataforma,
+                        c.correo,
+                        c.estado AS estado_cuenta
+                    FROM nube_perfiles AS p
+                    INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+                    WHERE p.id != ?
+                      AND COALESCE(p.estado, '') NOT IN (
+                            'caida', 'reemplazada', 'papelera',
+                            'disponible', 'garantia', 'vencida'
+                      )
+                      AND COALESCE(c.estado, '') NOT IN (
+                            'caida', 'papelera', 'reemplazada', 'garantia'
+                      )
+                    ORDER BY LOWER(TRIM(c.plataforma)), p.id
+                    """,
+                    (perfil_id,)
+                )
+                for candidato_fila in cursor.fetchall():
+                    candidato = dict(candidato_fila)
+                    estado = _estado_destino_extension_nube(
+                        candidato["fecha_vencimiento"]
+                    )
+                    if estado not in {"activa", "por_vencer"}:
+                        continue
+                    if not es_asignacion_operativa_nube(
+                        "cliente",
+                        candidato["fecha_entrega"],
+                        candidato["dias_cuenta"],
+                        candidato["fecha_vencimiento"]
+                    ):
+                        continue
+                    if not _servicio_pertenece_a_identidad_nube(
+                        cursor, candidato, identidad
+                    ):
+                        continue
+                    candidato["estado"] = estado
+                    candidato["nuevo_vencimiento"] = (
+                        _nuevo_vencimiento_extension_nube(
+                            candidato["fecha_vencimiento"],
+                            contexto["dias_restantes"]
+                        )
+                    )
+                    contexto["servicios_activos_cliente"].append(candidato)
         return contexto
     finally:
         conn.close()
@@ -1939,6 +2063,15 @@ def liberar_o_trasladar_perfil_nube(
     if accion == "liberar":
         return liberar_perfil_nube(
             perfil_origen_id=perfil_origen_id,
+            motivo=motivo,
+            operacion_uuid=operacion_uuid
+        )
+
+    if accion == "sumar_activo":
+        return _sumar_dias_servicio_activo_nube(
+            perfil_origen_id=perfil_origen_id,
+            perfil_destino_id=perfil_destino_id,
+            dias_trasladar=dias_trasladar,
             motivo=motivo,
             operacion_uuid=operacion_uuid
         )
@@ -2283,6 +2416,210 @@ def liberar_o_trasladar_perfil_nube(
             "codigo": "transferencia_no_valida",
             "mensaje": str(error)
         }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _sumar_dias_servicio_activo_nube(
+    perfil_origen_id,
+    perfil_destino_id,
+    dias_trasladar,
+    motivo="",
+    operacion_uuid=""
+):
+    motivo = (motivo or "").strip()
+    operacion_uuid = (operacion_uuid or "").strip()
+    try:
+        perfil_origen_id = int(perfil_origen_id)
+        perfil_destino_id = int(perfil_destino_id)
+        dias_trasladar = int(dias_trasladar)
+    except (TypeError, ValueError):
+        return {"ok": False, "codigo": "datos_no_validos",
+                "mensaje": "Selecciona un destino y una cantidad de días válidos."}
+
+    if not operacion_uuid:
+        return {"ok": False, "codigo": "operacion_uuid_requerido",
+                "mensaje": "La operación necesita un identificador único."}
+    if perfil_origen_id <= 0 or perfil_destino_id <= 0 or perfil_origen_id == perfil_destino_id:
+        return {"ok": False, "codigo": "destino_no_valido",
+                "mensaje": "Selecciona un servicio activo de destino diferente."}
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "SELECT 1 FROM nube_transferencias_servicios WHERE operacion_uuid = ?",
+            (operacion_uuid,)
+        )
+        if cursor.fetchone():
+            raise sqlite3.IntegrityError("operacion_uuid UNIQUE")
+        cursor.execute(
+            """
+            SELECT p.*, c.plataforma
+            FROM nube_perfiles AS p
+            INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+            WHERE p.id = ?
+            """, (perfil_origen_id,)
+        )
+        origen = cursor.fetchone()
+        if not origen or not es_asignacion_operativa_nube(
+            origen["nombre_cliente"], origen["fecha_entrega"],
+            origen["dias_cuenta"], origen["fecha_vencimiento"]
+        ):
+            raise ValueError("El perfil de origen ya no tiene una asignación válida.")
+
+        identidad = _identidad_cliente_servicio_nube(cursor, origen)
+        if not identidad:
+            raise ValueError("No se pudo identificar al cliente de forma inequívoca.")
+        dias_restantes = max(calcular_dias_restantes(origen["fecha_vencimiento"]), 0)
+        if dias_trasladar < 1 or dias_trasladar > dias_restantes:
+            raise ValueError(
+                f"Los días a trasladar deben estar entre 1 y {dias_restantes}."
+            )
+
+        cursor.execute(
+            """
+            SELECT p.*, c.plataforma, c.correo,
+                   c.contrasena, c.estado AS estado_cuenta
+            FROM nube_perfiles AS p
+            INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+            WHERE p.id = ?
+            """, (perfil_destino_id,)
+        )
+        destino = cursor.fetchone()
+        if not destino:
+            raise ValueError("No se encontró el servicio activo de destino.")
+        if not _servicio_pertenece_a_identidad_nube(cursor, destino, identidad):
+            raise ValueError("El servicio de destino no pertenece al mismo cliente.")
+        if (destino["estado"] or "") in {
+            "caida", "reemplazada", "papelera", "disponible", "garantia", "vencida"
+        }:
+            raise ValueError("El servicio de destino no está activo.")
+        estado_calculado = _estado_destino_extension_nube(
+            destino["fecha_vencimiento"]
+        )
+        if estado_calculado not in {"activa", "por_vencer"}:
+            raise ValueError("El servicio de destino no está activo.")
+        if (destino["estado_cuenta"] or "") in {
+            "caida", "papelera", "reemplazada", "garantia"
+        }:
+            raise ValueError("La cuenta madre de destino no es utilizable.")
+        if not es_asignacion_operativa_nube(
+            destino["nombre_cliente"], destino["fecha_entrega"],
+            destino["dias_cuenta"], destino["fecha_vencimiento"]
+        ):
+            raise ValueError("El servicio de destino no tiene una asignación válida.")
+
+        snapshot_origen = _crear_snapshot_servicio_nube(cursor, perfil_origen_id)
+        snapshot_destino_antes = _crear_snapshot_servicio_nube(cursor, perfil_destino_id)
+        if not snapshot_origen or not snapshot_destino_antes:
+            raise RuntimeError("No se pudieron crear los snapshots previos.")
+
+        nuevo_vencimiento = _nuevo_vencimiento_extension_nube(
+            destino["fecha_vencimiento"], dias_trasladar
+        )
+        nuevo_estado = calcular_estado_nube(nuevo_vencimiento, estado_actual="activa")
+        cursor.execute(
+            """
+            UPDATE nube_perfiles
+            SET fecha_vencimiento = ?, estado = ?,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ? AND fecha_vencimiento = ? AND COALESCE(estado, '') = ?
+            """,
+            (nuevo_vencimiento, nuevo_estado, perfil_destino_id,
+             destino["fecha_vencimiento"], destino["estado"] or "")
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("El servicio de destino cambió durante la operación.")
+        snapshot_destino_despues = _crear_snapshot_servicio_nube(cursor, perfil_destino_id)
+        if not snapshot_destino_despues:
+            raise RuntimeError("No se pudo crear el snapshot final del destino.")
+
+        cliente_id_historial = (
+            identidad["valor"] if identidad["tipo"] == "cliente_id"
+            else identidad.get("cliente_id_unico")
+        )
+        cursor.execute(
+            """
+            INSERT INTO nube_transferencias_servicios (
+                operacion_uuid, tipo_operacion, perfil_origen_id,
+                cuenta_origen_id, cliente_id, dias_disponibles,
+                dias_trasladados, destino_tipo, perfil_destino_id,
+                cuenta_destino_id, motivo, venta_origen_snapshot,
+                destino_antes_snapshot, destino_despues_snapshot
+            ) VALUES (?, 'sumar_activo', ?, ?, ?, ?, ?, 'perfil', ?, ?, ?, ?, ?, ?)
+            """,
+            (operacion_uuid, perfil_origen_id, origen["cuenta_id"],
+             cliente_id_historial, dias_restantes, dias_trasladar,
+             perfil_destino_id, destino["cuenta_id"], motivo,
+             snapshot_origen, snapshot_destino_antes, snapshot_destino_despues)
+        )
+
+        cursor.execute(
+            """
+            UPDATE nube_perfiles
+            SET cliente_id = NULL, nombre_cliente = '', telefono = '',
+                fecha_entrega = '', dias_cuenta = 0, fecha_vencimiento = '',
+                estado = 'disponible', fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ? AND COALESCE(estado, '') = ?
+              AND COALESCE(fecha_vencimiento, '') = ?
+            """,
+            (perfil_origen_id, origen["estado"] or "", origen["fecha_vencimiento"] or "")
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("El perfil de origen cambió durante la operación.")
+
+        descripcion = (
+            f"{dias_trasladar} días de {origen['plataforma']} · "
+            f"{origen['nombre_perfil']} sumados a {destino['plataforma']} · "
+            f"{destino['nombre_perfil']}"
+        ) + (f" · Motivo: {motivo}" if motivo else "")
+        cursor.executemany(
+            """
+            INSERT INTO nube_movimientos (
+                cuenta_id, tipo, descripcion, estado_anterior,
+                estado_nuevo, cliente_nombre
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            [
+                (origen["cuenta_id"], "traslado_dias_origen", descripcion,
+                 origen["estado"] or "", "disponible", origen["nombre_cliente"] or ""),
+                (destino["cuenta_id"], "suma_dias_destino", descripcion,
+                 destino["estado"] or "", nuevo_estado, destino["nombre_cliente"] or "")
+            ]
+        )
+        datos_entrega = _obtener_datos_entrega_perfil_nube(cursor, perfil_destino_id)
+        datos_entrega.update({
+            "plataforma_origen": origen["plataforma"] or "",
+            "plataforma_destino": destino["plataforma"] or "",
+            "dias_trasladados": dias_trasladar,
+            "vencimiento_anterior": destino["fecha_vencimiento"] or "",
+            "nuevo_vencimiento": nuevo_vencimiento
+        })
+        conn.commit()
+        return {
+            "ok": True, "mensaje": "Días trasladados correctamente.",
+            "perfil_origen_id": perfil_origen_id,
+            "perfil_destino_id": perfil_destino_id,
+            "dias_disponibles": dias_restantes,
+            "dias_trasladados": dias_trasladar,
+            "fecha_vencimiento": nuevo_vencimiento,
+            "estado": nuevo_estado, "datos_entrega": datos_entrega
+        }
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        if "operacion_uuid" in str(error).lower():
+            return {"ok": False, "codigo": "operacion_duplicada",
+                    "mensaje": "Esta operación ya fue procesada."}
+        return {"ok": False, "codigo": "error_integridad",
+                "mensaje": "No se pudo guardar el traslado de días."}
+    except (ValueError, RuntimeError) as error:
+        conn.rollback()
+        return {"ok": False, "codigo": "transferencia_no_valida", "mensaje": str(error)}
     except Exception:
         conn.rollback()
         raise

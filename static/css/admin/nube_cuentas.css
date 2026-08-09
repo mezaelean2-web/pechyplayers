@@ -1629,6 +1629,49 @@ body.nube-modal-abierto{
 }
 
 
+/* El formulario de gestion puede crecer con los flujos de liberacion. */
+#modalGestionarPerfil .nube-modal-panel{
+    max-height:calc(100vh - 48px);
+    max-height:calc(100dvh - 48px);
+}
+
+
+#modalGestionarPerfil .nube-form{
+    overflow-x:hidden;
+    overflow-y:auto;
+
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+}
+
+
+#modalGestionarPerfil .nube-form > *{
+    flex-shrink:0;
+}
+
+
+#modalGestionarPerfil .nube-form-grid{
+    overflow:visible;
+}
+
+
+#modalGestionarPerfil .nube-form::-webkit-scrollbar{
+    width:7px;
+}
+
+
+#modalGestionarPerfil .nube-form::-webkit-scrollbar-track{
+    background:transparent;
+}
+
+
+#modalGestionarPerfil .nube-form::-webkit-scrollbar-thumb{
+    border-radius:20px;
+
+    background:#30323a;
+}
+
+
 /* ==========================================
    RESPONSIVE MODAL
    ========================================== */
@@ -1643,6 +1686,11 @@ body.nube-modal-abierto{
         max-height:95vh;
 
         border-radius:16px;
+    }
+
+    #modalGestionarPerfil .nube-modal-panel{
+        max-height:calc(100vh - 24px);
+        max-height:calc(100dvh - 24px);
     }
 
     .nube-form-grid{

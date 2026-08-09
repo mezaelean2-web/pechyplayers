@@ -994,10 +994,16 @@ def liberar_trasladar_perfil_nube_route():
     datos = request.get_json(silent=True) or {}
 
     accion = datos.get("accion")
-    if accion not in {"liberar", "trasladar_nuevo"}:
+    if accion not in {"liberar", "trasladar_nuevo", "sumar_activo"}:
         return jsonify({
             "ok": False,
             "mensaje": "La acción solicitada no es válida."
+        }), 400
+
+    if accion == "sumar_activo" and datos.get("destino_tipo") != "perfil":
+        return jsonify({
+            "ok": False,
+            "mensaje": "El destino activo debe ser un perfil."
         }), 400
 
     try:
@@ -1014,7 +1020,7 @@ def liberar_trasladar_perfil_nube_route():
     resultado = liberar_o_trasladar_perfil_nube(
         perfil_origen_id=perfil_origen_id,
         accion=accion,
-        perfil_destino_id=datos.get("perfil_destino_id"),
+        perfil_destino_id=datos.get("destino_id", datos.get("perfil_destino_id")),
         dias_trasladar=datos.get("dias_trasladar"),
         motivo=datos.get("motivo", ""),
         operacion_uuid=datos.get("operacion_uuid", "")
