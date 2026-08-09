@@ -1,0 +1,492 @@
+{% extends "admin/base_admin.html" %}
+
+{% block contenido %}
+
+<section class="historial-page">
+
+    <div class="historial-encabezado">
+
+        <div>
+
+            <span class="historial-etiqueta">
+                ✦ ACTIVIDAD
+            </span>
+
+            <h1>
+                Historial del sistema
+            </h1>
+
+            <p>
+                Consulta los cambios y movimientos realizados
+                en PECHY PLAYERS.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <section class="historial-herramientas">
+
+        <div class="historial-buscador">
+
+            <span>
+                🔎
+            </span>
+
+            <input
+                type="search"
+                id="historialBuscador"
+                placeholder="Buscar movimiento, plataforma o fecha..."
+                autocomplete="off">
+
+        </div>
+
+
+        <div class="historial-filtros">
+
+
+            <button
+    type="button"
+    class="historial-filtro"
+    data-filtro="configuracion">
+
+    🛠 Configuración
+
+</button>
+
+            <button
+    type="button"
+    class="historial-filtro"
+    data-filtro="sistema">
+
+    ⚙ Sistema
+
+</button>
+
+            <button
+                type="button"
+                class="historial-filtro"
+                data-filtro="productos">
+
+                ◇ Productos
+
+            </button>
+
+            <button
+                type="button"
+                class="historial-filtro"
+                data-filtro="promociones">
+
+                🏷 Promociones
+
+            </button>
+
+            <button
+                type="button"
+                class="historial-filtro"
+                data-filtro="categorias">
+
+                📁 Categorías
+
+            </button>
+
+            <button
+                type="button"
+                class="historial-filtro"
+                data-filtro="sistema">
+
+                ⚙ Sistema
+
+            </button>
+
+        </div>
+
+        <div class="historial-fechas">
+
+    <button
+        type="button"
+        class="historial-fecha activo"
+        data-fecha="hoy">
+
+        Hoy
+
+    </button>
+
+    <button
+        type="button"
+        class="historial-fecha"
+        data-fecha="7">
+
+        7 días
+
+    </button>
+
+    <button
+        type="button"
+        class="historial-fecha"
+        data-fecha="30">
+
+        30 días
+
+    </button>
+
+    <button
+        type="button"
+        class="historial-fecha"
+        data-fecha="todos">
+
+        Todo
+
+    </button>
+
+</div>
+
+    </section>
+
+
+    <section class="historial-resumen">
+
+        <article class="historial-resumen-card">
+
+            <div class="historial-resumen-icono rojo">
+                〽
+            </div>
+
+            <div>
+
+                <span>
+                    Movimientos registrados
+                </span>
+
+                <strong>
+    {{ total_movimientos }}
+</strong>
+
+                <small>
+                    Actividad total disponible
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="historial-resumen-card">
+
+    <div class="historial-resumen-icono naranja">
+        !
+    </div>
+
+    <div>
+
+        <span>
+            Cambios críticos
+        </span>
+
+        <strong id="historialCambiosCriticos">
+            0
+        </strong>
+
+        <small>
+            Acciones que requieren atención
+        </small>
+
+    </div>
+
+</article>
+
+
+        <article class="historial-resumen-card">
+
+    <div class="historial-resumen-icono verde">
+        ◷
+    </div>
+
+    <div>
+
+        <span>
+            Última actividad
+        </span>
+
+        <strong
+            id="historialUltimaActividad"
+            class="historial-ultima-fecha"
+            data-fecha="{{ ultima_actividad or '' }}">
+
+            {% if ultima_actividad %}
+                {{ ultima_actividad }}
+            {% else %}
+                Sin actividad
+            {% endif %}
+
+        </strong>
+
+        <small>
+            Último movimiento registrado
+        </small>
+
+    </div>
+
+</article>
+
+    </section>
+
+
+    <section class="historial-contenido">
+
+        <div class="historial-tabla-card">
+
+            <div class="historial-tabla-cabecera">
+
+                <span>
+                    Actividad
+                </span>
+
+                <span>
+                    Categoría
+                </span>
+
+                <span>
+                    Fecha y hora
+                </span>
+
+            </div>
+
+
+            <div
+                class="historial-lista"
+                id="historialLista">
+
+                {% if historial %}
+
+                    {% for registro in historial %}
+
+                        <article
+                            class="historial-item"
+                            data-accion="{{ registro['accion']|lower }}"
+                            data-fecha="{{ registro['fecha'] }}">
+
+                            <div class="historial-item-actividad">
+
+                                <div
+    class="
+        historial-icono
+        icono-${categoria}
+    ">
+
+    ${iconos[categoria] || "●"}
+
+</div>
+
+                                <div>
+
+                                    <strong>
+                                        {{ registro["accion"] }}
+                                    </strong>
+
+                                    <small>
+                                        Movimiento registrado en el sistema
+                                    </small>
+
+                                </div>
+
+                            </div>
+
+
+                            <div class="historial-item-categoria">
+
+                                <span class="historial-badge">
+                                    Sistema
+                                </span>
+
+                            </div>
+
+
+                            <div class="historial-item-fecha">
+
+                                <strong>
+                                    {{ registro["fecha"] }}
+                                </strong>
+
+                                <small>
+                                    Registro guardado
+                                </small>
+
+                            </div>
+
+                        </article>
+
+                    {% endfor %}
+
+                {% else %}
+
+                    <div class="historial-vacio">
+
+                        <div class="historial-vacio-icono">
+                            🕘
+                        </div>
+
+                        <h2>
+                            No hay movimientos todavía
+                        </h2>
+
+                        <p>
+                            Las acciones realizadas dentro del panel
+                            aparecerán aquí.
+                        </p>
+
+                    </div>
+
+                {% endif %}
+
+            </div>
+
+            <div class="historial-cargar-contenedor">
+
+    <button
+        type="button"
+        id="btnCargarMasHistorial"
+        class="historial-cargar-mas"
+        data-offset="{{ historial|length }}">
+
+        Cargar más movimientos
+        <span>⌄</span>
+
+    </button>
+
+</div>
+
+        </div>
+
+
+        <aside class="historial-lateral">
+
+            <div class="historial-lateral-cabecera">
+
+    <h2>
+        Actividad reciente
+    </h2>
+
+    <button
+        type="button"
+        id="btnVerTodoHistorial"
+        class="historial-ver-todo">
+
+        Ver todo
+
+    </button>
+
+</div>
+
+
+            <div class="historial-lateral-lista">
+
+                {% for registro in historial[:5] %}
+
+                    <article class="historial-lateral-item">
+
+                        <div class="historial-lateral-icono">
+                            ✓
+                        </div>
+
+                        <div>
+
+                            <strong>
+                                {{ registro["accion"] }}
+                            </strong>
+
+                            <span>
+                                {{ registro["fecha"] }}
+                            </span>
+
+                        </div>
+
+                    </article>
+
+                {% endfor %}
+
+            </div>
+
+
+            <div class="historial-usuarios">
+
+    <div class="historial-usuarios-cabecera">
+
+        <span>
+            Usuario
+        </span>
+
+        <span>
+            Estado
+        </span>
+
+    </div>
+
+
+    <article class="historial-usuario-item">
+
+        <div class="historial-usuario-info">
+
+            <div class="historial-avatar">
+                A
+            </div>
+
+            <div>
+
+                <strong>
+                    Administrador
+                </strong>
+
+                <span>
+                    Superadministrador
+                </span>
+
+            </div>
+
+        </div>
+
+        <span class="historial-usuario-estado activo">
+            ● Activo
+        </span>
+
+    </article>
+
+
+    <article class="historial-usuario-item">
+
+        <div class="historial-usuario-info">
+
+            <div class="historial-avatar">
+                S
+            </div>
+
+            <div>
+
+                <strong>
+                    Sistema
+                </strong>
+
+                <span>
+                    Automatizado
+                </span>
+
+            </div>
+
+        </div>
+
+        <span class="historial-usuario-estado automatico">
+            ● Automático
+        </span>
+
+    </article>
+
+</div>
+
+        </aside>
+
+    </section>
+
+</section>
+
+{% endblock %}

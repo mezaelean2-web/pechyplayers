@@ -1,0 +1,128 @@
+/* ========================= */
+/*        TABLET             */
+/* ========================= */
+
+@media (max-width:1200px){
+
+    .dashboard-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
+
+
+/* ========================= */
+/*        MOVIL              */
+/* ========================= */
+
+@media (max-width:900px){
+
+    .admin-sidebar{
+
+        position:relative;
+
+        width:100%;
+
+        height:auto;
+
+    }
+
+    .admin-content{
+
+        margin-left:0;
+
+        width:100%;
+
+        padding:20px;
+
+    }
+
+    .admin-header{
+
+        flex-direction:column;
+
+        align-items:flex-start;
+
+    }
+
+    .header-actions{
+
+        width:100%;
+
+        align-items:stretch;
+
+    }
+
+    .header-button{
+
+        width:100%;
+
+    }
+
+    .dashboard-cards{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
+
+
+/* ========================= */
+/*     TELEFONO PEQUEÑO      */
+/* ========================= */
+
+@media (max-width:600px){
+
+    .header-info h1{
+
+        font-size:34px;
+
+    }
+
+    .panel-heading{
+
+        flex-direction:column;
+
+        align-items:flex-start;
+
+    }
+
+    .card-content strong{
+
+        font-size:36px;
+
+    }
+
+    .quick-action{
+
+        grid-template-columns:42px 1fr 20px;
+
+    }
+
+}
+
+/* ==========================================
+   ADMIN RESPONSIVE GENERAL
+========================================== */
+
+@media (max-width:768px){
+
+    .admin-sidebar{
+        display:none;
+    }
+
+    .admin-content{
+        margin-left:0;
+        width:100%;
+        padding:18px;
+    }
+
+    .admin-layout{
+        display:block;
+        width:100%;
+    }
+
+}

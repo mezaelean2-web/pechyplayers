@@ -5,7 +5,19 @@ document.addEventListener("DOMContentLoaded", function () {
      SPLASH
   ========================== */
 
+  if (typeof iniciarSplash === "function") {
   iniciarSplash();
+} else {
+  const splash = document.getElementById("splashMobile");
+
+  setTimeout(function () {
+    splash?.classList.add("oculto");
+  }, 1800);
+
+  setTimeout(function () {
+    splash?.remove();
+  }, 2500);
+}
 
   if (!esMovil) return;
 
@@ -29,6 +41,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let tarjetaActual = null;
 
+  function productoAgotado(card) {
+  return Boolean(
+    card?.querySelector(".agotado-ribbon") ||
+    card?.querySelector(".buy-agotado")
+  );
+}
+
+function enviarAgotadoAWhatsApp(card) {
+  const enlace =
+    card?.querySelector(".buy-agotado")?.getAttribute("href");
+
+  if (enlace) {
+    window.location.href = enlace;
+  }
+}
+
   if (!modal) return;
 
   function cerrarModal() {
@@ -46,6 +74,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const boton = card.querySelector(".buy");
 
     function abrirModalProducto() {
+      if (productoAgotado(card)) {
+  enviarAgotadoAWhatsApp(card);
+  return;
+}
         tarjetaActual = card;
       const nombre =
         card.querySelector(".cover-overlay h3")?.textContent.trim() || "";
@@ -115,40 +147,77 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   otrasTarjetas.slice(0, 6).forEach(function (otraCard) {
-    const otroNombre =
-      otraCard.querySelector(".cover-overlay h3")
-        ?.textContent.trim() || "Plataforma";
+  const otroNombre =
+    otraCard.querySelector(".cover-overlay h3")
+      ?.textContent.trim() || "Plataforma";
 
-    const otraImagen =
-      otraCard.querySelector(".cover-img")
-        ?.getAttribute("src") || "";
+  const otraImagen =
+    otraCard.querySelector(".cover-img")
+      ?.getAttribute("src") || "";
 
-    const recomendacion = document.createElement("button");
+  const estaAgotado =
+    productoAgotado(otraCard);
 
-    recomendacion.type = "button";
-    recomendacion.className = "modal-recomendacion";
+  const recomendacion =
+    document.createElement("button");
 
-    recomendacion.innerHTML = `
+  recomendacion.type = "button";
+
+  recomendacion.className =
+    estaAgotado
+      ? "modal-recomendacion recomendacion-agotada"
+      : "modal-recomendacion";
+
+  recomendacion.innerHTML = `
+    <div class="modal-recomendacion-imagen">
       <img src="${otraImagen}" alt="${otroNombre}">
-      <div class="modal-recomendacion-info">
-        <strong>${otroNombre}</strong>
-        <span>Ver planes →</span>
-      </div>
-    `;
 
-    recomendacion.addEventListener("click", function () {
-      const otraPortada = otraCard.querySelector(".cover");
+      ${
+        estaAgotado
+  ? `
+    <div class="recomendacion-ribbon-agotado">
+  <span>AGOTADO</span>
+</div>
+  `
+  : ""
+      }
+    </div>
 
-      contenido?.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
+    <div class="modal-recomendacion-info">
+      <strong>${otroNombre}</strong>
 
-      otraPortada?.click();
+      <span>
+        ${
+          estaAgotado
+            ? "Avísame cuando esté disponible →"
+            : "Ver planes →"
+        }
+      </span>
+    </div>
+  `;
+
+  recomendacion.addEventListener("click", function () {
+    if (estaAgotado) {
+      enviarAgotadoAWhatsApp(otraCard);
+      return;
+    }
+
+    const otraPortada =
+      otraCard.querySelector(".cover");
+
+    contenido?.scrollTo({
+      top: 0,
+      behavior: "smooth"
     });
 
-    modalRecomendacionesLista.appendChild(recomendacion);
+    otraPortada?.click();
   });
+
+  modalRecomendacionesLista.appendChild(
+    recomendacion
+  );
+});
+
 }
 
 if(typeof actualizarActividadModal==="function"){

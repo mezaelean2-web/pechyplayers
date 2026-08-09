@@ -1,0 +1,145 @@
+/* =====================================
+   NUEVO LOBBY CINEMATIC - PECHY PLAYERS
+===================================== */
+
+.lobby-cinematic{
+    position:relative;
+    max-width:1400px;
+    margin:50px auto;
+    padding:70px 30px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:32px;
+
+    background:
+        radial-gradient(circle at top, #5c0000 0%, #190000 28%, #080808 70%);
+
+    box-shadow:
+        0 35px 90px rgba(0,0,0,.70),
+        inset 0 0 100px rgba(255,0,0,.08);
+}
+
+.lobby-cinematic::before{
+    content:"";
+    position:absolute;
+    inset:0;
+
+    background:
+        radial-gradient(circle, rgba(255,255,255,.07) 1px, transparent 1px);
+
+    background-size:35px 35px;
+    opacity:.25;
+    pointer-events:none;
+}
+
+.lobby-nuevo-encabezado{
+    position:relative;
+    z-index:2;
+    max-width:750px;
+    margin:0 auto 45px;
+    text-align:center;
+}
+
+.lobby-nuevo-encabezado small{
+    display:block;
+    margin-bottom:12px;
+    color:#ff3c3c;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:4px;
+}
+
+.lobby-nuevo-encabezado h2{
+    margin:0;
+    color:#fff;
+    font-size:clamp(36px, 5vw, 64px);
+    line-height:1;
+}
+
+.lobby-nuevo-encabezado p{
+    margin:18px 0 0;
+    color:rgba(255,255,255,.68);
+    font-size:17px;
+}
+
+.lobby-nuevo-prueba{
+    position:relative;
+    z-index:2;
+    max-width:1000px;
+    margin:auto;
+    padding:75px 35px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:28px;
+    text-align:center;
+
+    background:
+        linear-gradient(145deg, rgba(30,30,30,.96), rgba(4,4,4,.98));
+
+    box-shadow:
+        0 30px 70px rgba(0,0,0,.70),
+        0 0 40px rgba(255,0,0,.16),
+        inset 0 0 60px rgba(255,255,255,.025);
+}
+
+.lobby-nuevo-prueba span{
+    color:#ff4545;
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:4px;
+}
+
+.lobby-nuevo-prueba h3{
+    margin:16px 0 12px;
+    color:#fff;
+    font-size:clamp(30px, 4vw, 48px);
+    line-height:1.05;
+}
+
+.lobby-nuevo-prueba p{
+    max-width:650px;
+    margin:0 auto;
+    color:rgba(255,255,255,.68);
+    font-size:17px;
+    line-height:1.6;
+}
+
+@media (max-width:768px){
+
+    .lobby-cinematic{
+        margin:35px 0;
+        padding:45px 16px;
+        border-radius:0;
+    }
+
+    .lobby-nuevo-encabezado{
+        margin-bottom:30px;
+        text-align:left;
+    }
+
+    .lobby-nuevo-encabezado small{
+        font-size:10px;
+        letter-spacing:2px;
+    }
+
+    .lobby-nuevo-encabezado h2{
+        font-size:36px;
+    }
+
+    .lobby-nuevo-encabezado p{
+        font-size:14px;
+    }
+
+    .lobby-nuevo-prueba{
+        padding:45px 20px;
+        border-radius:22px;
+    }
+
+    .lobby-nuevo-prueba h3{
+        font-size:30px;
+    }
+
+    .lobby-nuevo-prueba p{
+        font-size:14px;
+    }
+}

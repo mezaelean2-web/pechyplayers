@@ -1,0 +1,1984 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Organización | PECHY PLAYERS{% endblock %}
+
+{% block contenido %}
+
+<section class="organizacion-page">
+
+    <div class="page-header">
+
+        <div>
+            <h1>📂 Organización del catálogo</h1>
+
+            <p>
+                Administra las categorías, iconos, colores y el orden del catálogo.
+            </p>
+        </div>
+
+        <button class="btn-nueva-categoria">
+            <i data-lucide="plus"></i>
+            Nueva categoría
+        </button>
+
+    </div>
+
+    <div class="categorias-grid">
+
+    <article class="categoria-card-premium categoria-nueva-premium">
+
+    <div class="categoria-icono-premium">
+        <i data-lucide="plus"></i>
+    </div>
+
+    <h3>CREAR CATEGORÍA</h3>
+
+    <span class="categoria-badge">
+        NUEVA
+    </span>
+
+    <div class="categoria-nueva-descripcion">
+        Agrega una nueva categoría para organizar los productos del catálogo.
+    </div>
+
+    <button type="button" class="categoria-nueva-boton">
+        <i data-lucide="plus"></i>
+        Crear categoría
+    </button>
+
+</article>
+
+   {% for nombre_categoria, productos in categorias.items() %}
+
+{% set estilo = estilos_categorias.get(
+    nombre_categoria,
+    {"icono": "folder", "clase": "otros"}
+) %}
+
+<article
+    class="categoria-card-premium {{ estilo.clase }}"
+    data-categoria="{{ nombre_categoria }}"
+    data-icono="{{ estilo.icono }}"
+    data-color="{{ estilo.color }}"
+    style="--categoria-color: {{ estilo.color }};"
+>
+
+    <div class="categoria-drag" draggable="true">
+        <i data-lucide="grip-vertical"></i>
+    </div>
+
+    <div class="categoria-menu-contenedor">
+
+    <button type="button" class="categoria-menu">
+        <i data-lucide="more-horizontal"></i>
+    </button>
+
+    <div class="categoria-menu-flotante">
+
+        <button
+    type="button"
+
+    data-categoria="{{ nombre_categoria }}"
+    data-total="{{ productos|length }}"
+    data-icono="{{ estilo.icono }}"
+    data-color="{{ estilo.color }}">
+
+    <i data-lucide="pencil"></i>
+    Editar categoría
+
+</button>
+
+        <button
+    type="button"
+    class="menu-cambiar-color"
+    data-categoria="{{ nombre_categoria }}"
+>
+    <i data-lucide="palette"></i>
+    Cambiar color
+</button>
+
+        <button type="button">
+            <i data-lucide="image"></i>
+            Cambiar icono
+        </button>
+
+        <button type="button" class="menu-eliminar">
+            <i data-lucide="trash-2"></i>
+            Eliminar categoría
+        </button>
+
+    </div>
+
+</div>
+
+    <div class="categoria-icono-premium">
+    <i data-lucide="{{ estilo.icono }}"></i>
+</div>
+
+    <h3>{{ nombre_categoria }}</h3>
+
+    <div class="categoria-estadisticas">
+
+    <div class="categoria-stat">
+        <i data-lucide="package"></i>
+        <span>{{ productos|length }} productos</span>
+    </div>
+
+    <div class="categoria-stat">
+        <i data-lucide="eye"></i>
+        <span>Visible</span>
+    </div>
+
+    <div class="categoria-stat">
+        <i data-lucide="move"></i>
+        <span>Orden #1</span>
+    </div>
+
+</div>
+
+    <div
+    class="categoria-productos-premium productos-ordenables"
+    data-categoria="{{ nombre_categoria }}"
+>
+
+    {% for producto in productos %}
+        <div
+            class="categoria-producto-item producto-arrastrable"
+            draggable="true"
+            data-producto="{{ producto.nombre }}"
+        >
+            <i data-lucide="grip-vertical"></i>
+
+            <span class="categoria-producto-punto"></span>
+
+            <span>{{ producto.nombre }}</span>
+        </div>
+    {% endfor %}
+
+</div>
+
+    <div class="categoria-acciones-premium">
+
+        <button
+    type="button"
+    class="toggle-visible"
+    data-categoria="{{ nombre_categoria }}"
+    data-visible="{{ estilo.visible }}"
+    title="Visibilidad"
+
+    <button
+        type="button"
+        class="toggle-visible"
+        data-categoria="{{ nombre_categoria }}"
+        data-visible="{{ estilo.visible }}"
+        title="Visibilidad"
+    >
+        <i data-lucide="{% if estilo.visible %}eye{% else %}eye-off{% endif %}"></i>
+    </button>
+
+    <button
+        type="button"
+        class="editar"
+        data-categoria="{{ nombre_categoria }}"
+        data-total="{{ productos|length }}"
+        data-icono="{{ estilo.icono }}"
+        data-color="{{ estilo.color }}"
+        title="Editar"
+    >
+        <i data-lucide="pencil"></i>
+    </button>
+
+    <button type="button" class="eliminar" title="Eliminar">
+        <i data-lucide="trash-2"></i>
+    </button>
+
+</div>
+
+</article>
+
+{% endfor %}
+
+</div>
+
+<div id="modalNuevaCategoria" class="modal-categoria">
+
+    <div class="modal-categoria-overlay"></div>
+
+    <div class="modal-categoria-contenido">
+
+        <button
+            type="button"
+            class="modal-categoria-cerrar"
+            id="cerrarNuevaCategoria">
+
+            <i data-lucide="x"></i>
+
+        </button>
+
+        <div class="modal-categoria-icono">
+            <i data-lucide="folder-plus"></i>
+        </div>
+
+        <div class="modal-categoria-encabezado">
+
+            <span>Nueva categoría</span>
+
+            <h2>Crear categoría</h2>
+
+            <p>
+                Agrega una nueva categoría para organizar
+                mejor tu catálogo.
+            </p>
+
+        </div>
+
+        <div class="modal-categoria-formulario">
+
+            <label>
+
+                Nombre
+
+                <input
+                    id="nuevaCategoriaNombre"
+                    type="text"
+                    placeholder="Ej: Películas"
+                >
+
+            </label>
+
+            <label>
+
+                Icono
+
+                <select id="nuevaCategoriaIcono">
+
+                    <option value="folder">Carpeta</option>
+                    <option value="tv">TV</option>
+                    <option value="clapperboard">Películas</option>
+                    <option value="music-2">Música</option>
+                    <option value="trophy">Deportes</option>
+                    <option value="gift">Regalos</option>
+
+                </select>
+
+            </label>
+
+            <label>
+
+                Color
+
+                <input
+                    id="nuevaCategoriaColor"
+                    type="color"
+                    value="#ff2d37"
+                >
+
+            </label>
+
+            <label class="modal-categoria-switch">
+
+                <span>
+
+                    <strong>Visible</strong>
+
+                    <small>
+                        Mostrar esta categoría
+                        en el catálogo.
+                    </small>
+
+                </span>
+
+                <input
+                    id="nuevaCategoriaVisible"
+                    type="checkbox"
+                    checked
+                >
+
+            </label>
+
+        </div>
+
+        <div class="modal-categoria-acciones">
+
+            <button
+                type="button"
+                class="modal-btn-cancelar"
+                id="cancelarNuevaCategoria">
+
+                Cancelar
+
+            </button>
+
+            <button
+                type="button"
+                class="modal-btn-guardar"
+                id="guardarNuevaCategoria">
+
+                <i data-lucide="plus"></i>
+
+                Crear categoría
+
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+</section>
+
+<!-- PANEL LATERAL: ORDENAR PRODUCTOS DE UNA CATEGORÍA -->
+
+<div class="panel-productos-overlay" id="panelProductosOverlay"></div>
+
+<aside class="panel-productos" id="panelProductos">
+
+    <div class="panel-productos-header">
+
+        <div class="panel-productos-titulo">
+
+            <div
+                class="panel-productos-icono"
+                id="panelProductosIcono"
+            >
+                <i data-lucide="folder"></i>
+            </div>
+
+            <div>
+                <span>Organización interna</span>
+
+                <h2 id="panelProductosNombre">
+                    Categoría
+                </h2>
+
+                <p>
+                    Arrastra los productos para cambiar su orden.
+                </p>
+            </div>
+
+        </div>
+
+        <button
+            type="button"
+            class="panel-productos-cerrar"
+            id="cerrarPanelProductos"
+            title="Cerrar"
+        >
+            <i data-lucide="x"></i>
+        </button>
+
+    </div>
+
+    <div class="panel-productos-contenido">
+
+        <div class="panel-productos-info">
+
+            <i data-lucide="move"></i>
+
+            <span>
+                El primer producto de esta lista aparecerá primero
+                en el catálogo.
+            </span>
+
+        </div>
+
+        <button
+    type="button"
+    class="panel-productos-agregar"
+    id="abrirAgregarProductos"
+>
+    <i data-lucide="folder-plus"></i>
+
+    <span>Agregar productos</span>
+</button>
+
+        <div
+            class="panel-productos-lista"
+            id="panelProductosLista"
+        >
+            <!-- Los productos se cargarán aquí con JavaScript -->
+        </div>
+
+    </div>
+
+    <div class="panel-productos-footer">
+
+        <button
+            type="button"
+            class="panel-productos-cancelar"
+            id="cancelarOrdenProductos"
+        >
+            Cancelar
+        </button>
+
+        <button
+            type="button"
+            class="panel-productos-guardar"
+            id="guardarOrdenProductos"
+        >
+            <i data-lucide="save"></i>
+            Guardar orden
+        </button>
+
+    </div>
+
+</aside>
+
+<!-- MODAL: AGREGAR PRODUCTOS A UNA CATEGORÍA -->
+
+<div id="modalAgregarProductos" class="modal-categoria">
+
+    <div class="modal-categoria-overlay"></div>
+
+    <div class="modal-categoria-contenido">
+
+        <button
+            type="button"
+            class="modal-categoria-cerrar"
+            id="cerrarAgregarProductos"
+        >
+            <i data-lucide="x"></i>
+        </button>
+
+        <div class="modal-categoria-icono">
+            <i data-lucide="folder-plus"></i>
+        </div>
+
+        <div class="modal-categoria-encabezado">
+
+            <span>Organizar catálogo</span>
+
+            <h2>Agregar productos</h2>
+
+            <p>
+                Selecciona los productos que deseas agregar a
+                <strong id="nombreCategoriaAgregar">Categoría</strong>.
+            </p>
+
+        </div>
+
+        <div id="listaProductosSinCategoria">
+
+    {% if productos_sin_categoria %}
+
+        {% for producto in productos_sin_categoria %}
+
+            <label class="producto-sin-categoria-item">
+
+    <input
+        type="checkbox"
+        value="{{ producto.nombre }}"
+    >
+
+    <img
+        src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+        alt="{{ producto.nombre }}"
+        class="producto-sin-categoria-logo"
+    >
+
+    <span>{{ producto.nombre }}</span>
+
+</label>
+
+        {% endfor %}
+
+    {% else %}
+
+        <p>No hay productos sin categoría.</p>
+
+    {% endif %}
+
+</div>
+
+        <div class="modal-categoria-acciones">
+
+            <button
+                type="button"
+                class="modal-btn-cancelar"
+                id="cancelarAgregarProductos"
+            >
+                Cancelar
+            </button>
+
+            <button
+                type="button"
+                class="modal-btn-guardar"
+                id="confirmarAgregarProductos"
+            >
+                <i data-lucide="folder-plus"></i>
+                Agregar seleccionados
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div class="modal-categoria" id="modalCategoria">
+
+    <div class="modal-categoria-overlay"></div>
+
+    <div class="modal-categoria-contenido">
+
+        <button type="button" class="modal-categoria-cerrar">
+            <i data-lucide="x"></i>
+        </button>
+
+        <div class="modal-categoria-icono">
+            <i data-lucide="clapperboard"></i>
+        </div>
+
+        <div class="modal-categoria-encabezado">
+            <span>Editar categoría</span>
+            <h2>Streaming</h2>
+            <p>
+                Personaliza el nombre, icono, color y visibilidad.
+            </p>
+        </div>
+
+        <div class="modal-categoria-formulario">
+
+    <label>
+        Nombre de la categoría
+        <input
+            type="text"
+            id="editarCategoriaNombre"
+            value="Streaming"
+            placeholder="Nombre de la categoría"
+        >
+    </label>
+
+    <label>
+        Icono
+        <select id="editarCategoriaIcono">
+            <option value="clapperboard">Clapperboard</option>
+            <option value="tv">Televisión</option>
+            <option value="music-2">Música</option>
+            <option value="trophy">Trofeo</option>
+            <option value="gift">Regalo</option>
+            <option value="folder">Carpeta</option>
+        </select>
+    </label>
+
+    <label>
+        Color
+        <input
+            type="color"
+            id="editarCategoriaColor"
+            value="#ff2d37"
+        >
+    </label>
+
+    <label class="modal-categoria-switch">
+        <span>
+            <strong>Categoría visible</strong>
+            <small>Mostrar esta categoría en el catálogo</small>
+        </span>
+
+        <input
+            type="checkbox"
+            id="editarCategoriaVisible"
+            checked
+        >
+    </label>
+
+</div>
+
+        <div class="modal-categoria-acciones">
+
+            <button type="button" class="modal-btn-cancelar">
+                Cancelar
+            </button>
+
+            <button
+    type="button"
+    id="guardarCambiosCategoria"
+    class="modal-btn-guardar"
+>
+    <i data-lucide="save"></i>
+    Guardar cambios
+</button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<div id="modalEliminarCategoria" class="modal-categoria">
+
+    <div class="modal-categoria-overlay"></div>
+
+    <div class="modal-categoria-contenido">
+
+        <div class="modal-categoria-icono" style="--modal-color:#ef4444;--modal-border:#ef4444;--modal-bg:#ef444422;">
+            <i data-lucide="trash-2"></i>
+        </div>
+
+        <div class="modal-categoria-encabezado">
+            <span>Eliminar categoría</span>
+
+            <h2 id="categoriaEliminarNombre">
+                Streaming
+            </h2>
+
+            <p>
+                Esta acción moverá automáticamente todos los productos a
+                <strong>Sin categoría</strong>.
+                Ningún producto será eliminado.
+            </p>
+        </div>
+
+        <div class="modal-categoria-acciones">
+
+            <button
+                type="button"
+                id="cancelarEliminarCategoria"
+                class="modal-btn-cancelar">
+                Cancelar
+            </button>
+
+            <button
+                type="button"
+                id="confirmarEliminarCategoria"
+                class="modal-btn-guardar"
+                style="background:#ef4444;">
+                🗑️ Eliminar categoría
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const modal = document.getElementById("modalCategoria");
+
+    const botonesEditar = document.querySelectorAll(
+        ".categoria-acciones-premium .editar, .categoria-menu-flotante button:first-child"
+    );
+
+    const botonCerrar = modal.querySelector(
+    ".modal-categoria-cerrar"
+);
+
+const botonCancelar = modal.querySelector(
+    ".modal-btn-cancelar"
+);
+
+const overlay = modal.querySelector(
+    ".modal-categoria-overlay"
+);
+
+    const botonGuardar = document.getElementById(
+    "guardarCambiosCategoria"
+);
+
+const inputNombre = document.getElementById(
+    "editarCategoriaNombre"
+);
+
+const inputIcono = document.getElementById(
+    "editarCategoriaIcono"
+);
+
+const inputColor = document.getElementById(
+    "editarCategoriaColor"
+);
+
+const inputVisible = document.getElementById(
+    "editarCategoriaVisible"
+);
+
+let categoriaOriginal = "";
+
+    function abrirModal(event) {
+
+        event.stopPropagation();
+
+    const boton = event.currentTarget;
+
+    const categoria = boton.dataset.categoria;
+    const icono = boton.dataset.icono;
+    const color = boton.dataset.color;
+    console.log(categoria, color);
+    categoriaOriginal = categoria;
+
+    const tituloModal = modal.querySelector(
+        ".modal-categoria-encabezado h2"
+    );
+
+    const inputNombre = modal.querySelector(
+        '.modal-categoria-formulario input[type="text"]'
+    );
+
+    const iconoModalContenedor = modal.querySelector(
+        ".modal-categoria-icono"
+    );
+    const inputColor = modal.querySelector(
+    '.modal-categoria-formulario input[type="color"]'
+    );
+
+    const selectIcono = modal.querySelector(
+    ".modal-categoria-formulario select"
+    );
+
+    tituloModal.textContent = categoria;
+    inputNombre.value = categoria;
+
+    const colorHex = color || "#64748b";
+const iconoActual = icono || "folder";
+
+selectIcono.value = iconoActual;
+inputColor.value = colorHex;
+
+iconoModalContenedor.style.setProperty("--modal-color", colorHex);
+iconoModalContenedor.style.setProperty("--modal-border", colorHex);
+iconoModalContenedor.style.setProperty("--modal-bg", colorHex + "22");
+
+    iconoModalContenedor.innerHTML =
+        `<i data-lucide="${iconoActual}"></i>`;
+
+    modal.classList.add("activa");
+    document.body.style.overflow = "hidden";
+
+    lucide.createIcons();
+}
+
+    function cerrarModal() {
+        modal.classList.remove("activa");
+        document.body.style.overflow = "";
+    }
+
+    botonesEditar.forEach(function (boton) {
+        boton.addEventListener("click", abrirModal);
+    });
+
+    botonCerrar.addEventListener("click", cerrarModal);
+    botonCancelar.addEventListener("click", cerrarModal);
+    overlay.addEventListener("click", cerrarModal);
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            cerrarModal();
+        }
+    });
+
+    botonGuardar.addEventListener("click", async function () {
+
+    const nuevoNombre = inputNombre.value.trim();
+
+    if (!nuevoNombre) {
+        alert("Escribe el nombre de la categoría.");
+        return;
+    }
+
+    botonGuardar.disabled = true;
+    botonGuardar.textContent = "Guardando...";
+
+    try {
+
+        const respuesta = await fetch(
+            "/admin/organizacion/editar-categoria",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    categoria_original: categoriaOriginal,
+                    nombre: nuevoNombre,
+                    icono: inputIcono.value,
+                    color: inputColor.value,
+                    visible: inputVisible.checked
+                })
+            }
+        );
+
+        const resultado = await respuesta.json();
+
+        if (!respuesta.ok || !resultado.ok) {
+            throw new Error(
+                resultado.mensaje ||
+                "No fue posible guardar los cambios."
+            );
+        }
+
+        window.location.reload();
+
+    } catch (error) {
+
+        alert(error.message);
+
+        botonGuardar.disabled = false;
+
+        botonGuardar.innerHTML = `
+            <i data-lucide="save"></i>
+            Guardar cambios
+        `;
+
+        lucide.createIcons();
+    }
+
+});
+
+const botonesCambiarColor = document.querySelectorAll(
+    ".menu-cambiar-color"
+);
+
+botonesCambiarColor.forEach(function (boton) {
+
+    boton.addEventListener("click", function () {
+
+        const tarjeta = boton.closest(
+            ".categoria-card-premium"
+        );
+
+        const botonEditar = tarjeta.querySelector(
+            ".categoria-acciones-premium .editar"
+        );
+
+        if (!botonEditar) return;
+
+        botonEditar.click();
+
+        setTimeout(function () {
+            inputColor.click();
+        }, 150);
+
+    });
+
+});
+
+const botonesVisibilidad = document.querySelectorAll(
+    ".toggle-visible"
+);
+
+botonesVisibilidad.forEach(function (boton) {
+
+    boton.addEventListener("click", async function () {
+
+        const categoria = boton.dataset.categoria;
+
+        const visible =
+            boton.dataset.visible === "1";
+
+        const respuesta = await fetch(
+            "/admin/organizacion/toggle-visible",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    categoria: categoria,
+                    visible: !visible
+                })
+            }
+        );
+
+        const resultado = await respuesta.json();
+
+        if (!resultado.ok) {
+            alert(resultado.mensaje);
+            return;
+        }
+
+        window.location.reload();
+
+    });
+
+});
+
+    const modalEliminar = document.getElementById("modalEliminarCategoria");
+
+const botonesEliminar = document.querySelectorAll(
+    ".categoria-acciones-premium .eliminar, .categoria-menu-flotante .menu-eliminar"
+);
+
+const nombreCategoriaEliminar = document.getElementById(
+    "categoriaEliminarNombre"
+);
+
+const cancelarEliminar = document.getElementById(
+    "cancelarEliminarCategoria"
+);
+
+const confirmarEliminar = document.getElementById(
+    "confirmarEliminarCategoria"
+);
+
+const overlayEliminar = modalEliminar.querySelector(
+    ".modal-categoria-overlay"
+);
+
+function abrirModalEliminar(event) {
+
+    event.stopPropagation();
+
+    const tarjeta = event.currentTarget.closest(
+        ".categoria-card-premium"
+    );
+
+    const categoria = tarjeta.dataset.categoria;
+
+    nombreCategoriaEliminar.textContent = categoria;
+
+    modalEliminar.dataset.categoria = categoria;
+
+    modalEliminar.classList.add("activa");
+
+    document.body.style.overflow = "hidden";
+
+    lucide.createIcons();
+}
+
+function cerrarModalEliminar() {
+
+    modalEliminar.classList.remove("activa");
+
+    document.body.style.overflow = "";
+}
+
+botonesEliminar.forEach(function (boton) {
+    boton.addEventListener("click", abrirModalEliminar);
+});
+
+cancelarEliminar.addEventListener(
+    "click",
+    cerrarModalEliminar
+);
+
+overlayEliminar.addEventListener(
+    "click",
+    cerrarModalEliminar
+);
+
+confirmarEliminar.addEventListener("click", async function () {
+
+    const categoria = modalEliminar.dataset.categoria;
+
+    confirmarEliminar.disabled = true;
+    confirmarEliminar.textContent = "Eliminando...";
+
+    const respuesta = await fetch(
+        "/admin/organizacion/eliminar-categoria",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                categoria: categoria
+            })
+        }
+    );
+
+    const resultado = await respuesta.json();
+
+    if (resultado.ok) {
+
+        const tarjeta = document.querySelector(
+            '.categoria-card-premium[data-categoria="' + categoria + '"]'
+        );
+
+        tarjeta.style.transition = ".35s";
+
+        tarjeta.style.opacity = "0";
+        tarjeta.style.transform = "scale(.9)";
+
+        setTimeout(function () {
+            tarjeta.remove();
+        }, 350);
+
+        cerrarModalEliminar();
+
+    } else {
+
+        alert(resultado.mensaje);
+
+    }
+
+    confirmarEliminar.disabled = false;
+    confirmarEliminar.innerHTML = "🗑️ Eliminar categoría";
+
+});
+
+});
+
+let categoriaArrastrando = null;
+
+document.querySelectorAll(".categoria-drag").forEach(function (drag) {
+
+    drag.addEventListener("dragstart", function () {
+
+        categoriaArrastrando = drag.closest(".categoria-card-premium");
+
+        categoriaArrastrando.classList.add("arrastrando");
+
+    });
+
+    drag.addEventListener("dragend", async function () {
+
+    categoriaArrastrando.classList.remove("arrastrando");
+
+    const orden = [];
+
+    document.querySelectorAll(".categoria-card-premium:not(.categoria-nueva-premium)")
+        .forEach(function (card) {
+
+            orden.push(card.dataset.categoria);
+
+        });
+
+    await fetch("/admin/organizacion/guardar-orden", {
+
+        method: "POST",
+
+        headers: {
+            "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+            orden: orden
+        })
+
+    });
+
+    categoriaArrastrando = null;
+
+});
+
+});
+
+const contenedorCategorias = document.querySelector(".categorias-grid");
+
+contenedorCategorias.addEventListener("dragover", function (event) {
+
+    event.preventDefault();
+
+    if (!categoriaArrastrando) {
+        return;
+    }
+
+    const tarjetaDebajo = event.target.closest(
+        ".categoria-card-premium:not(.categoria-nueva-premium):not(.arrastrando)"
+    );
+
+    if (!tarjetaDebajo) {
+        return;
+    }
+
+    const rect = tarjetaDebajo.getBoundingClientRect();
+
+    const mitadHorizontal =
+        event.clientX < rect.left + rect.width / 2;
+
+    if (mitadHorizontal) {
+
+        contenedorCategorias.insertBefore(
+            categoriaArrastrando,
+            tarjetaDebajo
+        );
+
+    } else {
+
+        contenedorCategorias.insertBefore(
+            categoriaArrastrando,
+            tarjetaDebajo.nextSibling
+        );
+
+    }
+
+});
+
+// ==================================
+// DETECTAR PRODUCTO SOBRE CATEGORÍA
+// ==================================
+
+let productoMoviendoCategoria = null;
+
+let intervaloAutoScroll = null;
+
+document.addEventListener("dragover", function(event){
+
+    window.ultimaPosicionMouseY = event.clientY;
+
+});
+
+document.addEventListener(
+    "wheel",
+    function(event){
+
+        if(!productoMoviendoCategoria){
+            return;
+        }
+
+        event.preventDefault();
+
+        window.scrollBy(
+    0,
+    event.deltaY
+);
+
+    },
+    {
+        passive:false
+    }
+);
+
+document.querySelectorAll(".producto-arrastrable")
+.forEach(function(producto){
+
+    producto.addEventListener("dragstart", function(event){
+
+        productoMoviendoCategoria = producto;
+
+        event.dataTransfer.effectAllowed = "move";
+
+        event.dataTransfer.setData(
+            "text/plain",
+            producto.dataset.producto
+        );
+
+        intervaloAutoScroll = setInterval(function(){
+
+    const posicionMouse = window.ultimaPosicionMouseY;
+
+    if(posicionMouse === undefined){
+        return;
+    }
+
+    const zonaScroll = 170;
+
+    const distanciaArriba = posicionMouse;
+
+    const distanciaAbajo =
+        window.innerHeight - posicionMouse;
+
+    if(distanciaArriba < zonaScroll){
+
+        const intensidad =
+            (zonaScroll - distanciaArriba) / zonaScroll;
+
+        const velocidad =
+            Math.ceil(5 + intensidad * 30);
+
+        window.scrollBy({
+            top:-velocidad,
+            behavior:"auto"
+        });
+
+    }else if(distanciaAbajo < zonaScroll){
+
+        const intensidad =
+            (zonaScroll - distanciaAbajo) / zonaScroll;
+
+        const velocidad =
+            Math.ceil(5 + intensidad * 30);
+
+        window.scrollBy({
+            top:velocidad,
+            behavior:"auto"
+        });
+
+    }
+
+}, 20);
+
+    });
+
+    producto.addEventListener("dragend", function(){
+
+        clearInterval(intervaloAutoScroll);
+        intervaloAutoScroll = null;
+
+        productoMoviendoCategoria = null;
+
+        document.querySelectorAll(".categoria-card-premium")
+        .forEach(function(card){
+
+            card.classList.remove("destino-producto");
+
+        });
+
+    });
+
+});
+
+
+document.querySelectorAll(
+    ".categoria-card-premium:not(.categoria-nueva-premium)"
+)
+.forEach(function(card){
+
+    card.addEventListener("dragover", function(event){
+
+        if(!productoMoviendoCategoria){
+            return;
+        }
+
+        const categoriaOrigen =
+            productoMoviendoCategoria.closest(
+                ".categoria-card-premium"
+            );
+
+        if(categoriaOrigen === card){
+            return;
+        }
+
+        event.preventDefault();
+
+        card.classList.add("destino-producto");
+
+    });
+
+    card.addEventListener("dragleave", function(event){
+
+        if(!card.contains(event.relatedTarget)){
+
+            card.classList.remove("destino-producto");
+
+        }
+
+    });
+
+    card.addEventListener("drop", function(event){
+
+        if(!productoMoviendoCategoria){
+            return;
+        }
+
+        event.preventDefault();
+
+        card.classList.remove("destino-producto");
+
+        const producto =
+    productoMoviendoCategoria.dataset.producto;
+
+const categoriaDestino =
+    card.dataset.categoria;
+
+fetch(
+    "/admin/organizacion/mover-producto",
+    {
+        method:"POST",
+
+        headers:{
+            "Content-Type":"application/json"
+        },
+
+        body:JSON.stringify({
+            producto:producto,
+            categoria_destino:categoriaDestino
+        })
+    }
+)
+.then(function(respuesta){
+
+    return respuesta.json().then(function(resultado){
+
+        if(!respuesta.ok || !resultado.ok){
+
+            throw new Error(
+                resultado.mensaje ||
+                "No fue posible mover el producto."
+            );
+
+        }
+
+        window.location.reload();
+
+    });
+
+})
+.catch(function(error){
+
+    alert(error.message);
+
+});
+
+    });
+
+});
+
+// ==========================
+// PANEL LATERAL PRODUCTOS
+// ==========================
+
+const panelProductos =
+    document.getElementById("panelProductos");
+
+    let categoriaActual = "";
+
+const overlayPanelProductos =
+    document.getElementById("panelProductosOverlay");
+
+const cerrarPanelProductos =
+    document.getElementById("cerrarPanelProductos");
+
+const cancelarOrdenProductos =
+    document.getElementById("cancelarOrdenProductos");
+
+const guardarOrdenProductos =
+    document.getElementById("guardarOrdenProductos");    
+
+const abrirAgregarProductos =
+    document.getElementById("abrirAgregarProductos");
+
+    const modalAgregarProductos =
+    document.getElementById("modalAgregarProductos");
+
+const cerrarAgregarProductos =
+    document.getElementById("cerrarAgregarProductos");
+
+const cancelarAgregarProductos =
+    document.getElementById("cancelarAgregarProductos");
+
+const overlayAgregarProductos =
+    modalAgregarProductos.querySelector(".modal-categoria-overlay");
+
+const nombreCategoriaAgregar =
+    document.getElementById("nombreCategoriaAgregar");
+
+const confirmarAgregarProductos =
+    document.getElementById("confirmarAgregarProductos");
+
+const tituloPanelProductos =
+    document.getElementById("panelProductosNombre");
+
+const iconoPanelProductos =
+    document.getElementById("panelProductosIcono");
+
+const listaPanelProductos =
+    document.getElementById("panelProductosLista");
+
+
+document.querySelectorAll(".categoria-card-premium")
+.forEach(function(card){
+
+    if(card.classList.contains("categoria-nueva-premium")){
+        return;
+    }
+
+    card.addEventListener("click",function(e){
+
+        // No abrir si se hizo clic en botones
+        if(
+            e.target.closest("button") ||
+            e.target.closest(".categoria-drag")
+        ){
+            return;
+        }
+
+        tituloPanelProductos.textContent =
+            card.dataset.categoria;
+
+            categoriaActual = card.dataset.categoria;
+
+        iconoPanelProductos.innerHTML =
+            `<i data-lucide="${card.dataset.icono}"></i>`;
+            const colorCategoria =
+    card.dataset.color || "#ff2d37";
+
+panelProductos.style.setProperty(
+    "--panel-color",
+    colorCategoria
+);
+
+        const productos = [];
+
+card.querySelectorAll(".producto-arrastrable")
+.forEach(function(item){
+
+    productos.push(item.dataset.producto);
+
+});
+
+listaPanelProductos.innerHTML = "";
+
+productos.forEach(function(nombre){
+
+    listaPanelProductos.innerHTML += `
+        <div
+            class="panel-producto-item"
+            draggable="true"
+            data-producto="${nombre}"
+        >
+
+            <div class="panel-producto-handle">
+                <i data-lucide="grip-vertical"></i>
+            </div>
+
+            <div class="panel-producto-nombre">
+                ${nombre}
+            </div>
+
+        </div>
+    `;
+
+});
+
+lucide.createIcons();
+activarArrastreProductos();
+
+        panelProductos.classList.add("activo");
+        overlayPanelProductos.classList.add("activo");
+
+        document.body.style.overflow="hidden";
+
+        lucide.createIcons();
+
+    });
+
+});
+
+// ==========================
+// ARRASTRAR PRODUCTOS
+// ==========================
+
+let productoArrastrando = null;
+
+function activarArrastreProductos(){
+
+    const productosPanel =
+        listaPanelProductos.querySelectorAll(".panel-producto-item");
+
+    productosPanel.forEach(function(producto){
+
+        producto.addEventListener("dragstart", function(event){
+
+    productoArrastrando = producto;
+
+    productoMoviendoCategoria = producto;
+
+    producto.classList.add("arrastrando");
+
+    document.addEventListener("drag", controlarSalidaPanel);
+
+    event.dataTransfer.effectAllowed = "move";
+
+    event.dataTransfer.setData(
+        "text/plain",
+        producto.dataset.producto
+    );
+
+    // overlayPanelProductos.style.pointerEvents = "none";
+    // overlayPanelProductos.style.opacity = "0";
+
+    // panelProductos.classList.remove("activo");
+
+    document.body.style.overflow = "";
+
+    setTimeout(function(){
+        producto.style.opacity = ".35";
+    }, 0);
+
+});
+
+        producto.addEventListener("dragend", function(){
+
+            document.removeEventListener(
+    "drag",
+    controlarSalidaPanel
+);
+
+    producto.style.opacity = "1";
+
+    producto.classList.remove("arrastrando");
+
+    productoArrastrando = null;
+    productoMoviendoCategoria = null;
+
+    overlayPanelProductos.style.pointerEvents = "";
+    overlayPanelProductos.style.opacity = "";
+
+    panelProductos.classList.add("activo");
+
+    document.body.style.overflow = "hidden";
+
+    document.querySelectorAll(".categoria-card-premium")
+    .forEach(function(card){
+
+        card.classList.remove("destino-producto");
+
+        
+
+    });
+
+});
+
+    });
+
+}
+
+
+
+function controlarSalidaPanel(event){
+
+    if(event.clientX===0 && event.clientY===0){
+        return;
+    }
+
+    const rect =
+        panelProductos.getBoundingClientRect();
+
+    const dentro =
+
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+
+    if(dentro){
+        return;
+    }
+
+    panelProductos.classList.remove("activo");
+
+    overlayPanelProductos.style.pointerEvents="none";
+    overlayPanelProductos.style.opacity="0";
+
+}
+
+
+
+function obtenerProductoDespues(contenedor, posicionY){
+
+    const elementos = [
+        ...contenedor.querySelectorAll(
+            ".panel-producto-item:not(.arrastrando)"
+        )
+    ];
+
+    return elementos.reduce(function(resultado, elemento){
+
+        const caja = elemento.getBoundingClientRect();
+
+        const distancia =
+            posicionY - caja.top - caja.height / 2;
+
+        if(
+            distancia < 0 &&
+            distancia > resultado.distancia
+        ){
+            return {
+                distancia: distancia,
+                elemento: elemento
+            };
+        }
+
+        return resultado;
+
+    }, {
+        distancia: Number.NEGATIVE_INFINITY,
+        elemento: null
+    }).elemento;
+
+}
+
+
+listaPanelProductos.addEventListener("dragover", function(event){
+
+    event.preventDefault();
+
+    if(!productoArrastrando){
+        return;
+    }
+
+    const productoDespues =
+        obtenerProductoDespues(
+            listaPanelProductos,
+            event.clientY
+        );
+
+    if(productoDespues === null){
+
+        listaPanelProductos.appendChild(
+            productoArrastrando
+        );
+
+    }else{
+
+        listaPanelProductos.insertBefore(
+            productoArrastrando,
+            productoDespues
+        );
+
+    }
+
+});
+
+guardarOrdenProductos.addEventListener("click", async function(){
+
+    const categoria =
+        tituloPanelProductos.textContent.trim();
+
+    const productos = [];
+
+    listaPanelProductos
+        .querySelectorAll(".panel-producto-item")
+        .forEach(function(item){
+
+            productos.push(
+                item.dataset.producto
+            );
+
+        });
+
+    guardarOrdenProductos.disabled = true;
+
+    guardarOrdenProductos.innerHTML = `
+        <i data-lucide="loader-circle"></i>
+        Guardando...
+    `;
+
+    lucide.createIcons();
+
+    try{
+
+        const respuesta = await fetch(
+            "/guardar-orden-categoria",
+            {
+                method: "POST",
+
+                headers: {
+                    "Content-Type": "application/json"
+                },
+
+                body: JSON.stringify({
+                    categoria: categoria,
+                    orden: productos
+                })
+            }
+        );
+
+        const resultado = await respuesta.json();
+
+        if(!respuesta.ok || !resultado.ok){
+
+            throw new Error(
+                resultado.mensaje ||
+                "No fue posible guardar el orden."
+            );
+
+        }
+
+        window.location.reload();
+
+    }catch(error){
+
+        alert(error.message);
+
+        guardarOrdenProductos.disabled = false;
+
+        guardarOrdenProductos.innerHTML = `
+            <i data-lucide="save"></i>
+            Guardar orden
+        `;
+
+        lucide.createIcons();
+
+    }
+
+});
+
+function cerrarPanelOrden(){
+
+    panelProductos.classList.remove("activo");
+
+    overlayPanelProductos.classList.remove("activo");
+
+    document.body.style.overflow="";
+
+}
+
+cerrarPanelProductos.addEventListener(
+    "click",
+    cerrarPanelOrden
+);
+
+cancelarOrdenProductos.addEventListener(
+    "click",
+    cerrarPanelOrden
+);
+
+overlayPanelProductos.addEventListener(
+    "click",
+    cerrarPanelOrden
+);
+
+abrirAgregarProductos.addEventListener("click", function(){
+
+    nombreCategoriaAgregar.textContent = categoriaActual;
+
+    const colorCategoria = getComputedStyle(panelProductos)
+    .getPropertyValue("--panel-color")
+    .trim();
+
+modalAgregarProductos.style.setProperty(
+    "--modal-color",
+    colorCategoria
+);
+
+modalAgregarProductos.style.setProperty(
+    "--modal-border",
+    colorCategoria
+);
+
+modalAgregarProductos.style.setProperty(
+    "--modal-bg",
+    colorCategoria + "22"
+);
+
+    modalAgregarProductos.classList.add("activa");
+
+    lucide.createIcons();
+
+});
+
+function cerrarModalAgregarProductos(){
+
+    modalAgregarProductos.classList.remove("activa");
+
+}
+
+cerrarAgregarProductos.addEventListener(
+    "click",
+    cerrarModalAgregarProductos
+);
+
+cancelarAgregarProductos.addEventListener(
+    "click",
+    cerrarModalAgregarProductos
+);
+
+overlayAgregarProductos.addEventListener(
+    "click",
+    cerrarModalAgregarProductos
+);
+
+confirmarAgregarProductos.addEventListener(
+    "click",
+    async function(){
+
+        const seleccionados = [];
+
+        document.querySelectorAll(
+            "#listaProductosSinCategoria input:checked"
+        ).forEach(function(checkbox){
+
+            seleccionados.push(checkbox.value);
+
+        });
+
+        if(seleccionados.length === 0){
+
+            alert("Selecciona al menos un producto.");
+
+            return;
+
+        }
+
+        confirmarAgregarProductos.disabled = true;
+
+        confirmarAgregarProductos.innerHTML = `
+            <i data-lucide="loader-circle"></i>
+            Agregando...
+        `;
+
+        lucide.createIcons();
+
+        try{
+
+            const respuesta = await fetch(
+                "/admin/organizacion/agregar-productos",
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":"application/json"
+                    },
+
+                    body:JSON.stringify({
+                        categoria:categoriaActual,
+                        productos:seleccionados
+                    })
+                }
+            );
+
+            const resultado = await respuesta.json();
+
+            if(!respuesta.ok || !resultado.ok){
+
+                throw new Error(
+                    resultado.mensaje ||
+                    "No fue posible agregar los productos."
+                );
+
+            }
+
+            window.location.reload();
+
+        }catch(error){
+
+            alert(error.message);
+
+            confirmarAgregarProductos.disabled = false;
+
+            confirmarAgregarProductos.innerHTML = `
+                <i data-lucide="folder-plus"></i>
+                Agregar seleccionados
+            `;
+
+            lucide.createIcons();
+
+        }
+
+    }
+);
+
+// ==========================
+// NUEVA CATEGORÍA
+// ==========================
+
+const modalNuevaCategoria =
+    document.getElementById("modalNuevaCategoria");
+
+const abrirNuevaCategoria = document.querySelectorAll(
+    ".btn-nueva-categoria, .categoria-nueva-boton"
+);
+
+const cerrarNuevaCategoria =
+    document.getElementById("cerrarNuevaCategoria");
+
+const cancelarNuevaCategoria =
+    document.getElementById("cancelarNuevaCategoria");
+
+const overlayNuevaCategoria =
+    modalNuevaCategoria.querySelector(".modal-categoria-overlay");
+
+function abrirModalNuevaCategoria() {
+
+    modalNuevaCategoria.classList.add("activa");
+
+    document.body.style.overflow = "hidden";
+
+    lucide.createIcons();
+
+}
+
+function cerrarModalNuevaCategoria() {
+
+    modalNuevaCategoria.classList.remove("activa");
+
+    document.body.style.overflow = "";
+
+}
+
+abrirNuevaCategoria.forEach(function(boton){
+
+    boton.addEventListener("click", abrirModalNuevaCategoria);
+
+});
+
+cerrarNuevaCategoria.addEventListener(
+    "click",
+    cerrarModalNuevaCategoria
+);
+
+cancelarNuevaCategoria.addEventListener(
+    "click",
+    cerrarModalNuevaCategoria
+);
+
+overlayNuevaCategoria.addEventListener(
+    "click",
+    cerrarModalNuevaCategoria
+);
+
+const guardarNuevaCategoria =
+    document.getElementById("guardarNuevaCategoria");
+
+guardarNuevaCategoria.addEventListener("click", async function () {
+
+    const nombre =
+        document.getElementById("nuevaCategoriaNombre").value.trim();
+
+    const icono =
+        document.getElementById("nuevaCategoriaIcono").value;
+
+    const color =
+        document.getElementById("nuevaCategoriaColor").value;
+
+    const visible =
+        document.getElementById("nuevaCategoriaVisible").checked;
+
+    if (!nombre) {
+        alert("Escribe el nombre de la categoría.");
+        return;
+    }
+
+    guardarNuevaCategoria.disabled = true;
+
+    guardarNuevaCategoria.innerHTML = `
+        <i data-lucide="loader-circle"></i>
+        Creando...
+    `;
+
+    lucide.createIcons();
+
+    try {
+
+        const respuesta = await fetch(
+            "/admin/organizacion/crear-categoria",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    nombre: nombre,
+                    icono: icono,
+                    color: color,
+                    visible: visible
+                })
+            }
+        );
+
+        const resultado = await respuesta.json();
+
+        if (!respuesta.ok || !resultado.ok) {
+            throw new Error(resultado.mensaje);
+        }
+
+        window.location.reload();
+
+    } catch (error) {
+
+        alert(error.message);
+
+        guardarNuevaCategoria.disabled = false;
+
+        guardarNuevaCategoria.innerHTML = `
+            <i data-lucide="plus"></i>
+            Crear categoría
+        `;
+
+        lucide.createIcons();
+    }
+
+});
+
+</script>
+
+{% endblock %}

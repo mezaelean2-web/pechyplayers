@@ -1,0 +1,89 @@
+<aside class="admin-sidebar">
+
+    <div class="sidebar-brand">
+        <img
+            src="{{ url_for('static', filename='img/logo.jpg') }}"
+            alt="PECHY PLAYERS"
+        >
+
+        <div>
+            <strong>PECHY</strong>
+            <span>PLAYERS ADMIN</span>
+        </div>
+    </div>
+
+    <nav class="sidebar-menu">
+
+    <div class="sidebar-group-title">PANEL</div>
+
+    <a href="/admin"
+       class="sidebar-link {% if request.path == '/admin' %}active{% endif %}">
+        <i data-lucide="layout-dashboard" class="sidebar-icon"></i>
+        <span>Dashboard</span>
+    </a>
+
+    <div class="sidebar-group-title">CATÁLOGO</div>
+
+    <a href="/admin/productos"
+       class="sidebar-link {% if request.path == '/admin/productos' %}active{% endif %}">
+        <i data-lucide="package" class="sidebar-icon"></i>
+        <span>Productos</span>
+    </a>
+
+    <a href="/admin/organizacion"
+       class="sidebar-link {% if request.path == '/admin/organizacion' %}active{% endif %}">
+        <i data-lucide="folders" class="sidebar-icon"></i>
+        <span>Organización</span>
+    </a>
+
+    <a href="/admin/cartelera"
+   class="sidebar-link {% if request.path == '/admin/cartelera' %}active{% endif %}">
+    <i data-lucide="clapperboard" class="sidebar-icon"></i>
+    <span>Cartelera</span>
+</a>
+
+    <a href="/admin/promociones"
+       class="sidebar-link {% if request.path == '/admin/promociones' %}active{% endif %}">
+        <i data-lucide="flame" class="sidebar-icon"></i>
+        <span>Promociones</span>
+    </a>
+
+    <div class="sidebar-group-title">INVENTARIO</div>
+
+<a href="/admin/nube-cuentas"
+   class="sidebar-link {% if request.path == '/admin/nube-cuentas' %}active{% endif %}">
+    <i data-lucide="cloud" class="sidebar-icon"></i>
+    <span>Nube de cuentas</span>
+</a>
+
+    <div class="sidebar-group-title">SISTEMA</div>
+
+    <a href="/admin/historial"
+       class="sidebar-link {% if request.path == '/admin/historial' %}active{% endif %}">
+        <i data-lucide="history" class="sidebar-icon"></i>
+        <span>Historial</span>
+    </a>
+
+    <a href="/admin/configuracion"
+       class="sidebar-link {% if request.path == '/admin/configuracion' %}active{% endif %}">
+        <i data-lucide="settings" class="sidebar-icon"></i>
+        <span>Configuración</span>
+    </a>
+
+</nav>
+
+    <div class="sidebar-footer">
+
+        <a href="/" class="sidebar-secondary-link">
+            <span>🌐</span>
+            Ver página
+        </a>
+
+        <a href="/logout" class="sidebar-secondary-link sidebar-logout">
+            <span>🚪</span>
+            Cerrar sesión
+        </a>
+
+    </div>
+
+</aside>

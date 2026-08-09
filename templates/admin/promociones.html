@@ -1,0 +1,337 @@
+{% extends "admin/base_admin.html" %}
+
+{% block contenido %}
+
+<h2 class="section-title">
+    🔥 Promociones
+</h2>
+
+{% set resumen = namespace(total=0, activas=0, ocultas=0) %}
+
+{% for promo in promociones %}
+
+    {% set resumen.total = resumen.total + 1 %}
+
+    {% if promo[2] == 1 %}
+        {% set resumen.activas = resumen.activas + 1 %}
+    {% else %}
+        {% set resumen.ocultas = resumen.ocultas + 1 %}
+    {% endif %}
+
+{% endfor %}
+
+<section class="promo-resumen">
+
+    <article class="promo-estadistica">
+
+        <div class="promo-estadistica-icono total">
+            🏷️
+        </div>
+
+        <div>
+            <span>Total promociones</span>
+            <strong>{{ resumen.total }}</strong>
+        </div>
+
+    </article>
+
+    <article class="promo-estadistica">
+
+        <div class="promo-estadistica-icono activa">
+            ✓
+        </div>
+
+        <div>
+            <span>Activas</span>
+            <strong>{{ resumen.activas }}</strong>
+        </div>
+
+    </article>
+
+    <article class="promo-estadistica">
+
+        <div class="promo-estadistica-icono oculta">
+            ◉
+        </div>
+
+        <div>
+            <span>Ocultas</span>
+            <strong>{{ resumen.ocultas }}</strong>
+        </div>
+
+    </article>
+
+    <div class="promo-resumen-acciones">
+
+        <button
+            type="button"
+            class="promo-accion-superior nueva"
+            id="btnNuevaPromoSuperior">
+
+            ＋ Nueva promoción
+
+        </button>
+
+        <button
+            type="button"
+            class="promo-accion-superior publicar"
+            id="btnPublicarPromo"
+            disabled>
+
+            📨 Publicar
+
+        </button>
+
+    </div>
+
+</section>
+
+<div class="promo-layout">
+
+    <!-- Vista previa -->
+    <section class="promo-preview">
+
+    <div class="promo-card-preview">
+
+        <div class="promo-badge">
+            🔥 PROMOCIÓN
+        </div>
+
+        <h2>
+            Centro de Promociones
+        </h2>
+
+        <p>
+            Administra las promociones que aparecerán
+            en la página principal de PECHY PLAYERS.
+        </p>
+
+        <div class="promo-preview-box">
+
+            <img
+                id="promoPreviewGrande"
+                src=""
+                alt="Vista previa"
+                style="display:none;">
+
+            
+
+                <div
+    id="promoPlaceholder"
+    class="promo-placeholder">
+
+    <div class="promo-placeholder-icon">
+        🖼️
+    </div>
+
+    <h3>Vista previa</h3>
+
+    <p>
+        Aquí aparecerá la promoción seleccionada.
+    </p>
+
+    <button
+        id="btnNuevaPromo"
+        class="promo-btn-upload">
+
+        ➕ Nueva promoción
+
+    </button>
+
+</div>
+
+<input
+    type="file"
+    id="promoInput"
+    accept="image/*"
+    hidden>
+
+
+    <form
+    id="promoForm"
+    method="POST"
+    enctype="multipart/form-data"
+    hidden>
+
+    <input
+        type="hidden"
+        name="id"
+        id="promoFormId">
+
+    <input
+    type="hidden"
+    name="activa"
+    id="promoFormActiva"
+    value="on">
+
+</form>
+
+<form
+    id="promoEliminarForm"
+    action="/eliminar-promocion"
+    method="POST"
+    hidden>
+
+    <input
+        type="hidden"
+        name="id"
+        id="promoEliminarId">
+
+</form>
+
+
+        </div>
+
+    </div>
+
+</section>
+
+    <!-- Panel lateral -->
+<aside class="promo-sidebar">
+
+    <div class="promo-panel-seleccionada">
+
+        <div class="promo-panel-encabezado">
+
+            <div>
+                <span>Promoción seleccionada</span>
+
+                <h3 id="promoSeleccionadaTitulo">
+                    Selecciona una promoción
+                </h3>
+            </div>
+
+            <span
+                class="promo-panel-estado visible"
+                id="promoSeleccionadaEstado">
+
+                ● Visible
+
+            </span>
+
+        </div>
+
+        <div class="promo-panel-detalle">
+
+    <span>Estado</span>
+
+    <button
+        type="button"
+        id="btnCambiarEstadoPromo"
+        class="promo-estado-control"
+        disabled>
+
+        Visible
+
+    </button>
+
+</div>
+
+        <div class="promo-panel-acciones">
+
+            <button
+                type="button"
+                class="promo-panel-btn editar"
+                id="btnEditarImagen">
+
+                ✏️ Editar imagen
+
+            </button>
+
+            <button
+                type="button"
+                class="promo-panel-btn eliminar"
+                id="btnEliminarPromo">
+
+                🗑️ Eliminar
+
+            </button>
+
+            <button
+                type="button"
+                class="promo-panel-btn publicar"
+                id="btnPublicarLateral"
+                 disabled>
+
+                📨 Publicar
+
+            </button>
+
+        </div>
+
+    </div>
+
+</aside>
+
+</div>
+
+<h2 class="promo-subtitulo">
+    Promociones guardadas
+</h2>
+
+<div class="promo-grid">
+
+{% for promo in promociones %}
+
+<div
+    class="promo-card"
+    draggable="true"
+    data-id="{{ promo[0] }}"
+    data-activa="{{ promo[2] }}"
+    data-imagen="{{ url_for('static', filename='img/promociones/' + promo[1]) }}">
+
+    <div class="promo-thumb-wrap">
+
+    <img
+        src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
+        class="promo-thumb">
+
+    <div class="promo-overlay">
+
+        <button class="btn-mini">
+            ✏️
+        </button>
+
+
+        <button
+    type="button"
+    class="btn-mini danger btn-eliminar-tarjeta"
+    data-id="{{ promo[0] }}">
+
+    🗑️
+
+</button>
+
+    </div>
+
+</div>
+
+    <div class="promo-info">
+
+        <strong>
+            Promoción {{ promo[0] }}
+        </strong>
+
+        {% if promo[2] == 1 %}
+
+        <span class="estado publicada">
+            ● Publicada
+        </span>
+
+        {% else %}
+
+        <span class="estado oculta">
+            ● Oculta
+        </span>
+
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endblock %}

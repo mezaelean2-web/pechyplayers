@@ -1,0 +1,2041 @@
+.cartelera-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 30px;
+    padding: 34px;
+    margin-bottom: 28px;
+    overflow: hidden;
+
+    background:
+        radial-gradient(
+            circle at top right,
+            rgba(255, 0, 0, 0.18),
+            transparent 38%
+        ),
+        linear-gradient(
+            135deg,
+            rgba(25, 25, 28, 0.96),
+            rgba(8, 9, 13, 0.98)
+        );
+
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 24px;
+    box-shadow:
+        0 18px 45px rgba(0, 0, 0, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.cartelera-header::after {
+    content: "";
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    right: -90px;
+    top: -120px;
+    border-radius: 50%;
+    background: rgba(255, 0, 0, 0.12);
+    filter: blur(25px);
+    pointer-events: none;
+}
+
+.cartelera-header h1 {
+    margin: 12px 0 8px;
+    color: #ffffff;
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1;
+    letter-spacing: -1.5px;
+}
+
+.cartelera-header p {
+    margin: 0;
+    max-width: 650px;
+    color: #9da3af;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
+.cartelera-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+
+    color: #ffcc55;
+    background: rgba(255, 204, 85, 0.08);
+    border: 1px solid rgba(255, 204, 85, 0.2);
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 1.7px;
+}
+
+.btn-cartelera {
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+
+    padding: 15px 21px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #ff2020, #ad0000);
+    border: 1px solid rgba(255, 90, 90, 0.55);
+    border-radius: 14px;
+
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+
+    box-shadow:
+        0 12px 30px rgba(255, 0, 0, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
+
+    transition:
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.btn-cartelera:hover {
+    transform: translateY(-3px);
+    box-shadow:
+        0 18px 38px rgba(255, 0, 0, 0.32),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.cartelera-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(270px, 340px));
+    gap: 24px;
+    align-items: start;
+}
+
+.plataforma-card {
+    position: relative;
+    overflow: hidden;
+    padding: 16px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(28, 29, 34, 0.96),
+            rgba(10, 11, 15, 0.98)
+        );
+
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 22px;
+
+    box-shadow:
+        0 20px 45px rgba(0, 0, 0, 0.38),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+    transition:
+        transform 0.3s ease,
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+.plataforma-card:hover {
+    transform: translateY(-7px);
+    border-color: rgba(255, 40, 40, 0.45);
+    box-shadow:
+        0 28px 55px rgba(0, 0, 0, 0.5),
+        0 0 30px rgba(255, 0, 0, 0.08);
+}
+
+.plataforma-logo {
+    position: absolute;
+    z-index: 2;
+    top: 28px;
+    left: 28px;
+
+    padding: 8px 11px;
+
+    color: #ffffff;
+    background: rgba(5, 5, 8, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    backdrop-filter: blur(12px);
+
+    font-size: 12px;
+    font-weight: 950;
+    letter-spacing: 1.3px;
+}
+
+.poster-demo {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+
+    color: rgba(255, 255, 255, 0.58);
+    background:
+        radial-gradient(
+            circle at 50% 30%,
+            rgba(255, 30, 30, 0.28),
+            transparent 33%
+        ),
+        linear-gradient(
+            145deg,
+            #24242a,
+            #0c0d11 68%
+        );
+
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 16px;
+
+    font-size: 58px;
+}
+
+.poster-demo::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0;
+    height: 42%;
+    background: linear-gradient(
+        to top,
+        rgba(0, 0, 0, 0.82),
+        transparent
+    );
+}
+
+.plataforma-card h2 {
+    margin: 20px 4px 8px;
+    color: #ffffff;
+    font-size: 22px;
+    letter-spacing: -0.5px;
+}
+
+.plataforma-card p {
+    min-height: 44px;
+    margin: 0 4px 18px;
+    color: #9298a5;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.plataforma-card > button {
+    width: 100%;
+    padding: 13px;
+
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+
+    font-weight: 800;
+    cursor: pointer;
+
+    transition:
+        background 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.25s ease;
+}
+
+.plataforma-card > button:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 25, 25, 0.12);
+    border-color: rgba(255, 45, 45, 0.4);
+}
+
+@media (max-width: 760px) {
+    .cartelera-header {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 25px;
+    }
+
+    .btn-cartelera {
+        width: 100%;
+    }
+
+    .cartelera-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.netflix-card {
+    width: 100%;
+    max-width: 360px;
+}
+
+.plataforma-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.netflix-logo {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 8px 13px;
+
+    color: #e50914;
+    background: rgba(229, 9, 20, 0.08);
+    border: 1px solid rgba(229, 9, 20, 0.28);
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 950;
+    letter-spacing: 1.8px;
+}
+
+.recomendacion-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 10px;
+
+    color: #a6acb8;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 999px;
+
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.recomendacion-status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #6f7682;
+}
+
+.netflix-poster {
+    position: relative;
+}
+
+.poster-placeholder {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.poster-placeholder span {
+    font-size: 58px;
+}
+
+.poster-placeholder small {
+    color: rgba(255, 255, 255, 0.48);
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+}
+
+.poster-tag {
+    position: absolute;
+    z-index: 3;
+    left: 14px;
+    bottom: 14px;
+
+    padding: 8px 10px;
+
+    color: #ffffff;
+    background: rgba(5, 5, 8, 0.76);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 9px;
+    backdrop-filter: blur(12px);
+
+    font-size: 11px;
+    font-weight: 850;
+}
+
+.pelicula-info {
+    padding: 18px 4px 4px;
+}
+
+.pelicula-genero {
+    display: inline-block;
+    margin-bottom: 8px;
+    color: #e50914;
+    font-size: 11px;
+    font-weight: 900;
+    letter-spacing: 0.9px;
+    text-transform: uppercase;
+}
+
+.pelicula-info h2 {
+    margin: 0 0 8px;
+}
+
+.pelicula-info p {
+    min-height: unset;
+    margin: 0;
+}
+
+.pelicula-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 18px;
+}
+
+.btn-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 11px 12px;
+
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.045);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 11px;
+
+    font-size: 12px;
+    font-weight: 850;
+    cursor: pointer;
+
+    transition:
+        transform 0.25s ease,
+        background 0.25s ease,
+        border-color 0.25s ease;
+}
+
+.btn-action svg {
+    width: 16px;
+    height: 16px;
+}
+
+.btn-action:hover {
+    transform: translateY(-2px);
+}
+
+.btn-change:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.16);
+}
+
+.btn-ai {
+    background: linear-gradient(
+        135deg,
+        rgba(229, 9, 20, 0.18),
+        rgba(125, 0, 8, 0.18)
+    );
+    border-color: rgba(229, 9, 20, 0.28);
+}
+
+.btn-ai:hover {
+    background: linear-gradient(
+        135deg,
+        rgba(229, 9, 20, 0.28),
+        rgba(125, 0, 8, 0.25)
+    );
+    border-color: rgba(229, 9, 20, 0.48);
+}
+
+.btn-preview {
+    grid-column: 1 / -1;
+}
+
+.btn-preview:hover {
+    background: rgba(255, 204, 85, 0.08);
+    border-color: rgba(255, 204, 85, 0.25);
+}
+
+@media (max-width: 480px) {
+    .pelicula-actions {
+        grid-template-columns: 1fr;
+    }
+
+    .btn-preview {
+        grid-column: auto;
+    }
+}
+
+/* ===== MODAL CARTELERA ===== */
+
+.modal-cartelera{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:9999;
+}
+
+.modal-cartelera.active{
+    display:flex;
+}
+
+.modal-cartelera-overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.75);
+    backdrop-filter:blur(8px);
+}
+
+.modal-cartelera-panel{
+    position:relative;
+    width:min(950px,95vw);
+    max-height:92vh;
+    overflow:auto;
+
+    background:#111318;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:22px;
+
+    box-shadow:
+        0 30px 80px rgba(0,0,0,.55);
+
+    animation:modalShow .25s ease;
+}
+
+@keyframes modalShow{
+
+    from{
+        opacity:0;
+        transform:translateY(25px) scale(.98);
+    }
+
+    to{
+        opacity:1;
+        transform:none;
+    }
+
+}
+
+.modal-cartelera-header{
+
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+
+    padding:28px;
+
+    border-bottom:1px solid rgba(255,255,255,.08);
+
+}
+
+.modal-cartelera-header h2{
+
+    margin-top:8px;
+    color:white;
+    font-size:34px;
+
+}
+
+.modal-cartelera-header p{
+
+    margin-top:8px;
+    color:#9aa1ad;
+
+}
+
+.modal-cartelera-badge{
+
+    color:#ffcf5c;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:1px;
+
+}
+
+.modal-cartelera-close{
+
+    width:46px;
+    height:46px;
+
+    border:none;
+    border-radius:12px;
+
+    background:#1c1f27;
+    color:white;
+
+    cursor:pointer;
+
+}
+
+.modal-cartelera-close:hover{
+
+    background:#2a2e38;
+
+}
+
+.modal-cartelera-body{
+
+    display:grid;
+    grid-template-columns:280px 1fr;
+    gap:28px;
+
+    padding:28px;
+
+}
+
+.poster-upload-box{
+
+    border:2px dashed rgba(255,255,255,.15);
+    border-radius:18px;
+
+    padding:22px;
+
+    text-align:center;
+
+}
+
+.poster-upload-preview{
+
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:12px;
+
+    padding:30px 10px;
+
+    color:#c3c8d2;
+
+}
+
+.poster-upload-preview svg{
+
+    width:60px;
+    height:60px;
+
+}
+
+.btn-upload-poster{
+
+    width:100%;
+    margin-top:18px;
+    padding:13px;
+
+    border:none;
+    border-radius:12px;
+
+    background:#d80c18;
+    color:white;
+
+    font-weight:700;
+
+    cursor:pointer;
+
+}
+
+.form-cartelera-grid{
+
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:18px;
+
+}
+
+.form-cartelera-group{
+
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+
+}
+
+.form-cartelera-group label{
+
+    color:white;
+    font-weight:700;
+
+}
+
+.form-cartelera-group input,
+.form-cartelera-group select,
+.form-cartelera-group textarea{
+
+    width:100%;
+
+    padding:13px;
+
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,.12);
+
+    background:#1b1f28;
+    color:white;
+
+}
+
+.form-cartelera-group textarea{
+
+    resize:vertical;
+
+}
+
+.form-cartelera-options{
+
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+
+    margin-top:20px;
+
+}
+
+.modal-cartelera-footer{
+
+    display:flex;
+    justify-content:flex-end;
+    gap:15px;
+
+    padding:24px 28px;
+
+    border-top:1px solid rgba(255,255,255,.08);
+
+}
+
+.btn-modal-cancelar{
+
+    padding:13px 20px;
+
+    border:none;
+    border-radius:12px;
+
+    background:#262a34;
+    color:white;
+
+    cursor:pointer;
+
+}
+
+.btn-modal-guardar{
+
+    padding:13px 24px;
+
+    border:none;
+    border-radius:12px;
+
+    background:#d80c18;
+    color:white;
+
+    font-weight:800;
+
+    cursor:pointer;
+
+}
+
+@media(max-width:900px){
+
+    .modal-cartelera-body{
+
+        grid-template-columns:1fr;
+
+    }
+
+    .form-cartelera-grid{
+
+        grid-template-columns:1fr;
+
+    }
+
+}
+
+.poster-upload-preview {
+    position: relative;
+    min-height: 300px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 14px;
+}
+
+.poster-upload-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    min-height: 300px;
+    padding: 30px 10px;
+    color: #c3c8d2;
+}
+
+.poster-upload-placeholder.oculto,
+.banner-upload-placeholder.oculto {
+    display: none;
+}
+
+.poster-preview-imagen {
+    display: none;
+    width: 100%;
+    height: 300px;
+    object-fit: cover;
+    border-radius: 14px;
+}
+
+.poster-preview-imagen.visible {
+    display: block;
+}
+
+.poster-preview-remove {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.72);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+
+    cursor: pointer;
+    transition:
+        transform 0.2s ease,
+        background 0.2s ease;
+}
+
+.poster-preview-remove.visible {
+    display: flex;
+}
+
+.poster-preview-remove:hover {
+    transform: scale(1.05);
+    background: rgba(229, 9, 20, 0.88);
+}
+
+.poster-preview-remove svg {
+    width: 17px;
+    height: 17px;
+}
+
+/* =========================================================
+   SELECTOR PREMIUM DE PLATAFORMAS
+========================================================= */
+
+.plataforma-multiple {
+    grid-column: span 1;
+}
+
+.plataformas-grid {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    padding-bottom: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    scroll-behavior: smooth;
+}
+
+.plataformas-grid::-webkit-scrollbar {
+    height: 6px;
+}
+
+.plataformas-grid::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 999px;
+}
+
+.plataformas-grid::-webkit-scrollbar-thumb {
+    background: rgba(239, 11, 26, 0.65);
+    border-radius: 999px;
+}
+
+.plataforma-card-select {
+    display: block;
+    flex: 0 0 145px;
+    cursor: pointer;
+}
+
+.plataforma-card-select input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.plataforma-card-contenido {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    min-height: 125px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.035);
+    transition:
+        transform 0.22s ease,
+        border-color 0.22s ease,
+        box-shadow 0.22s ease,
+        background 0.22s ease;
+}
+
+.plataforma-card-contenido img {
+    width: 100%;
+    height: 88px;
+    display: block;
+    object-fit: cover;
+    opacity: 0.82;
+    transition:
+        transform 0.25s ease,
+        opacity 0.25s ease;
+}
+
+.plataforma-card-contenido span {
+    display: block;
+    padding: 10px;
+    color: #f5f7fb;
+    font-size: 12px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.plataforma-check-icon {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #ef0b1a;
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.65);
+    transition:
+        opacity 0.2s ease,
+        transform 0.2s ease;
+    box-shadow: 0 0 18px rgba(239, 11, 26, 0.60);
+}
+
+.plataforma-card-select:hover .plataforma-card-contenido {
+    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.055);
+}
+
+.plataforma-card-select:hover .plataforma-card-contenido img {
+    opacity: 1;
+    transform: scale(1.04);
+}
+
+.plataforma-card-select input:checked + .plataforma-card-contenido {
+    border-color: #ef0b1a;
+    background: rgba(239, 11, 26, 0.09);
+    box-shadow:
+        0 0 0 1px rgba(239, 11, 26, 0.22),
+        0 10px 28px rgba(239, 11, 26, 0.18);
+}
+
+.plataforma-card-select input:checked + .plataforma-card-contenido img {
+    opacity: 1;
+}
+
+.plataforma-card-select input:checked
++ .plataforma-card-contenido
+.plataforma-check-icon {
+    opacity: 1;
+    transform: scale(1);
+}
+
+@media (max-width: 700px) {
+    .plataforma-card-select {
+        flex-basis: 125px;
+    }
+
+    .plataforma-card-contenido {
+        min-height: 112px;
+    }
+
+    .plataforma-card-contenido img {
+        height: 76px;
+    }
+}
+
+/* =========================================================
+   PLATAFORMAS DESPLEGABLES
+========================================================= */
+
+.plataforma-multiple {
+    width: 100%;
+    min-width: 0;
+}
+
+.plataformas-desplegable {
+    position: relative;
+    width: 100%;
+    margin-top: 9px;
+}
+
+.plataformas-desplegable summary {
+    list-style: none;
+}
+
+.plataformas-desplegable summary::-webkit-details-marker {
+    display: none;
+}
+
+.plataformas-desplegable-boton {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 10px;
+    background: #1c2029;
+    color: #f5f7fb;
+    cursor: pointer;
+    transition:
+        border-color 0.2s ease,
+        background 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+.plataformas-desplegable-boton:hover {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: #20252f;
+}
+
+.plataformas-desplegable[open]
+.plataformas-desplegable-boton {
+    border-color: #ef1425;
+    box-shadow: 0 0 0 2px rgba(239, 20, 37, 0.08);
+}
+
+.plataformas-desplegable-texto {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.plataformas-desplegable-texto svg {
+    width: 17px;
+    height: 17px;
+    color: #c8ced9;
+}
+
+.plataformas-desplegable-flecha {
+    width: 17px;
+    height: 17px;
+    transition: transform 0.2s ease;
+}
+
+.plataformas-desplegable[open]
+.plataformas-desplegable-flecha {
+    transform: rotate(180deg);
+}
+
+.plataformas-carrusel {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    margin-top: 7px;
+    padding: 10px 42px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 11px;
+    background: #15181f;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+.plataformas-desplegable-contenido {
+    width: 100%;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    box-sizing: border-box;
+}
+
+.plataformas-desplegable-contenido::-webkit-scrollbar {
+    display: none;
+}
+
+.plataforma-mini-card {
+    position: relative;
+    flex: 0 0 150px;
+    min-width: 150px;
+    cursor: pointer;
+}
+
+.plataforma-mini-card input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.plataforma-mini-card{
+    position: relative;
+    flex: 0 0 105px;
+    min-width: 105px;
+}
+
+.plataforma-mini-card input{
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.plataformas-carrusel-flecha{
+
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+
+    width:42px;
+    height:42px;
+
+    border:none;
+    border-radius:50%;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    cursor:pointer;
+
+    color:#fff;
+
+    background:rgba(15,15,18,.82);
+
+    backdrop-filter:blur(10px);
+
+    box-shadow:
+        0 10px 24px rgba(0,0,0,.35);
+
+    transition:
+        .25s;
+}
+
+.plataformas-carrusel-flecha:hover{
+
+    transform:translateY(-50%) scale(1.12);
+
+    background:#e50914;
+
+    box-shadow:
+        0 0 18px rgba(229,9,20,.45);
+
+}
+
+.plataformas-carrusel-flecha i{
+
+    width:22px;
+    height:22px;
+
+}
+
+.plataformas-carrusel-flecha:hover {
+    background: #ef1425;
+    border-color: #ef1425;
+    transform: translateY(-50%) scale(1.05);
+}
+
+.plataformas-carrusel-flecha svg {
+    width: 16px;
+    height: 16px;
+}
+
+.plataformas-carrusel-flecha.izquierda {
+    left:8px;
+}
+
+.plataformas-carrusel-flecha.derecha {
+    right:8px;
+}
+
+.plataforma-mini-contenido {
+    position: relative;
+
+    width: 100%;
+    height: 112px;
+    padding: 12px 10px;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+
+    overflow: hidden;
+
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 14px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.065),
+            rgba(255, 255, 255, 0.018)
+        );
+
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.05),
+        0 12px 24px rgba(0, 0, 0, 0.18);
+
+    transition:
+        transform 0.25s ease,
+        border-color 0.25s ease,
+        background 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+.plataforma-mini-contenido img {
+    display: block;
+
+    width: 82px;
+    height: 60px;
+
+    object-fit: contain;
+    border-radius: 8px;
+
+    filter: brightness(0.92);
+    transition:
+        transform 0.25s ease,
+        filter 0.25s ease;
+}
+
+.plataforma-mini-contenido span {
+    width: 100%;
+
+    overflow: hidden;
+    color: #f5f7fb;
+
+    font-size: 11px;
+    font-weight: 800;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    letter-spacing: 0.2px;
+}
+
+.plataforma-mini-card:hover
+.plataforma-mini-contenido {
+    transform: translateY(-1px);
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.045);
+}
+
+.plataforma-mini-card input:checked
++ .plataforma-mini-contenido {
+    border-color: #ef1425;
+    background: rgba(239, 20, 37, 0.10);
+}
+
+.plataforma-mini-check {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 16px;
+    height: 16px;
+    display: grid;
+    place-items: center;
+    border-radius: 5px;
+    background: #ef1425;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 900;
+    opacity: 0;
+    transform: scale(0.6);
+    transition:
+        opacity 0.18s ease,
+        transform 0.18s ease;
+}
+
+.plataforma-mini-card input:checked
++ .plataforma-mini-contenido
+.plataforma-mini-check {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* =========================================================
+   AJUSTE COMPACTO DEL PÓSTER EN EL MODAL
+========================================================= */
+
+.poster-upload-box {
+    align-self: flex-start;
+    height: auto;
+    min-height: 0;
+    padding: 18px;
+}
+
+.poster-upload-preview {
+    width: 100%;
+    height: 320px;
+    min-height: 320px;
+    max-height: 320px;
+}
+
+.poster-preview-imagen {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+}
+
+.btn-upload-poster {
+    margin-top: 14px;
+}
+
+/* =========================================================
+   EVITAR DESBORDAMIENTO HORIZONTAL DEL MODAL
+========================================================= */
+
+.modal-cartelera-panel {
+    max-width: calc(100vw - 30px);
+    overflow-x: hidden;
+}
+
+.modal-cartelera-body {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+.modal-cartelera-form {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    overflow-x: hidden;
+}
+
+.form-cartelera-group,
+.plataforma-multiple,
+.plataformas-desplegable,
+.plataformas-carrusel {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.poster-cartelera-imagen {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+/* =========================================================
+   TARJETAS DE CARTELERA — ACABADO PREMIUM
+========================================================= */
+
+.cartelera-grid {
+    align-items: stretch;
+}
+
+.plataforma-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-height: 100%;
+    padding: 14px;
+    isolation: isolate;
+}
+
+.plataforma-topbar {
+    flex-shrink: 0;
+}
+
+
+/* PÓSTER */
+
+.poster-demo {
+    flex-shrink: 0;
+    aspect-ratio: 2 / 3;
+    min-height: 0;
+
+    background:
+        radial-gradient(
+            circle at 50% 25%,
+            rgba(255, 30, 30, 0.22),
+            transparent 38%
+        ),
+        linear-gradient(
+            145deg,
+            #24242a,
+            #090a0e 72%
+        );
+
+    box-shadow:
+        0 18px 38px rgba(0, 0, 0, 0.42),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.poster-cartelera-imagen {
+    position: relative;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    border-radius: inherit;
+
+    transition:
+        transform 0.45s ease,
+        filter 0.45s ease;
+}
+
+.poster-demo::after {
+    z-index: 1;
+    height: 45%;
+    pointer-events: none;
+
+    background: linear-gradient(
+        to top,
+        rgba(4, 5, 8, 0.94) 0%,
+        rgba(4, 5, 8, 0.45) 48%,
+        transparent 100%
+    );
+}
+
+.plataforma-card:hover .poster-cartelera-imagen {
+    transform: scale(1.045);
+    filter: brightness(1.06) saturate(1.08);
+}
+
+.poster-tag {
+    z-index: 3;
+}
+
+
+/* INFORMACIÓN */
+
+.pelicula-info {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 18px 4px 2px;
+}
+
+.pelicula-info h2 {
+    min-height: 54px;
+    margin: 0 0 8px;
+
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+
+    font-size: 21px;
+    line-height: 1.28;
+}
+
+.pelicula-info p {
+    min-height: 62px;
+    margin: 0;
+
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+
+    color: #9da4b2;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.pelicula-genero {
+    min-height: 18px;
+}
+
+
+/* BOTONES SIEMPRE AL FINAL */
+
+.pelicula-actions {
+    flex-shrink: 0;
+    margin-top: auto;
+    padding-top: 18px;
+}
+
+.btn-action {
+    overflow: hidden;
+    white-space: nowrap;
+}
+
+
+/* EFECTO PREMIUM DE LA TARJETA */
+
+.plataforma-card::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    inset: 0;
+
+    border-radius: inherit;
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(229, 9, 20, 0.08),
+            transparent 38%
+        );
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.plataforma-card:hover::before {
+    opacity: 1;
+}
+
+.plataforma-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(239, 20, 37, 0.38);
+
+    box-shadow:
+        0 30px 65px rgba(0, 0, 0, 0.55),
+        0 0 35px rgba(229, 9, 20, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+
+/* MÓVIL */
+
+@media (max-width: 760px) {
+
+    .plataforma-card {
+        max-width: 420px;
+        margin: 0 auto;
+    }
+
+    .pelicula-info h2 {
+        min-height: auto;
+    }
+
+    .pelicula-info p {
+        min-height: auto;
+    }
+
+}
+
+/* =========================================================
+   COLORES DINÁMICOS POR PLATAFORMA
+========================================================= */
+
+.plataforma-dinamica {
+    --plataforma-color: #ef1425;
+    --plataforma-rgb: 239, 20, 37;
+}
+
+.plataforma-dinamica[data-plataforma*="Netflix"] {
+    --plataforma-color: #e50914;
+    --plataforma-rgb: 229, 9, 20;
+}
+
+.plataforma-dinamica[data-plataforma*="Disney"] {
+    --plataforma-color: #1687ff;
+    --plataforma-rgb: 22, 135, 255;
+}
+
+.plataforma-dinamica[data-plataforma*="Prime Video"] {
+    --plataforma-color: #00a8e1;
+    --plataforma-rgb: 0, 168, 225;
+}
+
+.plataforma-dinamica[data-plataforma*="Max"] {
+    --plataforma-color: #8f5cff;
+    --plataforma-rgb: 143, 92, 255;
+}
+
+.plataforma-dinamica[data-plataforma*="Paramount"] {
+    --plataforma-color: #2f72ff;
+    --plataforma-rgb: 47, 114, 255;
+}
+
+.plataforma-dinamica .plataforma-logo-dinamica {
+    color: var(--plataforma-color);
+
+    background: rgba(
+        var(--plataforma-rgb),
+        0.09
+    );
+
+    border-color: rgba(
+        var(--plataforma-rgb),
+        0.34
+    );
+
+    box-shadow:
+        0 0 20px rgba(
+            var(--plataforma-rgb),
+            0.06
+        );
+}
+
+.plataforma-dinamica .pelicula-genero {
+    color: var(--plataforma-color);
+}
+
+.plataforma-dinamica .btn-ai {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--plataforma-rgb), 0.18),
+        rgba(var(--plataforma-rgb), 0.08)
+    );
+
+    border-color: rgba(
+        var(--plataforma-rgb),
+        0.32
+    );
+}
+
+.plataforma-dinamica .btn-ai:hover {
+    background: linear-gradient(
+        135deg,
+        rgba(var(--plataforma-rgb), 0.30),
+        rgba(var(--plataforma-rgb), 0.14)
+    );
+
+    border-color: rgba(
+        var(--plataforma-rgb),
+        0.58
+    );
+
+    box-shadow:
+        0 0 22px rgba(
+            var(--plataforma-rgb),
+            0.12
+        );
+}
+
+.plataforma-dinamica::before {
+    background:
+        radial-gradient(
+            circle at 50% 0%,
+            rgba(var(--plataforma-rgb), 0.12),
+            transparent 42%
+        );
+}
+
+.plataforma-dinamica:hover {
+    border-color: rgba(
+        var(--plataforma-rgb),
+        0.42
+    );
+
+    box-shadow:
+        0 30px 65px rgba(0, 0, 0, 0.55),
+        0 0 38px rgba(
+            var(--plataforma-rgb),
+            0.10
+        ),
+        inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* CORREGIR POSICIÓN DEL LOGO DINÁMICO */
+
+.plataforma-logo-dinamica {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    padding: 8px 13px;
+    border-radius: 10px;
+
+    font-size: 14px;
+    font-weight: 950;
+    letter-spacing: 1.2px;
+}
+
+.plataforma-topbar {
+    position: relative;
+    z-index: 4;
+}
+
+.modal-vista-cartelera {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+
+    transition:
+        opacity 0.25s ease,
+        visibility 0.25s ease;
+}
+
+.modal-vista-cartelera.active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.modal-vista-overlay {
+    position: absolute;
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.82);
+    backdrop-filter: blur(8px);
+}
+
+.modal-vista-panel {
+    position: relative;
+    z-index: 2;
+
+    width: min(900px, 100%);
+    min-height: 500px;
+
+    background: #111;
+    border-radius: 20px;
+    overflow: hidden;
+
+    box-shadow:
+        0 30px 80px rgba(0, 0, 0, 0.75);
+}
+
+.modal-vista-cerrar {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    z-index: 5;
+
+    width: 42px;
+    height: 42px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(0, 0, 0, 0.75);
+    color: white;
+
+    cursor: pointer;
+}
+
+.modal-vista-banner {
+    position: relative;
+    min-height: 500px;
+}
+
+.modal-vista-banner > img {
+    position: absolute;
+    inset: 0;
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+}
+
+.modal-vista-degradado {
+    position: absolute;
+    inset: 0;
+
+    background:
+        linear-gradient(
+            to top,
+            #111 5%,
+            rgba(17, 17, 17, 0.85) 35%,
+            rgba(17, 17, 17, 0.15) 75%
+        );
+}
+
+.modal-vista-contenido {
+    position: absolute;
+    left: 40px;
+    right: 40px;
+    bottom: 40px;
+    z-index: 3;
+
+    color: white;
+}
+
+.modal-vista-contenido h2 {
+    margin: 12px 0;
+    font-size: clamp(32px, 5vw, 58px);
+}
+
+.modal-vista-meta,
+.modal-vista-etiquetas,
+.modal-vista-plataformas {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.modal-vista-etiquetas span,
+.modal-vista-plataformas span {
+    padding: 7px 12px;
+
+    border-radius: 999px;
+
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.modal-vista-contenido p {
+    max-width: 650px;
+    line-height: 1.6;
+}
+
+/* =========================================================
+   ARREGLO DEFINITIVO — CARRUSEL HORIZONTAL DE PLATAFORMAS
+========================================================= */
+
+.plataformas-carrusel {
+    position: relative;
+    width: 100%;
+    padding: 14px 46px;
+    overflow: hidden;
+}
+
+.plataformas-desplegable-contenido {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+
+    width: 100%;
+    max-width: 100%;
+
+    gap: 12px;
+
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+}
+
+.plataformas-desplegable-contenido::-webkit-scrollbar {
+    display: none;
+}
+
+.plataformas-desplegable-contenido
+.plataforma-mini-card {
+    display: block !important;
+
+    flex: 0 0 165px !important;
+    width: 165px !important;
+    min-width: 165px !important;
+    max-width: 165px !important;
+
+    margin: 0 !important;
+}
+
+.plataformas-desplegable-contenido
+.plataforma-mini-contenido {
+    width: 100% !important;
+    height: 124px;
+    box-sizing: border-box;
+}
+
+/* =========================================================
+   MEJORA 2 — SELECCIÓN PREMIUM CON CLASE
+========================================================= */
+
+.plataforma-mini-card.seleccionada
+.plataforma-mini-contenido {
+    transform: translateY(-4px) scale(1.02) !important;
+
+    border-color: var(--color,#ef1425) !important;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(239, 20, 37, 0.20),
+            rgba(239, 20, 37, 0.07)
+        ) !important;
+
+    box-shadow:
+        0 0 0 1px rgba(239, 20, 37, 0.35),
+        0 16px 34px rgba(239, 20, 37, 0.24),
+        0 0 30px rgba(239, 20, 37, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10) !important;
+}
+
+.plataforma-mini-card.seleccionada
+.plataforma-mini-contenido img {
+    transform: scale(1.10) !important;
+    filter: brightness(1.12) saturate(1.12) !important;
+}
+
+.plataforma-mini-card.seleccionada
+.plataforma-mini-check {
+    opacity: 1 !important;
+    transform: scale(1) rotate(0deg) !important;
+}
+
+/* =========================================================
+   MEJORA 3 — HOVER PREMIUM
+========================================================= */
+
+.plataforma-mini-card:hover
+.plataforma-mini-contenido {
+    transform: translateY(-3px) scale(1.015);
+
+    border-color: var(--color,#ffffff);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255, 255, 255, 0.10),
+            rgba(255, 255, 255, 0.03)
+        );
+
+    box-shadow:
+        0 16px 30px rgba(0, 0, 0, 0.30),
+        0 0 22px rgba(255, 255, 255, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.plataforma-mini-card:hover
+.plataforma-mini-contenido img {
+    transform: scale(1.08);
+    filter: brightness(1.10) saturate(1.08);
+}
+
+/* La selección roja manda sobre el hover */
+
+.plataforma-mini-card.seleccionada:hover
+.plataforma-mini-contenido {
+    transform: translateY(-5px) scale(1.03) !important;
+}
+/* =========================================================
+   MEJORA 5 — COLORES POR PLATAFORMA
+========================================================= */
+
+.plataforma-mini-card[data-plataforma*="netflix"]{
+    --color:#e50914;
+}
+
+.plataforma-mini-card[data-plataforma*="disney"]{
+    --color:#0063e5;
+}
+
+.plataforma-mini-card[data-plataforma*="max"]{
+    --color:#6f2cff;
+}
+
+.plataforma-mini-card[data-plataforma*="prime"]{
+    --color:#00a8e1;
+}
+
+.plataforma-mini-card[data-plataforma*="spotify"]{
+    --color:#1db954;
+}
+
+.plataforma-mini-card[data-plataforma*="apple"]{
+    --color:#444;
+}
+
+.plataforma-mini-card[data-plataforma*="crunchyroll"]{
+    --color:#f47521;
+}
+
+.plataforma-mini-card[data-plataforma*="paramount"]{
+    --color:#0057ff;
+}
+
+.plataforma-mini-card[data-plataforma*="youtube"]{
+    --color:#ff0000;
+}
+
+.plataforma-mini-card[data-plataforma*="vix"]{
+    --color:#ff4cff;
+}
+
+.plataforma-mini-card[data-plataforma*="directv"]{
+    --color:#00b5ff;
+}
+
+.plataforma-mini-card[data-plataforma*="iptv"]{
+    --color:#00c853;
+}
+
+.plataforma-mini-card[data-plataforma*="plex"]{
+    --color:#e5a100;
+}
+
+.plataforma-mini-card[data-plataforma*="jellyfin"]{
+    --color:#a259ff;
+}
+
+/* ==========================================
+   BANNER PREVIEW
+========================================== */
+
+.banner-upload-preview{
+
+    width:210px;
+
+    height:118px;
+
+    margin:16px auto;
+
+    border:2px dashed rgba(255,255,255,.15);
+
+    border-radius:16px;
+
+    overflow:hidden;
+
+    background:#181818;
+
+    display:flex;
+
+    align-items:center;
+
+    justify-content:center;
+
+}
+
+.banner-upload-placeholder{
+
+    display:flex;
+
+    flex-direction:column;
+
+    align-items:center;
+
+    justify-content:center;
+
+    gap:10px;
+
+    width:100%;
+
+    height:100%;
+
+    color:#c3c8d2;
+
+}
+
+.banner-preview-imagen{
+
+    width:100%;
+
+    height:100%;
+
+    object-fit:cover;
+
+    object-position:center;
+
+    display:none;
+
+}
+
+.banner-preview-imagen.visible{
+
+    display:block;
+
+}

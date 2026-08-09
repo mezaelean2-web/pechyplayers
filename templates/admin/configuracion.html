@@ -1,0 +1,2534 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}
+Configuración | PECHY PLAYERS
+{% endblock %}
+
+{% block contenido %}
+
+<section class="configuracion-page">
+
+    <header class="configuracion-header">
+
+        <div>
+
+            <span class="configuracion-label">
+                SISTEMA
+            </span>
+
+            <h1>
+                Configuración
+            </h1>
+
+            <p>
+                Centro de control del negocio y de la plantilla.
+            </p>
+
+        </div>
+
+
+        <div class="configuracion-header-acciones">
+
+            <button
+                type="button"
+                class="configuracion-btn secundario"
+                disabled>
+
+                ↶ Restaurar
+
+            </button>
+
+            <button
+                type="button"
+                class="configuracion-btn principal"
+                disabled>
+
+                💾 Guardar cambios
+
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <section class="configuracion-resumen">
+
+        <article class="configuracion-resumen-card">
+
+            <div class="configuracion-resumen-icono identidad">
+                🛡
+            </div>
+
+            <div>
+
+                <strong>
+                    Identidad
+                </strong>
+
+                <span>
+                    PECHY PLAYERS
+                </span>
+
+                <small>
+                    Marca activa
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="configuracion-resumen-card">
+
+            <div class="configuracion-resumen-icono contacto">
+                ☎
+            </div>
+
+            <div>
+
+                <strong>
+                    Contacto
+                </strong>
+
+                <span>
+                    +{{ config.get("whatsapp", "573147735950") }}
+                </span>
+
+                <small>
+                    WhatsApp principal
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="configuracion-resumen-card">
+
+            <div class="configuracion-resumen-icono apariencia">
+                🎨
+            </div>
+
+            <div>
+
+                <strong>
+                    Apariencia
+                </strong>
+
+                <span>
+                    Tema oscuro
+                </span>
+
+                <small>
+                    Estilo actual
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="configuracion-resumen-card">
+
+            <div class="configuracion-resumen-icono seguridad">
+                🔒
+            </div>
+
+            <div>
+
+                <strong>
+                    Seguridad
+                </strong>
+
+                <span>
+                    Nivel alto
+                </span>
+
+                <small>
+                    Sistema protegido
+                </small>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+    <section class="configuracion-layout">
+
+        <div class="configuracion-modulos-card">
+
+            <div class="configuracion-modulos-header">
+
+                <div>
+
+                    <span>
+                        ✦
+                    </span>
+
+                    <h2>
+                        Módulos de configuración
+                    </h2>
+
+                </div>
+
+                <small>
+                    Selecciona un módulo para editarlo
+                </small>
+
+            </div>
+
+
+            <div class="configuracion-modulos-grid">
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card activo"
+                    data-modulo="identidad">
+
+                    <span class="configuracion-modulo-icono">
+                        🛡
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            1. Identidad del negocio
+                        </strong>
+
+                        <p>
+                            Nombre, logo, eslogan y configuración básica.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="apariencia">
+
+                    <span class="configuracion-modulo-icono">
+                        🎨
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            2. Colores y apariencia
+                        </strong>
+
+                        <p>
+                            Paleta de colores, tipografía y estilos.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="contacto">
+
+                    <span class="configuracion-modulo-icono">
+                        ☎
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            3. WhatsApp y contacto
+                        </strong>
+
+                        <p>
+                            Números, redes y mensajes de contacto.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="comercial">
+
+                    <span class="configuracion-modulo-icono">
+                        ℹ
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            4. Información comercial
+                        </strong>
+
+                        <p>
+                            Moneda, garantía, políticas y pagos.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="inicio">
+
+                    <span class="configuracion-modulo-icono">
+                        🏠
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            5. Página de inicio
+                        </strong>
+
+                        <p>
+                            Banners, secciones y contenido destacado.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="catalogo">
+
+                    <span class="configuracion-modulo-icono">
+                        📦
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            6. Catálogo
+                        </strong>
+
+                        <p>
+                            Ajustes globales de productos y precios.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="promociones">
+
+                    <span class="configuracion-modulo-icono">
+                        🔥
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            7. Promociones
+                        </strong>
+
+                        <p>
+                            Visibilidad, reglas y comportamiento.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="cartelera">
+
+                    <span class="configuracion-modulo-icono">
+                        🎬
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            8. Cartelera
+                        </strong>
+
+                        <p>
+                            Estrenos, tendencias y visualización.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="mensajes">
+
+                    <span class="configuracion-modulo-icono">
+                        💬
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            9. Mensajes automáticos
+                        </strong>
+
+                        <p>
+                            Textos de compra, soporte y garantía.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="sistema">
+
+                    <span class="configuracion-modulo-icono">
+                        〽
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            10. Estado del sistema
+                        </strong>
+
+                        <p>
+                            Tienda, mantenimiento y avisos.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="accesos">
+
+                    <span class="configuracion-modulo-icono">
+                        ⚡
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            11. Accesos rápidos
+                        </strong>
+
+                        <p>
+                            Enlaces directos a módulos del panel.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="cliente">
+
+                    <span class="configuracion-modulo-icono">
+                        👤
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            12. Modo cliente / White label
+                        </strong>
+
+                        <p>
+                            Preparación para vender la plataforma.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="seguridad">
+
+                    <span class="configuracion-modulo-icono">
+                        🛡
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            13. Seguridad
+                        </strong>
+
+                        <p>
+                            Contraseña, sesiones y confirmaciones.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="respaldo">
+
+                    <span class="configuracion-modulo-icono">
+                        ☁
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            14. Respaldo y mantenimiento
+                        </strong>
+
+                        <p>
+                            Copias, restauración y limpieza.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+
+                <button
+                    type="button"
+                    class="configuracion-modulo-card"
+                    data-modulo="auditoria">
+
+                    <span class="configuracion-modulo-icono">
+                        📋
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            15. Auditoría
+                        </strong>
+
+                        <p>
+                            Cambios, accesos y actividad importante.
+                        </p>
+
+                    </div>
+
+                    <span class="configuracion-modulo-flecha">
+                        ›
+                    </span>
+
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <aside class="configuracion-lateral">
+
+            <section class="configuracion-preview-card">
+
+    <div class="configuracion-lateral-header">
+
+        <h2 id="configuracionModuloTitulo">
+            Identidad del negocio
+        </h2>
+
+        <a
+            href="/"
+            target="_blank"
+            title="Abrir página">
+
+            ↗
+
+        </a>
+
+    </div>
+
+
+    <div class="configuracion-preview">
+
+        <div
+            class="configuracion-preview-logo"
+            id="configuracionModuloIcono">
+
+            🛡
+
+        </div>
+
+        <div>
+
+            <strong id="configuracionPreviewNombre">
+                {{ config.get("nombre_negocio", "PECHY PLAYERS") }}
+            </strong>
+
+            <span id="configuracionModuloDescripcion">
+                Edita el nombre, logo, eslogan y datos principales de la marca.
+            </span>
+
+        </div>
+
+    </div>
+
+
+    
+
+</section>
+
+
+            <section class="configuracion-ajustes-rapidos">
+
+                <h2>
+                    Ajustes rápidos
+                </h2>
+
+
+                <div class="configuracion-campo">
+
+                    <label>
+                        Nombre del negocio
+                    </label>
+
+                    <input
+                        type="text"
+                        value="PECHY PLAYERS"
+                        disabled>
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label>
+                        WhatsApp principal
+                    </label>
+
+                    <input
+                        type="text"
+                        value="{{ config.get('whatsapp', '573147735950') }}"
+                        disabled>
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label>
+                        Color principal
+                    </label>
+
+                    <div class="configuracion-color-preview">
+
+                        <span>
+                            #E50914
+                        </span>
+
+                        <i></i>
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-estado-rapido">
+
+                    <span>
+                        Modo mantenimiento
+                    </span>
+
+                    <button
+                        type="button"
+                        class="configuracion-switch"
+                        disabled>
+
+                        <span></span>
+
+                    </button>
+
+                </div>
+
+
+                <div class="configuracion-estado-rapido">
+
+                    <span>
+                        Mostrar mensajes automáticos
+                    </span>
+
+                    <button
+                        type="button"
+                        class="configuracion-switch activo"
+                        disabled>
+
+                        <span></span>
+
+                    </button>
+
+                </div>
+
+            </section>
+
+        </aside>
+
+    </section>
+
+</section>
+
+<!-- ==========================================
+     MODAL: IDENTIDAD DEL NEGOCIO
+========================================== -->
+
+<div
+    class="configuracion-modal"
+    id="modalIdentidad"
+    aria-hidden="true">
+
+    <div
+        class="configuracion-modal-fondo"
+        data-cerrar-modal="identidad">
+    </div>
+
+
+    <section
+        class="configuracion-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalIdentidadTitulo">
+
+
+        <header class="configuracion-modal-header">
+
+            <div class="configuracion-modal-header-info">
+
+                <div class="configuracion-modal-icono">
+                    🛡
+                </div>
+
+                <div>
+
+                    <span>
+                        IDENTIDAD Y MARCA
+                    </span>
+
+                    <h2 id="modalIdentidadTitulo">
+                        Editar identidad del negocio
+                    </h2>
+
+                    <p>
+                        Personaliza los datos principales que
+                        identificarán la página.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="configuracion-modal-cerrar"
+                id="btnCerrarModalIdentidad"
+                aria-label="Cerrar">
+
+                ✕
+
+            </button>
+
+        </header>
+
+
+        <div class="configuracion-modal-contenido">
+
+            <!-- VISTA PREVIA -->
+
+            <aside class="configuracion-modal-preview">
+
+                <span class="configuracion-modal-preview-label">
+                    VISTA PREVIA
+                </span>
+
+
+                <div class="configuracion-modal-preview-web">
+
+                    <div class="configuracion-modal-preview-marca">
+
+                        <div class="configuracion-modal-preview-logo">
+                            PP
+                        </div>
+
+                        <div>
+
+                            <strong id="previewModalNombre">
+                                {{ config.get("nombre_negocio", "PECHY PLAYERS") }}
+                            </strong>
+
+                            <span id="previewModalEslogan">
+                                {{ config.get("eslogan", "Vive el cine a otro nivel") }}
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <p id="previewModalDescripcion">
+                        {{ config.get(
+                            "descripcion_negocio",
+                            "Entretenimiento, streaming y servicios digitales en un solo lugar."
+                        ) }}
+                    </p>
+
+
+                    <div class="configuracion-modal-preview-boton">
+                        Ver catálogo
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-modal-preview-dato">
+
+                    <span>
+                        Título del navegador
+                    </span>
+
+                    <strong id="previewModalTitulo">
+                        {{ config.get("titulo_navegador", "PECHY PLAYERS") }}
+                    </strong>
+
+                </div>
+
+
+                <div class="configuracion-modal-preview-footer">
+
+                    <span>
+                        Footer
+                    </span>
+
+                    <p id="previewModalFooter">
+                        {{ config.get(
+                            "texto_footer",
+                            "PECHY PLAYERS - Todos los derechos reservados."
+                        ) }}
+                    </p>
+
+                </div>
+
+            </aside>
+
+
+            <!-- FORMULARIO -->
+
+            <form
+                action="/actualizar-config"
+                method="POST"
+                class="configuracion-modal-form"
+                id="formIdentidad">
+
+                <input
+                    type="hidden"
+                    name="tipo_configuracion"
+                    value="identidad">
+
+
+                <div class="configuracion-modal-form-grid">
+
+                    <div class="configuracion-campo">
+
+                        <label for="nombreNegocio">
+                            Nombre del negocio
+                        </label>
+
+                        <input
+                            type="text"
+                            id="nombreNegocio"
+                            name="nombre_negocio"
+                            value="{{ config.get('nombre_negocio', 'PECHY PLAYERS') }}"
+                            required>
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="nombreCorto">
+                            Nombre corto
+                        </label>
+
+                        <input
+                            type="text"
+                            id="nombreCorto"
+                            name="nombre_corto"
+                            value="{{ config.get('nombre_corto', 'PECHY') }}">
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label for="esloganNegocio">
+                        Eslogan
+                    </label>
+
+                    <input
+                        type="text"
+                        id="esloganNegocio"
+                        name="eslogan"
+                        value="{{ config.get('eslogan', 'Vive el cine a otro nivel') }}">
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label for="descripcionNegocio">
+                        Descripción del negocio
+                    </label>
+
+                    <textarea
+                        id="descripcionNegocio"
+                        name="descripcion_negocio"
+                        rows="4">{{ config.get(
+                            "descripcion_negocio",
+                            "Entretenimiento, streaming y servicios digitales en un solo lugar."
+                        ) }}</textarea>
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label for="tituloNavegador">
+                        Título del navegador
+                    </label>
+
+                    <input
+                        type="text"
+                        id="tituloNavegador"
+                        name="titulo_navegador"
+                        value="{{ config.get('titulo_navegador', 'PECHY PLAYERS') }}">
+
+                </div>
+
+
+                <div class="configuracion-campo">
+
+                    <label for="textoFooter">
+                        Texto del footer
+                    </label>
+
+                    <textarea
+                        id="textoFooter"
+                        name="texto_footer"
+                        rows="3">{{ config.get(
+                            "texto_footer",
+                            "PECHY PLAYERS - Todos los derechos reservados."
+                        ) }}</textarea>
+
+                </div>
+
+
+                <footer class="configuracion-modal-acciones">
+
+                    <button
+                        type="button"
+                        class="configuracion-modal-btn cancelar"
+                        id="btnCancelarModalIdentidad">
+
+                        Cancelar
+
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="configuracion-modal-btn guardar">
+
+                        💾 Guardar cambios
+
+                    </button>
+
+                </footer>
+
+            </form>
+
+        </div>
+
+    </section>
+
+</div>
+
+<!-- ==========================================
+     MODAL: CONTACTO Y WHATSAPP
+========================================== -->
+
+<div
+    class="configuracion-modal"
+    id="modalContacto"
+    aria-hidden="true">
+
+    <div
+        class="configuracion-modal-fondo"
+        data-cerrar-modal="contacto">
+    </div>
+
+
+    <section
+        class="configuracion-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalContactoTitulo">
+
+
+        <header class="configuracion-modal-header">
+
+            <div class="configuracion-modal-header-info">
+
+                <div class="configuracion-modal-icono">
+                    📲
+                </div>
+
+                <div>
+
+                    <span>
+                        CONTACTO PRINCIPAL
+                    </span>
+
+                    <h2 id="modalContactoTitulo">
+                        Editar WhatsApp del negocio
+                    </h2>
+
+                    <p>
+                        Configura el número que recibirán los clientes
+                        desde toda la página.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="configuracion-modal-cerrar"
+                id="btnCerrarModalContacto"
+                aria-label="Cerrar">
+
+                ✕
+
+            </button>
+
+        </header>
+
+
+        <div class="configuracion-modal-contenido">
+
+            <!-- VISTA PREVIA -->
+
+            <aside class="configuracion-modal-preview">
+
+                <span class="configuracion-modal-preview-label">
+                    VISTA PREVIA
+                </span>
+
+
+                <div class="configuracion-contacto-preview">
+
+                    <div class="configuracion-contacto-preview-icono">
+                        💬
+                    </div>
+
+                    <div>
+
+                        <small>
+                            WHATSAPP PRINCIPAL
+                        </small>
+
+                        <strong id="previewContactoNumero">
+                            +{{ config.get("whatsapp", "573147735950") }}
+                        </strong>
+
+                        <span>
+                            Este número recibirá las compras,
+                            consultas y solicitudes de los clientes.
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-contacto-enlace">
+
+                    <span>
+                        Enlace generado
+                    </span>
+
+                    <strong id="previewContactoEnlace">
+                        wa.me/{{ config.get("whatsapp", "573147735950") }}
+                    </strong>
+
+                </div>
+
+
+                <div class="configuracion-contacto-botones">
+
+                    <div>
+                        💬 Comprar por WhatsApp
+                    </div>
+
+                    <div>
+                        💬 Botón flotante
+                    </div>
+
+                    <div>
+                        💬 Contacto del footer
+                    </div>
+
+                </div>
+
+            </aside>
+
+
+            <!-- FORMULARIO -->
+
+            <form
+                action="/actualizar-config"
+                method="POST"
+                class="configuracion-modal-form"
+                id="formContacto">
+
+                <input
+                    type="hidden"
+                    name="tipo_configuracion"
+                    value="whatsapp">
+
+
+                <div class="configuracion-campo">
+
+                    <label for="whatsappPrincipal">
+                        Número principal de WhatsApp
+                    </label>
+
+                    <input
+                        type="tel"
+                        id="whatsappPrincipal"
+                        name="whatsapp"
+                        value="{{ config.get('whatsapp', '573147735950') }}"
+                        inputmode="numeric"
+                        autocomplete="tel"
+                        required>
+
+                    <small class="configuracion-campo-ayuda">
+                        Escribe el número con indicativo del país,
+                        sin espacios, signos ni guiones.
+                        Ejemplo: 573147735950.
+                    </small>
+
+                </div>
+
+
+                <div class="configuracion-contacto-validacion">
+
+                    <span>
+                        ✓
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Número conectado globalmente
+                        </strong>
+
+                        <p>
+                            Al guardar, este número se usará en el menú,
+                            productos, promociones, footer y botón flotante.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-contacto-ejemplo">
+
+                    <span>
+                        Ejemplo del enlace final
+                    </span>
+
+                    <code id="previewContactoUrlCompleta">
+                        https://wa.me/{{ config.get("whatsapp", "573147735950") }}
+                    </code>
+
+                </div>
+
+
+                <footer class="configuracion-modal-acciones">
+
+                    <button
+                        type="button"
+                        class="configuracion-modal-btn cancelar"
+                        id="btnCancelarModalContacto">
+
+                        Cancelar
+
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="configuracion-modal-btn guardar">
+
+                        💾 Guardar WhatsApp
+
+                    </button>
+
+                </footer>
+
+            </form>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+<!-- ==========================================
+     MODAL: COLORES Y APARIENCIA
+========================================== -->
+
+<div
+    class="configuracion-modal"
+    id="modalApariencia"
+    aria-hidden="true">
+
+    <div
+        class="configuracion-modal-fondo"
+        data-cerrar-modal="apariencia">
+    </div>
+
+
+    <section
+        class="configuracion-modal-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalAparienciaTitulo">
+
+
+        <header class="configuracion-modal-header">
+
+            <div class="configuracion-modal-header-info">
+
+                <div class="configuracion-modal-icono">
+                    🎨
+                </div>
+
+                <div>
+
+                    <span>
+                        APARIENCIA VISUAL
+                    </span>
+
+                    <h2 id="modalAparienciaTitulo">
+                        Colores y estilo del negocio
+                    </h2>
+
+                    <p>
+                        Personaliza los colores principales de la página
+                        y observa los cambios antes de guardarlos.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="configuracion-modal-cerrar"
+                id="btnCerrarModalApariencia"
+                aria-label="Cerrar">
+
+                ✕
+
+            </button>
+
+        </header>
+
+
+        <div class="configuracion-modal-contenido">
+
+            <!-- VISTA PREVIA -->
+
+            <aside class="configuracion-modal-preview">
+
+                <span class="configuracion-modal-preview-label">
+                    VISTA PREVIA
+                </span>
+
+
+                <div
+                    class="configuracion-apariencia-preview"
+                    id="previewApariencia">
+
+                    <div class="configuracion-apariencia-preview-nav">
+
+                        <div
+                            class="configuracion-apariencia-preview-logo"
+                            id="previewAparienciaLogo">
+
+                            PP
+
+                        </div>
+
+                        <strong>
+                            {{ config.get(
+                                "nombre_negocio",
+                                "PECHY PLAYERS"
+                            ) }}
+                        </strong>
+
+                        <span id="previewAparienciaPunto">
+                            ●
+                        </span>
+
+                    </div>
+
+
+                    <div class="configuracion-apariencia-preview-hero">
+
+                        <small id="previewAparienciaEtiqueta">
+                            EXPERIENCIA PREMIUM
+                        </small>
+
+                        <h3>
+                            El mejor entretenimiento
+                            <span id="previewAparienciaTituloColor">
+                                en tus manos
+                            </span>
+                        </h3>
+
+                        <p>
+                            Plataformas, promociones y atención rápida
+                            desde un solo lugar.
+                        </p>
+
+                        <div class="configuracion-apariencia-preview-acciones">
+
+                            <button
+                                type="button"
+                                id="previewAparienciaBoton">
+
+                                Ver catálogo
+
+                            </button>
+
+                            <span id="previewAparienciaAcento">
+                                ★ PREMIUM
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="configuracion-apariencia-preview-tarjetas">
+
+                        <div>
+                            <span>🎬</span>
+                            <strong>Streaming</strong>
+                        </div>
+
+                        <div>
+                            <span>⚡</span>
+                            <strong>Entrega rápida</strong>
+                        </div>
+
+                        <div>
+                            <span>🛡</span>
+                            <strong>Compra segura</strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-apariencia-resumen">
+
+                    <div>
+
+                        <span>
+                            Principal
+                        </span>
+
+                        <strong id="previewValorPrincipal">
+                            {{ config.get(
+                                "color_principal",
+                                "#e50914"
+                            ) }}
+                        </strong>
+
+                    </div>
+
+                    <div>
+
+                        <span>
+                            Secundario
+                        </span>
+
+                        <strong id="previewValorSecundario">
+                            {{ config.get(
+                                "color_secundario",
+                                "#18191d"
+                            ) }}
+                        </strong>
+
+                    </div>
+
+                    <div>
+
+                        <span>
+                            Acento
+                        </span>
+
+                        <strong id="previewValorAcento">
+                            {{ config.get(
+                                "color_acento",
+                                "#d4af37"
+                            ) }}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </aside>
+
+
+            <!-- FORMULARIO -->
+
+            <form
+                action="/actualizar-config"
+                method="POST"
+                class="configuracion-modal-form"
+                id="formApariencia">
+
+                <input
+                    type="hidden"
+                    name="tipo_configuracion"
+                    value="apariencia">
+
+
+                <div class="configuracion-color-campo">
+
+                    <div>
+
+                        <label for="colorPrincipal">
+                            Color principal
+                        </label>
+
+                        <span>
+                            Botones, enlaces, brillos y elementos destacados.
+                        </span>
+
+                    </div>
+
+
+                    <div class="configuracion-color-selector">
+
+                        <input
+                            type="color"
+                            id="colorPrincipal"
+                            name="color_principal"
+                            value="{{ config.get(
+                                'color_principal',
+                                '#e50914'
+                            ) }}">
+
+                        <input
+                            type="text"
+                            id="colorPrincipalTexto"
+                            value="{{ config.get(
+                                'color_principal',
+                                '#e50914'
+                            ) }}"
+                            maxlength="7"
+                            aria-label="Código del color principal">
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-color-campo">
+
+                    <div>
+
+                        <label for="colorSecundario">
+                            Color secundario
+                        </label>
+
+                        <span>
+                            Tarjetas, paneles y superficies oscuras.
+                        </span>
+
+                    </div>
+
+
+                    <div class="configuracion-color-selector">
+
+                        <input
+                            type="color"
+                            id="colorSecundario"
+                            name="color_secundario"
+                            value="{{ config.get(
+                                'color_secundario',
+                                '#18191d'
+                            ) }}">
+
+                        <input
+                            type="text"
+                            id="colorSecundarioTexto"
+                            value="{{ config.get(
+                                'color_secundario',
+                                '#18191d'
+                            ) }}"
+                            maxlength="7"
+                            aria-label="Código del color secundario">
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-color-campo">
+
+                    <div>
+
+                        <label for="colorAcento">
+                            Color de acento
+                        </label>
+
+                        <span>
+                            Detalles premium, estrellas y elementos especiales.
+                        </span>
+
+                    </div>
+
+
+                    <div class="configuracion-color-selector">
+
+                        <input
+                            type="color"
+                            id="colorAcento"
+                            name="color_acento"
+                            value="{{ config.get(
+                                'color_acento',
+                                '#d4af37'
+                            ) }}">
+
+                        <input
+                            type="text"
+                            id="colorAcentoTexto"
+                            value="{{ config.get(
+                                'color_acento',
+                                '#d4af37'
+                            ) }}"
+                            maxlength="7"
+                            aria-label="Código del color de acento">
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-intensidad">
+
+                    <div class="configuracion-intensidad-header">
+
+                        <div>
+
+                            <label for="intensidadFondo">
+                                Intensidad del fondo
+                            </label>
+
+                            <span>
+                                Controla qué tan oscuro se verá el fondo.
+                            </span>
+
+                        </div>
+
+                        <strong id="intensidadFondoValor">
+                            {{ config.get(
+                                "intensidad_fondo",
+                                "100"
+                            ) }}%
+                        </strong>
+
+                    </div>
+
+
+                    <input
+                        type="range"
+                        id="intensidadFondo"
+                        name="intensidad_fondo"
+                        min="60"
+                        max="100"
+                        step="1"
+                        value="{{ config.get(
+                            'intensidad_fondo',
+                            '100'
+                        ) }}">
+
+                    <div class="configuracion-intensidad-leyenda">
+
+                        <span>
+                            Más suave
+                        </span>
+
+                        <span>
+                            Más oscuro
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="configuracion-apariencia-aviso">
+
+                    <span>
+                        👁
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Vista previa antes de guardar
+                        </strong>
+
+                        <p>
+                            Los cambios se mostrarán primero dentro de este
+                            cuadro. La página pública no cambiará hasta
+                            presionar Guardar apariencia.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <footer class="configuracion-modal-acciones">
+
+                    <button
+                        type="button"
+                        class="configuracion-modal-btn cancelar"
+                        id="btnRestaurarApariencia">
+
+                        ↺ Restaurar colores
+
+                    </button>
+
+                    <button
+                        type="button"
+                        class="configuracion-modal-btn cancelar"
+                        id="btnCancelarModalApariencia">
+
+                        Cancelar
+
+                    </button>
+
+                    <button
+                        type="submit"
+                        class="configuracion-modal-btn guardar">
+
+                        💾 Guardar apariencia
+
+                    </button>
+
+                </footer>
+
+            </form>
+
+        </div>
+
+    </section>
+
+</div>
+
+
+<!-- ==========================================
+     MODAL CONFIGURACIÓN COMERCIAL
+========================================== -->
+
+<div
+    class="configuracion-modal"
+    id="modalComercial"
+    aria-hidden="true"
+>
+
+    <div
+        class="configuracion-modal-fondo"
+        data-cerrar-modal="comercial"
+    ></div>
+
+
+    <div class="configuracion-modal-panel comercial-modal-contenido">
+
+        <div class="configuracion-modal-header">
+
+            <div>
+
+                <span class="configuracion-modal-etiqueta">
+                    MÓDULO COMERCIAL
+                </span>
+
+                <h2>
+                    Configuración comercial
+                </h2>
+
+                <p>
+                    Controla la moneda, la garantía y los mensajes comerciales del negocio.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="configuracion-modal-cerrar"
+                id="btnCerrarModalComercial"
+                aria-label="Cerrar"
+            >
+                ✕
+            </button>
+
+        </div>
+
+
+        <form
+            action="/actualizar-config"
+            method="POST"
+            id="formComercial"
+        >
+
+            <input
+                type="hidden"
+                name="tipo_configuracion"
+                value="comercial"
+            >
+
+
+            <div class="comercial-modal-grid">
+
+                <!-- FORMULARIO -->
+
+                <div class="comercial-formulario">
+
+                    <div class="configuracion-campo">
+
+                        <label for="monedaNombre">
+                            Nombre de la moneda
+                        </label>
+
+                        <input
+                            type="text"
+                            id="monedaNombre"
+                            name="moneda_nombre"
+                            value="{{ config.get('moneda_nombre', 'Peso colombiano') }}"
+                            maxlength="40"
+                            required
+                        >
+
+                        <small>
+                            Ejemplo: Peso colombiano, Dólar estadounidense.
+                        </small>
+
+                    </div>
+
+
+                    <div class="comercial-campos-dobles">
+
+                        <div class="configuracion-campo">
+
+                            <label for="monedaSimbolo">
+                                Símbolo
+                            </label>
+
+                            <input
+                                type="text"
+                                id="monedaSimbolo"
+                                name="moneda_simbolo"
+                                value="{{ config.get('moneda_simbolo', '$') }}"
+                                maxlength="5"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="configuracion-campo">
+
+                            <label for="separadorMiles">
+                                Separador de miles
+                            </label>
+
+                            <select
+                                id="separadorMiles"
+                                name="separador_miles"
+                            >
+
+                                <option
+                                    value="."
+                                    {% if config.get('separador_miles', '.') == '.' %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    Punto: 20.000
+                                </option>
+
+                                <option
+                                    value=","
+                                    {% if config.get('separador_miles') == ',' %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    Coma: 20,000
+                                </option>
+
+                                <option
+                                    value=" "
+                                    {% if config.get('separador_miles') == ' ' %}
+                                    selected
+                                    {% endif %}
+                                >
+                                    Espacio: 20 000
+                                </option>
+
+                            </select>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="diasGarantia">
+                            Días de garantía
+                        </label>
+
+                        <input
+                            type="number"
+                            id="diasGarantia"
+                            name="dias_garantia"
+                            value="{{ config.get('dias_garantia', '30') }}"
+                            min="0"
+                            max="365"
+                            required
+                        >
+
+                        <small>
+                            Se mostrará en mensajes y secciones comerciales.
+                        </small>
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="textoEntrega">
+                            Texto de entrega
+                        </label>
+
+                        <input
+                            type="text"
+                            id="textoEntrega"
+                            name="texto_entrega"
+                            value="{{ config.get('texto_entrega', 'Entrega inmediata') }}"
+                            maxlength="60"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="textoDisponibilidad">
+                            Texto de disponibilidad
+                        </label>
+
+                        <input
+                            type="text"
+                            id="textoDisponibilidad"
+                            name="texto_disponibilidad"
+                            value="{{ config.get('texto_disponibilidad', 'Disponible') }}"
+                            maxlength="40"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="mensajeComercial">
+                            Mensaje comercial principal
+                        </label>
+
+                        <textarea
+                            id="mensajeComercial"
+                            name="mensaje_comercial"
+                            rows="5"
+                            maxlength="220"
+                            required
+                        >{{ config.get('mensaje_comercial', 'Plataformas premium al mejor precio, entrega inmediata y soporte rápido.') }}</textarea>
+
+                        <small>
+                            Máximo 220 caracteres.
+                        </small>
+
+                    </div>
+
+                </div>
+
+
+                <!-- PREVISUALIZACIÓN -->
+
+                <aside class="comercial-preview">
+
+                    <span class="comercial-preview-etiqueta">
+                        VISTA PREVIA
+                    </span>
+
+                    <div class="comercial-preview-tarjeta">
+
+                        <div class="comercial-preview-superior">
+
+                            <span id="previewComercialDisponibilidad">
+                                {{ config.get('texto_disponibilidad', 'Disponible') }}
+                            </span>
+
+                            <strong id="previewComercialPrecio">
+                                {{ config.get('moneda_simbolo', '$') }}20{{ config.get('separador_miles', '.') }}000
+                            </strong>
+
+                        </div>
+
+
+                        <h3>
+                            Netflix Premium
+                        </h3>
+
+
+                        <p id="previewComercialMensaje">
+                            {{ config.get('mensaje_comercial', 'Plataformas premium al mejor precio, entrega inmediata y soporte rápido.') }}
+                        </p>
+
+
+                        <div class="comercial-preview-detalles">
+
+                            <div>
+
+                                <span>
+                                    ⚡
+                                </span>
+
+                                <p>
+
+                                    <small>
+                                        Entrega
+                                    </small>
+
+                                    <strong id="previewComercialEntrega">
+                                        {{ config.get('texto_entrega', 'Entrega inmediata') }}
+                                    </strong>
+
+                                </p>
+
+                            </div>
+
+
+                            <div>
+
+                                <span>
+                                    🛡️
+                                </span>
+
+                                <p>
+
+                                    <small>
+                                        Garantía
+                                    </small>
+
+                                    <strong>
+                                        <span id="previewComercialGarantia">
+                                            {{ config.get('dias_garantia', '30') }}
+                                        </span>
+                                        días
+                                    </strong>
+
+                                </p>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="comercial-preview-resumen">
+
+                        <div>
+
+                            <span>
+                                Moneda
+                            </span>
+
+                            <strong id="previewComercialMoneda">
+                                {{ config.get('moneda_nombre', 'Peso colombiano') }}
+                            </strong>
+
+                        </div>
+
+
+                        <div>
+
+                            <span>
+                                Formato
+                            </span>
+
+                            <strong id="previewComercialFormato">
+                                {{ config.get('moneda_simbolo', '$') }}20{{ config.get('separador_miles', '.') }}000
+                            </strong>
+
+                        </div>
+
+                    </div>
+
+                </aside>
+
+            </div>
+
+
+            <div class="configuracion-modal-footer">
+
+                <button
+                    type="button"
+                    class="configuracion-btn-secundario"
+                    id="btnCancelarModalComercial"
+                >
+                    Cancelar
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="configuracion-btn-principal"
+                >
+                    Guardar configuración
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<!-- ==========================================
+     MODAL — PÁGINA DE INICIO
+========================================== -->
+
+<div
+    id="modalInicio"
+    class="configuracion-modal"
+    aria-hidden="true"
+>
+
+    <div
+        class="configuracion-modal-fondo"
+        data-cerrar-modal="inicio"
+    ></div>
+
+
+    <div class="configuracion-modal-panel inicio-modal-panel">
+
+        <!-- CABECERA -->
+
+        <div class="configuracion-modal-header">
+
+            <div class="configuracion-modal-header-info">
+
+                <div class="configuracion-modal-icono">
+                    🏠
+                </div>
+
+                <div>
+
+                    <span>MÓDULO DE INICIO</span>
+
+                    <h2>Página de inicio</h2>
+
+                    <p>
+                        Personaliza el contenido principal que verá
+                        el cliente al entrar a la tienda.
+                    </p>
+
+                </div>
+
+            </div>
+
+
+            <button
+                type="button"
+                id="btnCerrarModalInicio"
+                class="configuracion-modal-cerrar"
+                aria-label="Cerrar"
+            >
+                ✕
+            </button>
+
+        </div>
+
+
+        <!-- FORMULARIO -->
+
+        <form
+            id="formInicio"
+            action="/actualizar-config"
+            method="POST"
+        >
+
+            <input
+                type="hidden"
+                name="tipo_configuracion"
+                value="inicio"
+            >
+
+
+            <div class="inicio-modal-grid">
+
+                <!-- COLUMNA DE CAMPOS -->
+
+                <div class="inicio-formulario">
+
+                    <div class="inicio-estado-card">
+
+                        <div>
+
+                            <strong>Hero principal</strong>
+
+                            <span>
+                                Controla si la presentación principal
+                                aparece en la página pública.
+                            </span>
+
+                        </div>
+
+
+                        <label class="inicio-switch">
+
+                            <input
+                                id="inicioHeroActivo"
+                                type="checkbox"
+                                name="inicio_hero_activo"
+                                value="1"
+                                {% if config.get(
+                                    "inicio_hero_activo",
+                                    "1"
+                                ) == "1" %}
+                                    checked
+                                {% endif %}
+                            >
+
+                            <span></span>
+
+                        </label>
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="inicioBadge">
+                            Insignia superior
+                        </label>
+
+                        <input
+                            id="inicioBadge"
+                            type="text"
+                            name="inicio_badge"
+                            maxlength="60"
+                            value="{{ config.get(
+                                'inicio_badge',
+                                '🛡️ COMPRA SEGURA Y PROTEGIDA'
+                            ) }}"
+                            required
+                        >
+
+                        <small>
+                            Texto pequeño que aparece encima del título.
+                        </small>
+
+                    </div>
+
+
+                    <div class="inicio-campos-titulo">
+
+                        <div class="configuracion-campo">
+
+                            <label for="inicioTituloSuperior">
+                                Primera línea
+                            </label>
+
+                            <input
+                                id="inicioTituloSuperior"
+                                type="text"
+                                name="inicio_titulo_superior"
+                                maxlength="30"
+                                value="{{ config.get(
+                                    'inicio_titulo_superior',
+                                    'EL MEJOR'
+                                ) }}"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="configuracion-campo">
+
+                            <label for="inicioTituloDestacado">
+                                Línea destacada
+                            </label>
+
+                            <input
+                                id="inicioTituloDestacado"
+                                type="text"
+                                name="inicio_titulo_destacado"
+                                maxlength="35"
+                                value="{{ config.get(
+                                    'inicio_titulo_destacado',
+                                    'ENTRETENIMIENTO'
+                                ) }}"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="configuracion-campo">
+
+                        <label for="inicioTituloInferior">
+                            Última línea
+                        </label>
+
+                        <input
+                            id="inicioTituloInferior"
+                            type="text"
+                            name="inicio_titulo_inferior"
+                            maxlength="30"
+                            value="{{ config.get(
+                                'inicio_titulo_inferior',
+                                'EN TUS MANOS'
+                            ) }}"
+                            required
+                        >
+
+                    </div>
+
+
+                    <div class="inicio-campos-titulo">
+
+                        <div class="configuracion-campo">
+
+                            <label for="inicioBotonCatalogo">
+                                Botón de catálogo
+                            </label>
+
+                            <input
+                                id="inicioBotonCatalogo"
+                                type="text"
+                                name="inicio_boton_catalogo"
+                                maxlength="35"
+                                value="{{ config.get(
+                                    'inicio_boton_catalogo',
+                                    'Explorar catálogo →'
+                                ) }}"
+                                required
+                            >
+
+                        </div>
+
+
+                        <div class="configuracion-campo">
+
+                            <label for="inicioBotonWhatsapp">
+                                Botón de WhatsApp
+                            </label>
+
+                            <input
+                                id="inicioBotonWhatsapp"
+                                type="text"
+                                name="inicio_boton_whatsapp"
+                                maxlength="40"
+                                value="{{ config.get(
+                                    'inicio_boton_whatsapp',
+                                    '💬 Comprar por WhatsApp'
+                                ) }}"
+                                required
+                            >
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="inicio-aviso">
+
+                        <span>ℹ️</span>
+
+                        <div>
+
+                            <strong>Mensaje comercial conectado</strong>
+
+                            <p>
+                                La descripción que aparece debajo del
+                                título se controla desde el módulo de
+                                Configuración comercial.
+                            </p>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <!-- VISTA PREVIA -->
+
+                <div class="inicio-preview">
+
+                    <span class="inicio-preview-etiqueta">
+                        VISTA PREVIA
+                    </span>
+
+
+                    <div
+                        id="previewInicioHero"
+                        class="inicio-preview-hero"
+                    >
+
+                        <div class="inicio-preview-fondo"></div>
+
+
+                        <div class="inicio-preview-contenido">
+
+                            <span
+                                id="previewInicioBadge"
+                                class="inicio-preview-badge"
+                            >
+                                {{ config.get(
+                                    "inicio_badge",
+                                    "🛡️ COMPRA SEGURA Y PROTEGIDA"
+                                ) }}
+                            </span>
+
+
+                            <h3>
+
+                                <span id="previewInicioTituloSuperior">
+                                    {{ config.get(
+                                        "inicio_titulo_superior",
+                                        "EL MEJOR"
+                                    ) }}
+                                </span>
+
+                                <strong id="previewInicioTituloDestacado">
+                                    {{ config.get(
+                                        "inicio_titulo_destacado",
+                                        "ENTRETENIMIENTO"
+                                    ) }}
+                                </strong>
+
+                                <span id="previewInicioTituloInferior">
+                                    {{ config.get(
+                                        "inicio_titulo_inferior",
+                                        "EN TUS MANOS"
+                                    ) }}
+                                </span>
+
+                            </h3>
+
+
+                            <p>
+                                {{ config.get(
+                                    "mensaje_comercial",
+                                    "Plataformas premium al mejor precio, entrega inmediata y soporte rápido."
+                                ) }}
+                            </p>
+
+
+                            <div class="inicio-preview-botones">
+
+                                <span id="previewInicioBotonCatalogo">
+                                    {{ config.get(
+                                        "inicio_boton_catalogo",
+                                        "Explorar catálogo →"
+                                    ) }}
+                                </span>
+
+                                <span id="previewInicioBotonWhatsapp">
+                                    {{ config.get(
+                                        "inicio_boton_whatsapp",
+                                        "💬 Comprar por WhatsApp"
+                                    ) }}
+                                </span>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div class="inicio-preview-estado">
+
+                        <span>Estado del hero</span>
+
+                        <strong id="previewInicioEstado">
+                            {% if config.get(
+                                "inicio_hero_activo",
+                                "1"
+                            ) == "1" %}
+                                ACTIVO
+                            {% else %}
+                                OCULTO
+                            {% endif %}
+                        </strong>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <!-- PIE -->
+
+            <div class="configuracion-modal-footer">
+
+                <button
+                    type="button"
+                    id="btnCancelarModalInicio"
+                    class="configuracion-btn-secundario"
+                >
+                    Cancelar
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="configuracion-btn-principal"
+                >
+                    Guardar configuración
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -1,0 +1,629 @@
+{% extends "admin/base_admin.html" %}
+
+{% block contenido %}
+
+<!-- ============================== -->
+<!--      AGREGAR PRODUCTO          -->
+<!-- ============================== -->
+
+<section class="admin-section" id="agregar">
+
+    <div class="section-heading">
+
+        <div>
+            <span class="section-label">CATÁLOGO</span>
+            <h2>Agregar producto</h2>
+            <p>Registra una plataforma, plan o servicio nuevo.</p>
+        </div>
+
+        <span class="section-heading-icon">➕</span>
+
+    </div>
+
+    <div class="product-create-card glass">
+
+        <form
+            action="/agregar-producto"
+            method="POST"
+            enctype="multipart/form-data"
+            class="product-create-form"
+        >
+
+            <div class="form-field">
+
+                <label for="nuevoNombre">Nombre del producto</label>
+
+                <input
+                    id="nuevoNombre"
+                    type="text"
+                    name="nombre"
+                    placeholder="Ejemplo: Apple TV+"
+                    required
+                >
+
+            </div>
+
+            <div class="form-field">
+
+                <label for="nuevoPlan">Nombre del plan</label>
+
+                <input
+                    id="nuevoPlan"
+                    type="text"
+                    name="plan"
+                    placeholder="Ejemplo: Cuenta completa"
+                    required
+                >
+
+            </div>
+
+            <div class="form-field">
+
+                <label for="nuevoPrecio">Precio</label>
+
+                <input
+                    id="nuevoPrecio"
+                    type="text"
+                    name="precio"
+                    placeholder="Ejemplo: 18 MIL"
+                    required
+                >
+
+            </div>
+
+            <div class="form-field">
+
+                <label for="nuevaCategoria">Categoría</label>
+
+<select
+    id="nuevaCategoria"
+    name="categoria"
+>
+    <option value="" selected>
+        Sin categoría
+    </option>
+
+    {% for categoria in categorias %}
+
+        <option value="{{ categoria.nombre }}">
+            {{ categoria.nombre }}
+        </option>
+
+    {% endfor %}
+</select>
+
+            <div class="form-field form-field-image">
+
+                <label for="nuevaImagen">Imagen del producto</label>
+
+                <label class="image-upload-box" for="nuevaImagen">
+
+                    <span class="upload-icon">🖼️</span>
+
+                    <strong>Seleccionar imagen</strong>
+
+                    <small>JPG, PNG o WEBP</small>
+
+                </label>
+
+                <input
+                    id="nuevaImagen"
+                    class="hidden-file-input"
+                    type="file"
+                    name="imagen"
+                    accept="image/*"
+                    required
+                    onchange="previewImagen(this, 'previewAgregar')"
+                >
+
+                <div class="image-preview-wrap">
+
+                    <img
+                        id="previewAgregar"
+                        class="image-preview"
+                        alt="Vista previa del producto"
+                    >
+
+                </div>
+
+            </div>
+
+            <div class="form-submit-row">
+
+                <button
+                    class="premium-submit-button"
+                    type="submit"
+                >
+                    ➕ Agregar producto
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</section>
+
+
+<!-- ============================== -->
+<!--      ADMINISTRAR PRODUCTOS     -->
+<!-- ============================== -->
+
+<section class="admin-section" id="productos">
+
+    <div class="section-heading">
+
+        <div>
+            <span class="section-label">PRODUCTOS</span>
+            <h2>Administrar productos</h2>
+            <p>Edita precios, ofertas, imágenes y visibilidad.</p>
+        </div>
+
+        <span class="section-heading-icon">📺</span>
+
+    </div>
+
+    <div class="product-search glass">
+
+        <span>🔎</span>
+
+        <input
+            type="text"
+            id="buscadorAdmin"
+            placeholder="Buscar producto..."
+            autocomplete="off"
+        >
+
+    </div>
+
+    <div class="admin-products-list">
+
+        {% if productos %}
+
+            {% for producto in productos %}
+
+                <details
+                    class="admin-product-card glass admin-producto"
+                    data-nombre="{{ producto.nombre | lower }}"
+                >
+
+                    <summary class="admin-product-summary">
+
+                        <div class="admin-product-main">
+
+                            <img
+                                src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+                                alt="{{ producto.nombre }}"
+                                loading="lazy"
+                                decoding="async"
+                            >
+
+                            <div>
+
+                                <h3>{{ producto.nombre }}</h3>
+
+                                <div class="product-tags">
+
+                                    <span class="product-category-tag">
+                                        {{ producto.categoria }}
+                                    </span>
+
+                                    {% if producto.destacado == 1 %}
+                                        <span class="product-tag featured">
+                                            ⭐ Destacado
+                                        </span>
+                                    {% endif %}
+
+                                    {% if producto.estado == "disponible" %}
+    <span class="product-tag visible">
+        🟢 Disponible
+    </span>
+{% else %}
+    <span class="product-tag hidden">
+        🔴 Agotado
+    </span>
+{% endif %}
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                        <span class="accordion-arrow">⌄</span>
+
+                    </summary>
+
+                    <div class="admin-product-content">
+
+                        <!-- EDITAR NOMBRE E IMAGEN -->
+
+                        <div class="product-management-block">
+
+                            <div class="management-title">
+                                <span>✏️</span>
+
+                                <div>
+                                    <h4>Información del producto</h4>
+                                    <p>Cambia el nombre o reemplaza su imagen.</p>
+                                </div>
+                            </div>
+
+                            <form
+                                action="/editar-producto"
+                                method="POST"
+                                enctype="multipart/form-data"
+                                class="management-form"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="nombre_actual"
+                                    value="{{ producto.nombre }}"
+                                >
+
+                                <div class="form-field">
+
+                                    <label>Nombre</label>
+
+                                    <input
+                                        type="text"
+                                        name="nuevo_nombre"
+                                        value="{{ producto.nombre }}"
+                                        required
+                                    >
+
+                                </div>
+
+                                <div class="form-field">
+
+                                    <label for="imagenProducto{{ loop.index }}">
+                                        Nueva imagen
+                                    </label>
+
+                                    <input
+                                        id="imagenProducto{{ loop.index }}"
+                                        type="file"
+                                        name="imagen"
+                                        accept="image/*"
+                                        onchange="previewImagen(this, 'preview-{{ loop.index }}')"
+                                    >
+
+                                </div>
+
+                                <img
+                                    id="preview-{{ loop.index }}"
+                                    class="product-edit-preview"
+                                    alt="Vista previa"
+                                >
+
+                                <button
+                                    class="management-button blue"
+                                    type="submit"
+                                >
+                                    ✏️ Actualizar producto
+                                </button>
+
+                            </form>
+
+                        </div>
+
+
+                        <!-- CATEGORÍA -->
+
+                        <div class="product-management-block">
+
+                            <div class="management-title">
+
+                                <span>📂</span>
+
+                                <div>
+                                    <h4>Categoría</h4>
+                                    <p>Define dónde aparece el producto.</p>
+                                </div>
+
+                            </div>
+
+                            <form
+                                action="/actualizar-categoria"
+                                method="POST"
+                                class="management-form inline-management-form"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="nombre"
+                                    value="{{ producto.nombre }}"
+                                >
+
+                                <select name="categoria" required>
+
+    {% for categoria in categorias %}
+
+        <option
+            value="{{ categoria.nombre }}"
+            {% if producto.categoria == categoria.nombre %}
+                selected
+            {% endif %}
+        >
+            {{ categoria.nombre }}
+        </option>
+
+    {% endfor %}
+
+</select>
+
+                                <button
+                                    class="management-button green"
+                                    type="submit"
+                                >
+                                    💾 Guardar categoría
+                                </button>
+
+                            </form>
+
+                        </div>
+
+
+                        <!-- VISIBILIDAD Y DESTACADO -->
+
+                        <div class="product-options-grid">
+
+                            <form
+                                action="/actualizar-destacado"
+                                method="POST"
+                                class="product-option-card"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="nombre"
+                                    value="{{ producto.nombre }}"
+                                >
+
+                                <label class="premium-check">
+
+                                    <input
+                                        type="checkbox"
+                                        name="destacado"
+                                        {% if producto.destacado == 1 %}checked{% endif %}
+                                    >
+
+                                    <span>⭐ Producto destacado</span>
+
+                                </label>
+
+                                <button
+                                    class="management-button purple"
+                                    type="submit"
+                                >
+                                    Guardar destacado
+                                </button>
+
+                            </form>
+
+                            <form
+    action="/actualizar-estado"
+    method="POST"
+    class="product-option-card"
+>
+
+    <input
+        type="hidden"
+        name="nombre"
+        value="{{ producto.nombre }}"
+    >
+
+    <label class="premium-check">
+
+        <input
+            type="checkbox"
+            name="disponible"
+            {% if producto.estado == "disponible" %}checked{% endif %}
+        >
+
+        <span>
+            {% if producto.estado == "disponible" %}
+                🟢 Producto disponible
+            {% else %}
+                🔴 Producto agotado
+            {% endif %}
+        </span>
+
+    </label>
+
+    <button
+        class="management-button cyan"
+        type="submit"
+    >
+        Guardar estado
+    </button>
+
+</form>
+
+                        </div>
+
+
+                        <!-- DUPLICAR -->
+
+                        <div class="product-secondary-actions">
+
+                            <form
+                                action="/duplicar-producto"
+                                method="POST"
+                            >
+
+                                <input
+                                    type="hidden"
+                                    name="nombre"
+                                    value="{{ producto.nombre }}"
+                                >
+
+                                <button
+                                    class="secondary-action-button"
+                                    type="submit"
+                                >
+                                    📄 Duplicar producto
+                                </button>
+
+                            </form>
+
+                        </div>
+
+
+                        <!-- PLANES -->
+
+                        <div class="product-plans-section">
+
+                            <div class="management-title">
+
+                                <span>💳</span>
+
+                                <div>
+                                    <h4>Planes y precios</h4>
+                                    <p>Administra cada plan de este producto.</p>
+                                </div>
+
+                            </div>
+
+                            <div class="product-plans-grid">
+
+                                {% for plan in producto.planes %}
+
+                                    <article class="product-plan-card">
+
+                                        <div class="plan-card-header">
+
+                                            <span class="plan-icon">💎</span>
+
+                                            <div>
+                                                <small>PLAN</small>
+                                                <h4>{{ plan.plan }}</h4>
+                                            </div>
+
+                                        </div>
+
+                                        <form
+                                            action="/actualizar-precio"
+                                            method="POST"
+                                            class="plan-form"
+                                        >
+
+                                            <input
+                                                type="hidden"
+                                                name="id"
+                                                value="{{ plan.id }}"
+                                            >
+
+                                            <label>Precio normal</label>
+
+                                            <input
+                                                type="text"
+                                                name="precio"
+                                                value="{{ plan.precio }}"
+                                                required
+                                            >
+
+                                            <button
+                                                class="management-button green"
+                                                type="submit"
+                                            >
+                                                💾 Guardar precio
+                                            </button>
+
+                                        </form>
+
+                                        <form
+                                            action="/actualizar-oferta"
+                                            method="POST"
+                                            class="plan-form offer-form"
+                                        >
+
+                                            <input
+                                                type="hidden"
+                                                name="id"
+                                                value="{{ plan.id }}"
+                                            >
+
+                                            <label>Precio de oferta</label>
+
+                                            <input
+                                                type="text"
+                                                name="oferta_precio"
+                                                value="{{ plan.oferta_precio or '' }}"
+                                                placeholder="Ejemplo: 10 MIL"
+                                            >
+
+                                            <label class="premium-check">
+
+                                                <input
+                                                    type="checkbox"
+                                                    name="oferta_activa"
+                                                    {% if plan.oferta_activa == 1 %}checked{% endif %}
+                                                >
+
+                                                <span>🔥 Oferta activa</span>
+
+                                            </label>
+
+                                            <button
+                                                class="management-button gold"
+                                                type="submit"
+                                            >
+                                                🔥 Guardar oferta
+                                            </button>
+
+                                        </form>
+
+                                        <form
+                                            action="/eliminar-plan"
+                                            method="POST"
+                                            onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')"
+                                        >
+
+                                            <input
+                                                type="hidden"
+                                                name="id"
+                                                value="{{ plan.id }}"
+                                            >
+
+                                            <button
+                                                class="management-button red full-width"
+                                                type="submit"
+                                            >
+                                                🗑️ Eliminar plan
+                                            </button>
+
+                                        </form>
+
+                                    </article>
+
+                                {% endfor %}
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </details>
+
+            {% endfor %}
+
+        {% else %}
+
+            <div class="empty-state glass">
+
+                <span>📺</span>
+                <h3>No hay productos registrados</h3>
+                <p>Agrega el primer producto desde el formulario superior.</p>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+
+</section>
+{% endblock %}

@@ -267,14 +267,19 @@
   padding:12px;
 }
 
-.switch-row input{
-  width:20px;
-  height:20px;
-  cursor:pointer;
-}
+input,
+select{
 
-.promo-card-footer button{
-  width:100%;
+    padding:13px;
+
+    border:none;
+
+    border-radius:12px;
+
+    background:#f8fafc;
+
+    color:#111;
+
 }
 
   </style>
@@ -291,6 +296,7 @@
     <a href="#configuracion">⚙️ Configuración</a>
     <a href="#productos">📺 Productos</a>
     <a href="#ordenar">↕️ Ordenar productos</a>
+    <a href="#ordenar-categorias">📂 Orden categorías</a>
     <a href="/">🌐 Ver página</a>
     <a href="/logout">🚪 Salir</a>
     <a href="#promociones">🔥 Promociones</a>
@@ -363,441 +369,27 @@
 
         <input type="text" name="plan" placeholder="Plan: Cuenta completa" required>
         <input type="text" name="precio" placeholder="Precio: 18 MIL" required>
+        <select name="categoria" required>
+
+    <option value="Streaming">🎬 Streaming</option>
+
+    <option value="Música">🎵 Música</option>
+
+    <option value="Deportes">⚽ Deportes</option>
+
+    <option value="IPTV">📺 IPTV</option>
+
+    <option value="Anime">🍿 Anime</option>
+
+    <option value="Combos">🔥 Combos</option>
+
+</select>
         <button class="btn-guardar" type="submit">➕ Agregar producto</button>
       </form>
     </div>
 
-    <h2 class="section-title" id="promociones">🔥 Promociones</h2>
-
-<div class="panel">
-
-    <form action="/agregar-promocion" method="POST" enctype="multipart/form-data">
-
-        <input
-            type="file"
-            name="imagen"
-            accept="image/*"
-            required
-            onchange="previewImagen(this,'previewPromo')">
-
-        <img
-            id="previewPromo"
-            style="
-                width:320px;
-                height:180px;
-                object-fit:cover;
-                border-radius:16px;
-                display:none;
-                border:2px solid #333;
-            ">
-
-        <label>
-            <input
-                type="checkbox"
-                name="activa"
-                checked>
-
-            🔥 Promoción activa
-        </label>
-
-        <button
-            class="btn-guardar"
-            type="submit">
-
-            📤 Subir promoción
-
-        </button>
-
-    </form>
-    
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,.08);margin:25px 0;">
-
-<h3 style="margin-bottom:18px;">🖼️ Promociones subidas</h3>
-
-{% if promociones %}
-
-<div class="promo-grid">
-
-{% for promo in promociones %}
-
-<div class="promo-card">
-
-  <div class="promo-imagen-wrap">
-
-    <img
-      src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
-      alt="Promoción">
-
-    {% if promo[2] == 1 %}
-      <span class="promo-estado publicada">● Publicada</span>
-    {% else %}
-      <span class="promo-estado oculta">● Oculta</span>
-    {% endif %}
-
-  </div>
-
-  <div class="promo-card-footer">
-
-    <form action="/actualizar-promocion" method="POST">
-      <input type="hidden" name="id" value="{{ promo[0] }}">
-
-      <label class="switch-row">
-        <span>Mostrar promoción</span>
-
-        <input
-          type="checkbox"
-          name="activa"
-          {% if promo[2] == 1 %}checked{% endif %}
-        >
-      </label>
-
-      <button class="btn-visible" type="submit">
-        👁 Guardar estado
-      </button>
-    </form>
-
-    <form
-      action="/eliminar-promocion"
-      method="POST"
-      onsubmit="return confirm('¿Seguro que quieres eliminar esta promoción?')"
-    >
-      <input type="hidden" name="id" value="{{ promo[0] }}">
-
-      <button class="btn-eliminar" type="submit">
-        🗑️ Eliminar promoción
-      </button>
-    </form>
-
-  </div>
-
-</div>
-
-{% endfor %}
-
-</div>
-
-{% else %}
-
-<p style="color:#aaa;">Todavía no hay promociones subidas.</p>
-
-{% endif %}
-
-</div>
-
-    <h2 class="section-title" id="configuracion">⚙️ Configuración</h2>
-
-    <div class="panel">
-      <form action="/actualizar-config" method="POST">
-        <input type="text" name="whatsapp" value="{{ config.whatsapp }}" placeholder="573147735950" required>
-        <button class="btn-guardar" type="submit">💾 Guardar WhatsApp</button>
-      </form>
-
-      <a href="/descargar-respaldo" class="btn-respaldo">📥 Descargar respaldo</a>
-    </div>
-
-<a href="/actualizar-db"
-   class="btn-respaldo"
-   style="background:#f59e0b;margin-left:10px;">
-   🛠 Actualizar Base de Datos
-</a>
-
-<h2 class="section-title" id="ordenar">↕️ Ordenar productos</h2>
-
-<div class="panel">
-  <p style="color:#aaa;margin-bottom:15px;">
-    Arrastra los productos y luego guarda el orden.
-  </p>
-
-<div id="listaOrden">
-
-{% for producto in productos %}
-
-<div class="orden-item"
-     draggable="true"
-     data-nombre="{{ producto.nombre }}">
-
-    <div class="orden-left">
-
-        <img
-        src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
-        class="orden-img">
-
-        <div>
-
-            <h3>{{ producto.nombre }}</h3>
-
-            <small>Arrastra para cambiar la posición</small>
-
-        </div>
-
-    </div>
-
-    <div class="orden-right">
-
-        ☰
-
-    </div>
-
-</div>
-
-{% endfor %}
-
-</div>
-
-  <button class="btn-guardar" onclick="guardarOrden()">💾 Guardar orden</button>
-</div>
-
-    <h2 class="section-title" id="productos">📺 Administrar productos</h2>
-
-    <input
-      type="text"
-      id="buscadorAdmin"
-      placeholder="🔎 Buscar producto..."
-      style="width:100%;max-width:420px;margin-bottom:18px;"
-    >
-
-    {% for producto in productos %}
-    <details class="panel product-accordion admin-producto" data-nombre="{{ producto.nombre | lower }}">
-
-      <summary class="accordion-title">
-        <div class="product-head">
-          <img src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}">
-
-          <div>
-            <h2>{{ producto.nombre }}</h2>
-
-            {% if producto.destacado == 1 %}
-              <span class="tag">⭐ Destacado</span>
-            {% endif %}
-
-            {% if producto.visible == 1 %}
-              <span class="tag">👁 Visible</span>
-            {% else %}
-              <span class="tag">🙈 Oculto</span>
-            {% endif %}
-          </div>
-        </div>
-      </summary>
-
-      <div class="action-buttons">
-        <form action="/editar-producto" method="POST" enctype="multipart/form-data">
-          <input type="hidden" name="nombre_actual" value="{{ producto.nombre }}">
-          <input type="text" name="nuevo_nombre" value="{{ producto.nombre }}" required>
-
-          <input type="file" name="imagen" accept="image/*" onchange="previewImagen(this, 'preview-{{ loop.index }}')">
-          <img id="preview-{{ loop.index }}" style="width:120px;height:80px;object-fit:cover;border-radius:10px;display:none;border:2px solid #333;">
-
-          <button class="btn-editar" type="submit">✏️ Actualizar nombre/imagen</button>
-        </form>
-
-        <form action="/duplicar-producto" method="POST">
-          <input type="hidden" name="nombre" value="{{ producto.nombre }}">
-          <button class="btn-editar" type="submit">📄 Duplicar producto</button>
-        </form>
-      </div>
-
-      <div class="action-buttons">
-        <form action="/actualizar-destacado" method="POST">
-          <input type="hidden" name="nombre" value="{{ producto.nombre }}">
-          <label>
-            <input type="checkbox" name="destacado" {% if producto.destacado == 1 %}checked{% endif %}>
-            ⭐ Producto destacado
-          </label>
-          <button class="btn-destacado" type="submit">⭐ Guardar destacado</button>
-        </form>
-
-        <form action="/actualizar-visible" method="POST">
-          <input type="hidden" name="nombre" value="{{ producto.nombre }}">
-          <label>
-            <input type="checkbox" name="visible" {% if producto.visible == 1 %}checked{% endif %}>
-            👁 Producto visible
-          </label>
-          <button class="btn-visible" type="submit">👁 Guardar visibilidad</button>
-        </form>
-      </div>
-
-      {% for plan in producto.planes %}
-      <div class="row-box">
-        <strong>{{ plan.plan }}</strong>
-
-        <form action="/actualizar-precio" method="POST">
-          <input type="hidden" name="id" value="{{ plan.id }}">
-          <input type="text" name="precio" value="{{ plan.precio }}">
-          <button class="btn-guardar" type="submit">💾 Guardar precio</button>
-        </form>
-
-        <form action="/actualizar-oferta" method="POST">
-          <input type="hidden" name="id" value="{{ plan.id }}">
-          <input type="text" name="oferta_precio" value="{{ plan.oferta_precio }}" placeholder="Precio oferta">
-          <label>
-            <input type="checkbox" name="oferta_activa" {% if plan.oferta_activa == 1 %}checked{% endif %}>
-            🔥 Oferta activa
-          </label>
-          <button class="btn-oferta" type="submit">🔥 Guardar oferta</button>
-        </form>
-
-        <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')">
-          <input type="hidden" name="id" value="{{ plan.id }}">
-          <button class="btn-eliminar" type="submit">🗑 Eliminar plan</button>
-        </form>
-      </div>
-      {% endfor %}
-
-    </details>
-    {% endfor %}
-
   </main>
 </div>
-
-<script>
-  const buscadorAdmin = document.getElementById("buscadorAdmin");
-  const productosAdmin = document.querySelectorAll(".admin-producto");
-
-  buscadorAdmin.addEventListener("input", function () {
-    const texto = this.value.toLowerCase();
-
-    productosAdmin.forEach(producto => {
-      const nombre = producto.dataset.nombre;
-      producto.style.display = nombre.includes(texto) ? "block" : "none";
-    });
-  });
-</script>
-
-<script>
-function previewImagen(input, previewId) {
-  const preview = document.getElementById(previewId);
-
-  if (input.files && input.files[0]) {
-    const reader = new FileReader();
-
-    reader.onload = function(e) {
-      preview.src = e.target.result;
-      preview.style.display = "block";
-    }
-
-    reader.readAsDataURL(input.files[0]);
-  }
-}
-</script>
-
-<script>
-function actualizarHora() {
-  const ahora = new Date();
-
-  const opciones = {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit"
-  };
-
-  document.getElementById("horaActual").textContent =
-    ahora.toLocaleDateString("es-CO", opciones);
-}
-
-actualizarHora();
-setInterval(actualizarHora, 60000);
-</script>
-
-<script>
-setTimeout(function(){
-  let toast = document.getElementById("toast");
-
-  if(toast){
-    toast.style.transition="0.5s";
-    toast.style.opacity="0";
-    toast.style.transform="translateX(120%)";
-
-    setTimeout(function(){
-      toast.remove();
-    },500);
-  }
-},3000);
-</script>
-
-<script>
-const listaOrden = document.getElementById("listaOrden");
-
-let itemArrastrado = null;
-
-listaOrden.addEventListener("dragstart", function(e){
-  itemArrastrado = e.target;
-  e.target.classList.add("dragging");
-});
-
-listaOrden.addEventListener("dragend", function(e){
-  e.target.classList.remove("dragging");
-});
-
-listaOrden.addEventListener("dragover", function(e){
-  e.preventDefault();
-
-  const despues = obtenerElementoDespues(listaOrden, e.clientY);
-
-  if (despues == null) {
-    listaOrden.appendChild(itemArrastrado);
-  } else {
-    listaOrden.insertBefore(itemArrastrado, despues);
-  }
-});
-
-function obtenerElementoDespues(container, y) {
-  const elementos = [...container.querySelectorAll(".orden-item:not(.dragging)")];
-
-  return elementos.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-
-    if (offset < 0 && offset > closest.offset) {
-      return { offset: offset, element: child };
-    } else {
-      return closest;
-    }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
-}
-
-function guardarOrden(){
-  const orden = [...document.querySelectorAll(".orden-item")]
-    .map(item => item.dataset.nombre);
-
-  fetch("/guardar-orden", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({orden: orden})
-  })
-  .then(res => res.json())
-  .then(data => {
-    if(data.ok){
-      mostrarToast("Orden guardado correctamente ✅");
-
-setTimeout(function(){
-  location.reload();
-}, 1000);
-    }
-  });
-}
-</script>
-
-<script>
-function mostrarToast(mensaje){
-  let toast = document.createElement("div");
-  toast.id = "toast";
-  toast.innerText = mensaje;
-  document.body.appendChild(toast);
-
-  setTimeout(function(){
-    toast.style.transition = "0.5s";
-    toast.style.opacity = "0";
-    toast.style.transform = "translateX(120%)";
-
-    setTimeout(function(){
-      toast.remove();
-    }, 500);
-  }, 3000);
-}
-</script>
 
 </body>
 </html>

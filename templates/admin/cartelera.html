@@ -1,0 +1,1563 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Cartelera{% endblock %}
+
+{% block contenido %}
+
+<div class="cartelera-header">
+
+    <div>
+        <span class="cartelera-badge">🎬 CARTELERA</span>
+
+        <h1>Recomendaciones destacadas</h1>
+
+        <p>
+            Administra las películas y series que verán primero tus clientes.
+        </p>
+    </div>
+
+    <button
+    type="button"
+    class="btn-cartelera"
+    id="abrirModalCartelera"
+>
+    + Agregar película
+</button>
+
+</div>
+
+<div class="cartelera-grid">
+
+    {% if peliculas %}
+
+        {% for pelicula in peliculas %}
+
+            <div
+    class="plataforma-card plataforma-dinamica tarjeta-cartelera"
+    data-pelicula-id="{{ pelicula.id }}"
+    data-plataforma="{{ pelicula.plataformas or 'Sin plataforma' }}"
+    draggable="true"
+>
+
+                <div class="plataforma-topbar">
+
+                    <div class="plataforma-logo plataforma-logo-dinamica">
+                        {{ pelicula.plataformas or "SIN PLATAFORMA" }}
+                    </div>
+
+                    <span class="recomendacion-status">
+
+                        {% if pelicula.publicado %}
+                            Publicado
+                        {% else %}
+                            Sin publicar
+                        {% endif %}
+
+                    </span>
+
+                </div>
+
+
+                <div class="poster-demo netflix-poster">
+
+                    {% if pelicula.poster %}
+
+                        <img
+                            src="{{ url_for(
+                                'static',
+                                filename='img/cartelera/' + pelicula.poster
+                            ) }}"
+                            alt="{{ pelicula.titulo }}"
+                            class="poster-cartelera-imagen"
+                        >
+
+                    {% else %}
+
+                        <div class="poster-placeholder">
+                            <span>🎞️</span>
+                            <small>Sin póster</small>
+                        </div>
+
+                    {% endif %}
+
+
+                    {% if pelicula.tendencia %}
+
+                        <span class="poster-tag">
+                            🔥 Tendencia semanal
+                        </span>
+
+                    {% endif %}
+
+                </div>
+
+
+                <div class="pelicula-info">
+
+                    <span class="pelicula-genero">
+                        {{ pelicula.genero or "Sin género" }}
+
+                        {% if pelicula.anio %}
+                            • {{ pelicula.anio }}
+                        {% endif %}
+                    </span>
+
+                    <h2>
+                        {{ pelicula.titulo }}
+                    </h2>
+
+                    <p>
+                        {{ pelicula.descripcion or "Sin descripción disponible." }}
+                    </p>
+
+                </div>
+
+
+                <div class="pelicula-actions">
+
+                    <button
+    type="button"
+    class="btn-action btn-change btn-editar-pelicula"
+
+    data-pelicula-id="{{ pelicula.id }}"
+    data-tipo="{{ pelicula.tipo or 'Película' }}"
+    data-titulo="{{ pelicula.titulo }}"
+    data-genero="{{ pelicula.genero or '' }}"
+    data-categoria="{{ pelicula.categoria or '' }}"
+    data-anio="{{ pelicula.anio or '' }}"
+    data-descripcion="{{ pelicula.descripcion or '' }}"
+    data-url="{{ pelicula.url or '' }}"
+    data-plataformas="{{ pelicula.plataformas or '' }}"
+    data-poster="{{ pelicula.poster or '' }}"
+    data-banner="{{ pelicula.banner or '' }}"
+    data-tendencia="{{ 1 if pelicula.tendencia else 0 }}"
+    data-destacado="{{ 1 if pelicula.destacado else 0 }}"
+    data-publicado="{{ 1 if pelicula.publicado else 0 }}"
+>
+    <i data-lucide="refresh-cw"></i>
+    Cambiar
+</button>
+
+                    <button
+                        type="button"
+                        class="btn-action btn-ai"
+                    >
+                        <i data-lucide="sparkles"></i>
+                        Buscar con IA
+                    </button>
+
+                    <button
+    type="button"
+    class="btn-action btn-preview btn-vista-cartelera"
+
+    data-titulo="{{ pelicula.titulo }}"
+    data-tipo="{{ pelicula.tipo or 'Película' }}"
+    data-genero="{{ pelicula.genero or '' }}"
+    data-anio="{{ pelicula.anio or '' }}"
+    data-descripcion="{{ pelicula.descripcion or '' }}"
+    data-plataformas="{{ pelicula.plataformas or '' }}"
+    data-poster="{{ pelicula.poster or '' }}"
+    data-tendencia="{{ 1 if pelicula.tendencia else 0 }}"
+    data-destacado="{{ 1 if pelicula.destacado else 0 }}"
+>
+    <i data-lucide="eye"></i>
+    Vista previa
+</button>
+
+                    <form
+    action="{{ url_for(
+        'eliminar_cartelera',
+        pelicula_id=pelicula.id
+    ) }}"
+    method="POST"
+    onsubmit="return confirmarEliminarPelicula(
+        '{{ pelicula.titulo|e }}'
+    )"
+>
+    <button
+        type="submit"
+        class="btn-action btn-delete"
+    >
+        <i data-lucide="trash-2"></i>
+        Eliminar
+    </button>
+</form>
+
+                </div>
+
+            </div>
+
+        {% endfor %}
+
+
+    {% else %}
+
+        <div class="plataforma-card netflix-card">
+
+            <div class="plataforma-topbar">
+
+                <div class="plataforma-logo netflix-logo">
+                    CARTELERA
+                </div>
+
+                <span class="recomendacion-status">
+                    Sin publicar
+                </span>
+
+            </div>
+
+            <div class="poster-demo netflix-poster">
+
+                <div class="poster-placeholder">
+                    <span>🎞️</span>
+                    <small>Sin póster</small>
+                </div>
+
+            </div>
+
+            <div class="pelicula-info">
+
+                <span class="pelicula-genero">
+                    Sin contenido
+                </span>
+
+                <h2>Sin recomendaciones</h2>
+
+                <p>
+                    Agrega una película o serie para comenzar.
+                </p>
+
+            </div>
+
+        </div>
+
+    {% endif %}
+
+</div>
+
+<div class="modal-cartelera" id="modalCartelera">
+
+    <div class="modal-cartelera-overlay"></div>
+
+    <div class="modal-cartelera-panel">
+
+        <div class="modal-cartelera-header">
+
+            <div>
+                <span class="modal-cartelera-badge">
+                    🎬 NUEVA RECOMENDACIÓN
+                </span>
+
+                <h2 id="tituloModalCartelera">
+    Agregar película
+</h2>
+
+                <p>
+                    Completa la información que verá el cliente en la cartelera.
+                </p>
+            </div>
+
+            <button
+                type="button"
+                class="modal-cartelera-close"
+                id="cerrarModalCartelera"
+            >
+                <i data-lucide="x"></i>
+            </button>
+
+        </div>
+
+        <div class="modal-cartelera-body">
+
+            <div class="poster-upload-box">
+
+                <div class="poster-upload-preview" id="posterPreview">
+
+    <div class="poster-upload-placeholder" id="posterPlaceholder">
+        <i data-lucide="image-plus"></i>
+        <strong>Subir póster</strong>
+        <span>JPG, PNG o WEBP</span>
+    </div>
+
+    <img
+        id="posterPreviewImagen"
+        class="poster-preview-imagen"
+        alt="Vista previa del póster"
+    >
+
+    <button
+        type="button"
+        class="poster-preview-remove"
+        id="eliminarPoster"
+        aria-label="Eliminar póster"
+    >
+        <i data-lucide="trash-2"></i>
+    </button>
+
+</div>
+
+                <input
+                    type="file"
+                    id="posterPelicula"
+                    name="poster"
+                    form="formCartelera"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    hidden
+                >
+
+                <button
+                    type="button"
+                    class="btn-upload-poster"
+                    id="seleccionarPoster"
+                >
+                    Seleccionar imagen
+                </button>
+
+                <div id="bannerBox">
+
+
+
+
+                    <div class="banner-upload-box">
+
+                <div class="banner-upload-preview" id="bannerPreview">
+
+    <div class="banner-upload-placeholder" id="bannerPlaceholder">
+        <i data-lucide="image-plus"></i>
+        <strong>Subir banner</strong>
+        <span>Imagen horizontal</span>
+    </div>
+
+    <img
+        id="bannerPreviewImagen"
+        class="poster-preview-imagen"
+        alt="Vista previa del banner"
+    >
+
+    <button
+        type="button"
+        class="poster-preview-remove"
+        id="eliminarBanner"
+        aria-label="Eliminar banner"
+    >
+        <i data-lucide="trash-2"></i>
+    </button>
+
+</div>
+
+                <input
+                    type="file"
+                    id="bannerPelicula"
+                    name="banner"
+                    form="formCartelera"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    hidden
+                >
+
+                <button
+                    type="button"
+                    class="btn-upload-poster"
+                    id="seleccionarBanner"
+                >
+                    Seleccionar banner
+                </button>
+</div>
+
+            </div>
+</div>
+            <form
+    class="modal-cartelera-form"
+    id="formCartelera"
+    method="POST"
+    action="/admin/cartelera/guardar"
+    enctype="multipart/form-data"
+>
+
+<input
+    type="hidden"
+    id="peliculaId"
+    name="pelicula_id"
+    value=""
+>
+
+                <div class="form-cartelera-grid">
+
+                    <div class="form-cartelera-group">
+    <label for="tipoPelicula">
+        Tipo
+    </label>
+
+    <select
+    id="tipoPelicula"
+    name="tipo"
+>
+        <option value="Película">🎬 Película</option>
+        <option value="Serie">📺 Serie</option>
+        <option value="Anime">🍥 Anime</option>
+        <option value="Documental">🎥 Documental</option>
+        <option value="Evento Deportivo">⚽ Evento Deportivo</option>
+        <option value="Programa">📡 Programa</option>
+        <option value="Estreno">✨ Estreno</option>
+        <option value="Otro">📦 Otro</option>
+    </select>
+</div>
+
+                    <div class="form-cartelera-group">
+                        <label for="tituloPelicula">
+                            Título
+                        </label>
+
+                        <input
+                            type="text"
+                            id="tituloPelicula"
+                            name="titulo"
+                            placeholder="Ejemplo: John Wick 4"
+                        >
+                    </div>
+
+                    <div class="form-cartelera-group">
+                        <label for="generoPelicula">
+                            Género
+                        </label>
+
+                        <input
+                            type="text"
+                            id="generoPelicula"
+                            name="genero"
+                            placeholder="Acción • Suspenso"
+                        >
+                    </div>
+
+                    <div class="form-cartelera-group">
+                        <label for="anioPelicula">
+                            Año
+                        </label>
+
+                        <input
+                            type="number"
+                            id="anioPelicula"
+                            name="anio"
+                            placeholder="2026"
+                            min="1900"
+                            max="2100"
+                        >
+                    </div>
+
+                </div>
+
+                <div class="form-cartelera-group">
+    <label for="categoriaPelicula">
+        Categoría
+    </label>
+
+    <select
+        id="categoriaPelicula"
+        name="categoria"
+    >
+        <option value="">Selecciona...</option>
+        <option value="Acción">Acción</option>
+        <option value="Drama">Drama</option>
+        <option value="Comedia">Comedia</option>
+        <option value="Terror">Terror</option>
+        <option value="Ciencia ficción">Ciencia ficción</option>
+        <option value="Infantil">Infantil</option>
+        <option value="Romance">Romance</option>
+        <option value="Documentales">Documentales</option>
+        <option value="Series">Series</option>
+        <option value="Anime">Anime</option>
+    </select>
+</div>
+
+                <div class="form-cartelera-group">
+                    <label for="descripcionPelicula">
+                        Descripción corta
+                    </label>
+
+                    <textarea
+                        id="descripcionPelicula"
+                        name="descripcion"
+                        rows="5"
+                        maxlength="250"
+                        placeholder="Escribe una recomendación atractiva y sin spoilers."
+                    ></textarea>
+                </div>
+
+                <div class="form-cartelera-group">
+
+    <label for="urlPelicula">
+        Ver ahora (URL)
+    </label>
+
+    <input
+        type="url"
+        id="urlPelicula"
+        name="url"
+        placeholder="https://..."
+    >
+
+</div>
+
+                <div class="form-cartelera-group plataforma-multiple">
+
+    <label>
+        Plataformas disponibles
+    </label>
+
+    <details class="plataformas-desplegable">
+
+        <summary class="plataformas-desplegable-boton">
+
+            <div class="plataformas-desplegable-texto">
+                <i data-lucide="tv"></i>
+                <span>Seleccionar plataformas</span>
+            </div>
+
+            <i
+                data-lucide="chevron-down"
+                class="plataformas-desplegable-flecha"
+            ></i>
+
+        </summary>
+
+        <div class="plataformas-carrusel">
+
+    <button
+        type="button"
+        class="plataformas-carrusel-flecha izquierda"
+        id="plataformasAnterior"
+        aria-label="Ver plataformas anteriores"
+    >
+        <i data-lucide="chevron-left"></i>
+    </button>
+
+    <div
+        class="plataformas-desplegable-contenido"
+        id="plataformasCarrusel"
+    >
+
+        {% for plataforma in plataformas %}
+
+            <label
+    class="plataforma-mini-card"
+    data-plataforma="{{ plataforma.nombre|lower }}"
+>
+
+                <input
+                    type="checkbox"
+                    name="plataformas"
+                    value="{{ plataforma.nombre }}"
+                >
+
+                <div class="plataforma-mini-contenido">
+
+                    {% if plataforma.imagen %}
+
+                        <img
+                            src="{{ url_for(
+                                'static',
+                                filename='img/platforms/' + plataforma.imagen
+                            ) }}"
+                            alt="{{ plataforma.nombre }}"
+                            loading="lazy"
+                        >
+
+                    {% else %}
+
+                        <div class="plataforma-mini-sin-imagen">
+                            📺
+                        </div>
+
+                    {% endif %}
+
+                    <span>{{ plataforma.nombre }}</span>
+
+                    <div class="plataforma-mini-check">
+                        ✓
+                    </div>
+
+                </div>
+
+            </label>
+
+        {% endfor %}
+
+    </div>
+
+    <button
+        type="button"
+        class="plataformas-carrusel-flecha derecha"
+        id="plataformasSiguiente"
+        aria-label="Ver más plataformas"
+    >
+        <i data-lucide="chevron-right"></i>
+    </button>
+
+</div>
+
+</details>
+
+</div>
+
+
+<div class="form-cartelera-options">
+
+    <label class="cartelera-check">
+        <input
+            type="checkbox"
+            id="tendenciaPelicula"
+            name="tendencia"
+        >
+        <span></span>
+        Marcar como tendencia semanal
+    </label>
+
+    <label class="cartelera-check">
+        <input
+            type="checkbox"
+            id="destacadoPelicula"
+            name="destacado"
+        >
+        <span></span>
+        Marcar como destacado
+    </label>
+
+    <label class="cartelera-check">
+        <input
+            type="checkbox"
+            id="publicarPelicula"
+            name="publicado"
+            checked
+        >
+        <span></span>
+        Publicar inmediatamente
+    </label>
+
+</div>
+
+
+<div class="modal-cartelera-footer">
+
+    <button
+        type="button"
+        class="btn-modal-cancelar"
+        id="cancelarModalCartelera"
+    >
+        Cancelar
+    </button>
+
+    <button
+        type="submit"
+        class="btn-modal-guardar"
+        id="guardarPelicula"
+    >
+        <i data-lucide="save"></i>
+        Guardar película
+    </button>
+
+</div>
+
+</form>
+</div>
+</div>
+</div>
+
+<div
+    class="modal-vista-cartelera"
+    id="modalVistaCartelera"
+>
+    <div
+        class="modal-vista-overlay"
+        id="cerrarVistaOverlay"
+    ></div>
+
+    <div class="modal-vista-panel">
+
+        <button
+            type="button"
+            class="modal-vista-cerrar"
+            id="cerrarVistaCartelera"
+        >
+            <i data-lucide="x"></i>
+        </button>
+
+        <div class="modal-vista-banner">
+
+            <img
+                id="vistaPoster"
+                alt="Vista previa"
+            >
+
+            <div class="modal-vista-degradado"></div>
+
+            <div class="modal-vista-contenido">
+
+                <div class="modal-vista-etiquetas">
+
+                    <span id="vistaTipo">
+                        Película
+                    </span>
+
+                    <span
+                        id="vistaTendencia"
+                        hidden
+                    >
+                        🔥 Tendencia
+                    </span>
+
+                </div>
+
+                <h2 id="vistaTitulo">
+                    Título
+                </h2>
+
+                <div class="modal-vista-meta">
+
+                    <span id="vistaAnio"></span>
+
+                    <span id="vistaGenero"></span>
+
+                </div>
+
+                <p id="vistaDescripcion">
+                    Sin descripción disponible.
+                </p>
+
+                <div
+                    class="modal-vista-plataformas"
+                    id="vistaPlataformas"
+                ></div>
+
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const modal = document.getElementById("modalCartelera");
+    const botonAbrir = document.getElementById("abrirModalCartelera");
+    const botonCerrar = document.getElementById("cerrarModalCartelera");
+    const botonCancelar = document.getElementById("cancelarModalCartelera");
+    const overlay = modal.querySelector(".modal-cartelera-overlay");
+
+    const modalVista =
+    document.getElementById("modalVistaCartelera");
+
+const botonCerrarVista =
+    document.getElementById("cerrarVistaCartelera");
+
+const overlayVista =
+    document.getElementById("cerrarVistaOverlay");
+
+const botonesVista =
+    document.querySelectorAll(".btn-vista-cartelera");
+
+    const vistaPoster =
+    document.getElementById("vistaPoster");
+
+const vistaTipo =
+    document.getElementById("vistaTipo");
+
+const vistaTendencia =
+    document.getElementById("vistaTendencia");
+
+const vistaTitulo =
+    document.getElementById("vistaTitulo");
+
+const vistaAnio =
+    document.getElementById("vistaAnio");
+
+const vistaGenero =
+    document.getElementById("vistaGenero");
+
+const vistaDescripcion =
+    document.getElementById("vistaDescripcion");
+
+const vistaPlataformas =
+    document.getElementById("vistaPlataformas");
+
+    const inputPoster = document.getElementById("posterPelicula");
+const botonSeleccionarPoster = document.getElementById("seleccionarPoster");
+
+const inputBanner =
+    document.getElementById("bannerPelicula");
+
+    const bannerBox =
+    document.getElementById("bannerBox");
+
+
+const botonSeleccionarBanner =
+    document.getElementById("seleccionarBanner");
+
+    const bannerPreviewImagen =
+    document.getElementById("bannerPreviewImagen");
+
+const bannerPlaceholder =
+    document.getElementById("bannerPlaceholder");
+
+const posterPreviewImagen = document.getElementById("posterPreviewImagen");
+const posterPlaceholder = document.getElementById("posterPlaceholder");
+const botonEliminarPoster = document.getElementById("eliminarPoster");
+
+const botonEliminarBanner =
+    document.getElementById("eliminarBanner");
+
+const carruselPlataformas =
+    document.getElementById("plataformasCarrusel");
+
+const botonPlataformasAnterior =
+    document.getElementById("plataformasAnterior");
+
+const botonPlataformasSiguiente =
+    document.getElementById("plataformasSiguiente");
+
+    const botonesEditarPelicula =
+    document.querySelectorAll(".btn-editar-pelicula");
+
+    const tituloModalCartelera =
+    document.getElementById("tituloModalCartelera");
+
+const campoPeliculaId =
+    document.getElementById("peliculaId");
+
+const botonAgregarPelicula =
+    document.getElementById("abrirModalCartelera");
+
+    const campoTipo =
+    document.getElementById("tipoPelicula");
+
+const campoTitulo =
+    document.getElementById("tituloPelicula");
+
+const campoGenero =
+    document.getElementById("generoPelicula");
+
+    const campoCategoria =
+    document.getElementById("categoriaPelicula");
+
+const campoAnio =
+    document.getElementById("anioPelicula");
+
+const campoDescripcion =
+    document.getElementById("descripcionPelicula");
+
+const campoUrl =
+    document.getElementById("urlPelicula");
+
+const campoTendencia =
+    document.getElementById("tendenciaPelicula");
+
+const campoDestacado =
+    document.getElementById("destacadoPelicula");
+
+const campoPublicado =
+    document.getElementById("publicarPelicula");
+
+const botonGuardarPelicula =
+    document.getElementById("guardarPelicula");
+
+const camposPlataformas =
+    document.querySelectorAll(
+        'input[name="plataformas"]'
+    );
+
+    camposPlataformas.forEach(function (checkbox) {
+
+    const tarjeta = checkbox.closest(
+        ".plataforma-mini-card"
+    );
+
+    if (!tarjeta) {
+        return;
+    }
+
+    const contenido = tarjeta.querySelector(
+        ".plataforma-mini-contenido"
+    );
+
+    const imagen = tarjeta.querySelector("img");
+
+    const check = tarjeta.querySelector(
+        ".plataforma-mini-check"
+    );
+
+    function convertirHexARgb(hex) {
+
+        const limpio = hex.replace("#", "");
+
+        const valor = parseInt(limpio, 16);
+
+        return {
+            r: (valor >> 16) & 255,
+            g: (valor >> 8) & 255,
+            b: valor & 255
+        };
+
+    }
+
+    function actualizarSeleccion() {
+
+        const estilosTarjeta =
+            getComputedStyle(tarjeta);
+
+        const color =
+            estilosTarjeta
+                .getPropertyValue("--color")
+                .trim() || "#ef1425";
+
+        const rgb = convertirHexARgb(color);
+
+        if (checkbox.checked) {
+
+            tarjeta.classList.add("seleccionada");
+
+            contenido.style.transform =
+                "translateY(-4px) scale(1.02)";
+
+            contenido.style.borderColor =
+                color;
+
+            contenido.style.background =
+                `linear-gradient(
+                    145deg,
+                    rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22),
+                    rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.07)
+                )`;
+
+            contenido.style.boxShadow =
+                `0 0 0 1px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35),
+                 0 16px 34px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.24),
+                 0 0 30px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.22)`;
+
+            if (imagen) {
+
+                imagen.style.transform =
+                    "scale(1.10)";
+
+                imagen.style.filter =
+                    "brightness(1.12) saturate(1.12)";
+
+            }
+
+            if (check) {
+
+                check.style.background = color;
+                check.style.opacity = "1";
+
+                check.style.transform =
+                    "scale(1) rotate(0deg)";
+
+            }
+
+        } else {
+
+            tarjeta.classList.remove("seleccionada");
+
+            contenido.style.transform = "";
+            contenido.style.borderColor = "";
+            contenido.style.background = "";
+            contenido.style.boxShadow = "";
+
+            if (imagen) {
+                imagen.style.transform = "";
+                imagen.style.filter = "";
+            }
+
+            if (check) {
+                check.style.background = "";
+                check.style.opacity = "";
+                check.style.transform = "";
+            }
+
+        }
+
+    }
+
+    tarjeta.addEventListener("click", function (event) {
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        checkbox.checked = !checkbox.checked;
+
+        actualizarSeleccion();
+
+    });
+
+    actualizarSeleccion();
+
+});
+
+    const contenedorCartelera =
+    document.querySelector(".cartelera-grid");
+
+const tarjetasCartelera =
+    document.querySelectorAll(".tarjeta-cartelera");
+
+let tarjetaArrastrada = null;
+
+    function abrirModal() {
+        modal.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+
+    function cerrarModal() {
+        modal.classList.remove("active");
+        document.body.style.overflow = "";
+    }
+
+    function abrirVistaCartelera() {
+
+    modalVista.classList.add("active");
+
+    document.body.style.overflow = "hidden";
+
+}
+
+function cerrarVistaCartelera() {
+
+    modalVista.classList.remove("active");
+
+    document.body.style.overflow = "";
+
+}
+
+    botonAbrir.addEventListener("click", abrirModal);
+    botonCerrar.addEventListener("click", cerrarModal);
+    botonCancelar.addEventListener("click", cerrarModal);
+    overlay.addEventListener("click", cerrarModal);
+
+    botonCerrarVista.addEventListener(
+    "click",
+    cerrarVistaCartelera
+);
+
+overlayVista.addEventListener(
+    "click",
+    cerrarVistaCartelera
+);
+
+botonesVista.forEach(function (boton) {
+
+    boton.addEventListener("click", function () {
+
+        const poster =
+            boton.dataset.poster || "";
+
+        const plataformas =
+            (boton.dataset.plataformas || "")
+            .split(",")
+            .map(function (plataforma) {
+                return plataforma.trim();
+            })
+            .filter(function (plataforma) {
+                return plataforma !== "";
+            });
+
+        vistaTipo.textContent =
+            boton.dataset.tipo || "Película";
+
+        vistaTitulo.textContent =
+            boton.dataset.titulo || "Sin título";
+
+        vistaAnio.textContent =
+            boton.dataset.anio || "";
+
+        vistaGenero.textContent =
+            boton.dataset.genero || "";
+
+        vistaDescripcion.textContent =
+            boton.dataset.descripcion ||
+            "Sin descripción disponible.";
+
+        vistaTendencia.hidden =
+            boton.dataset.tendencia !== "1";
+
+        if (poster) {
+
+            vistaPoster.src =
+                "/static/img/cartelera/" + poster;
+
+            vistaPoster.style.display = "block";
+
+        } else {
+
+            vistaPoster.removeAttribute("src");
+            vistaPoster.style.display = "none";
+
+        }
+
+        vistaPlataformas.innerHTML = "";
+
+        plataformas.forEach(function (plataforma) {
+
+            const etiqueta =
+                document.createElement("span");
+
+            etiqueta.textContent =
+                plataforma;
+
+            vistaPlataformas.appendChild(
+                etiqueta
+            );
+
+        });
+
+        abrirVistaCartelera();
+
+    });
+
+});
+
+    botonAgregarPelicula.addEventListener("click", function () {
+
+    campoPeliculaId.value = "";
+
+    tituloModalCartelera.textContent =
+        "Agregar película";
+
+});
+
+    document.addEventListener("keydown", function (event) {
+        if (event.key === "Escape") {
+            cerrarModal();
+        }
+    });
+
+    botonSeleccionarPoster.addEventListener("click", function () {
+    inputPoster.click();
+});
+
+botonSeleccionarBanner.addEventListener("click", function () {
+    inputBanner.click();
+});
+
+inputPoster.addEventListener("change", function () {
+
+    const archivo = inputPoster.files[0];
+
+    if (!archivo) {
+        return;
+    }
+
+    const tiposPermitidos = [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    if (!tiposPermitidos.includes(archivo.type)) {
+        alert("Selecciona una imagen JPG, PNG o WEBP.");
+        inputPoster.value = "";
+        return;
+    }
+
+    const imagenTemporal = URL.createObjectURL(archivo);
+
+    posterPreviewImagen.src = imagenTemporal;
+    posterPreviewImagen.classList.add("visible");
+    posterPlaceholder.classList.add("oculto");
+    botonEliminarPoster.classList.add("visible");
+
+});
+
+inputPoster.addEventListener("change", function () {
+
+    const archivo = inputPoster.files[0];
+
+    if (!archivo) {
+        return;
+    }
+
+    const tiposPermitidos = [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    if (!tiposPermitidos.includes(archivo.type)) {
+        alert("Selecciona una imagen JPG, PNG o WEBP.");
+        inputPoster.value = "";
+        return;
+    }
+
+    const imagenTemporal = URL.createObjectURL(archivo);
+
+    posterPreviewImagen.src = imagenTemporal;
+    posterPreviewImagen.classList.add("visible");
+    posterPlaceholder.classList.add("oculto");
+    botonEliminarPoster.classList.add("visible");
+
+    
+    botonSeleccionarBanner.style.display = "";
+    bannerBox.style.display = "";
+
+});
+
+inputBanner.addEventListener("change", function () {
+
+    const archivo = inputBanner.files[0];
+
+    if (!archivo) {
+        return;
+    }
+
+    const tiposPermitidos = [
+        "image/jpeg",
+        "image/png",
+        "image/webp"
+    ];
+
+    if (!tiposPermitidos.includes(archivo.type)) {
+        alert("Selecciona una imagen JPG, PNG o WEBP.");
+        inputBanner.value = "";
+        return;
+    }
+
+    const imagenTemporal = URL.createObjectURL(archivo);
+
+    bannerPreviewImagen.src = imagenTemporal;
+
+    bannerPreviewImagen.classList.add("visible");
+
+    bannerPlaceholder.classList.add("oculto");
+
+    botonEliminarBanner.classList.add("visible");
+
+});
+
+botonEliminarBanner.addEventListener("click", function () {
+
+    if (bannerPreviewImagen.src) {
+        URL.revokeObjectURL(bannerPreviewImagen.src);
+    }
+
+    inputBanner.value = "";
+
+    bannerPreviewImagen.removeAttribute("src");
+
+    bannerPreviewImagen.classList.remove("visible");
+
+    bannerPlaceholder.classList.remove("oculto");
+
+    botonEliminarBanner.classList.remove("visible");
+
+});
+
+
+const distanciaCarrusel = 120;
+
+botonPlataformasAnterior.addEventListener("click", function () {
+
+    carruselPlataformas.scrollBy({
+        left: -distanciaCarrusel,
+        behavior: "smooth"
+    });
+
+});
+
+botonPlataformasSiguiente.addEventListener("click", function () {
+
+    carruselPlataformas.scrollBy({
+        left: distanciaCarrusel,
+        behavior: "smooth"
+    });
+
+});
+
+botonesEditarPelicula.forEach(function (boton) {
+
+    boton.addEventListener("click", function () {
+
+        const peliculaId =
+            boton.dataset.peliculaId;
+
+        campoPeliculaId.value =
+            peliculaId;
+
+        campoTipo.value =
+            boton.dataset.tipo || "Película";
+
+        campoTitulo.value =
+            boton.dataset.titulo || "";
+
+        campoGenero.value =
+            boton.dataset.genero || "";
+
+        campoCategoria.value =
+            boton.dataset.categoria || "";
+
+        campoAnio.value =
+            boton.dataset.anio || "";
+
+        campoDescripcion.value =
+            boton.dataset.descripcion || "";
+
+        campoUrl.value =
+            boton.dataset.url || "";
+
+        campoTendencia.checked =
+            boton.dataset.tendencia === "1";
+
+        campoDestacado.checked =
+            boton.dataset.destacado === "1";
+
+        campoPublicado.checked =
+            boton.dataset.publicado === "1";
+
+            const posterActual = boton.dataset.poster || "";
+
+if (posterActual) {
+
+    posterPreviewImagen.src =
+        "/static/img/cartelera/" + posterActual;
+
+    posterPreviewImagen.classList.add("visible");
+    posterPlaceholder.classList.add("oculto");
+    botonEliminarPoster.classList.add("visible");
+
+} else {
+
+    posterPreviewImagen.removeAttribute("src");
+    posterPreviewImagen.classList.remove("visible");
+    posterPlaceholder.classList.remove("oculto");
+    botonEliminarPoster.classList.remove("visible");
+
+}
+
+const bannerActual = boton.dataset.banner || "";
+
+if (bannerActual) {
+
+    bannerPreviewImagen.src =
+        "/static/img/cartelera/" + bannerActual;
+
+    bannerPreviewImagen.classList.add("visible");
+    bannerPlaceholder.classList.add("oculto");
+
+
+} else {
+
+    bannerPreviewImagen.removeAttribute("src");
+    bannerPreviewImagen.classList.remove("visible");
+    bannerPlaceholder.classList.remove("oculto");
+
+}
+
+
+        const plataformasPelicula =
+            (boton.dataset.plataformas || "")
+            .split(",")
+            .map(function (plataforma) {
+                return plataforma.trim();
+            });
+
+
+        camposPlataformas.forEach(function (checkbox) {
+
+            checkbox.checked =
+                plataformasPelicula.includes(
+                    checkbox.value
+                );
+
+        });
+
+
+        tituloModalCartelera.textContent =
+            "Editar película";
+
+        botonGuardarPelicula.innerHTML =
+            '<i data-lucide="save"></i> Actualizar película';
+
+        abrirModal();
+
+        lucide.createIcons();
+
+    });
+
+});
+
+tarjetasCartelera.forEach(function (tarjeta) {
+
+    tarjeta.addEventListener("dragstart", function () {
+
+        tarjetaArrastrada = tarjeta;
+
+        tarjeta.classList.add("arrastrando");
+
+    });
+
+    tarjeta.addEventListener("dragend", function () {
+
+        tarjeta.classList.remove("arrastrando");
+
+        tarjetaArrastrada = null;
+
+        guardarOrdenCartelera();
+
+    });
+
+});
+
+contenedorCartelera.addEventListener("dragover", function (event) {
+
+    event.preventDefault();
+
+    if (!tarjetaArrastrada) {
+        return;
+    }
+
+    const tarjetaSiguiente =
+        obtenerTarjetaSiguiente(
+            contenedorCartelera,
+            event.clientX,
+            event.clientY
+        );
+
+    if (tarjetaSiguiente) {
+
+        contenedorCartelera.insertBefore(
+            tarjetaArrastrada,
+            tarjetaSiguiente
+        );
+
+    } else {
+
+        contenedorCartelera.appendChild(
+            tarjetaArrastrada
+        );
+
+    }
+
+});
+
+function obtenerTarjetaSiguiente(
+    contenedor,
+    posicionX,
+    posicionY
+) {
+
+    const tarjetasDisponibles = [
+        ...contenedor.querySelectorAll(
+            ".tarjeta-cartelera:not(.arrastrando)"
+        )
+    ];
+
+    let tarjetaMasCercana = null;
+    let distanciaMasCercana = Number.NEGATIVE_INFINITY;
+
+    tarjetasDisponibles.forEach(function (tarjeta) {
+
+        const caja =
+            tarjeta.getBoundingClientRect();
+
+        const centroX =
+            caja.left + caja.width / 2;
+
+        const centroY =
+            caja.top + caja.height / 2;
+
+        const diferenciaY =
+            posicionY - centroY;
+
+        const diferenciaX =
+            posicionX - centroX;
+
+        let distancia;
+
+        if (Math.abs(diferenciaY) > caja.height / 2) {
+
+            distancia = diferenciaY;
+
+        } else {
+
+            distancia = diferenciaX;
+
+        }
+
+        if (
+            distancia < 0 &&
+            distancia > distanciaMasCercana
+        ) {
+
+            distanciaMasCercana = distancia;
+            tarjetaMasCercana = tarjeta;
+
+        }
+
+    });
+
+    return tarjetaMasCercana;
+
+}
+
+function guardarOrdenCartelera() {
+
+    const orden = [
+        ...document.querySelectorAll(
+            ".tarjeta-cartelera"
+        )
+    ].map(function (tarjeta) {
+
+        return Number(
+            tarjeta.dataset.peliculaId
+        );
+
+    });
+
+    fetch("/admin/cartelera/guardar-orden", {
+
+        method: "POST",
+
+        headers: {
+            "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+            orden: orden
+        })
+
+    })
+    .then(function (respuesta) {
+
+        return respuesta.json();
+
+    })
+    .then(function (resultado) {
+
+        if (!resultado.ok) {
+
+            alert(
+                resultado.mensaje ||
+                "No se pudo guardar el orden."
+            );
+
+        }
+
+    })
+    .catch(function () {
+
+        alert(
+            "Ocurrió un error guardando el orden."
+        );
+
+    });
+
+}
+
+window.confirmarEliminarPelicula = function (titulo) {
+
+    return confirm(
+        `¿Seguro que deseas eliminar "${titulo}"?\n\nEsta acción no se puede deshacer.`
+    );
+
+};
+
+});
+
+</script>
+
+{% endblock %}

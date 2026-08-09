@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <title>{% block title %}PECHY ADMIN{% endblock %}</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/base.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/sidebar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/header.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/dashboard.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/productos.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/responsive.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/organizacion.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/cartelera.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/promociones.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/historial.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/configuracion.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/nube_cuentas.css') }}">
+
+</head>
+
+<body>
+
+<div class="admin-layout">
+
+    {% include 'admin/sidebar.html' %}
+
+    <main class="admin-content">
+
+    {% with mensajes = get_flashed_messages() %}
+
+        {% if mensajes %}
+
+            <div class="mensajes-flash">
+
+                {% for mensaje in mensajes %}
+
+                    <div class="mensaje-flash">
+                        {{ mensaje }}
+                    </div>
+
+                {% endfor %}
+
+            </div>
+
+        {% endif %}
+
+    {% endwith %}
+
+
+    {% block contenido %}
+    {% endblock %}
+
+</main>
+
+</div>
+
+<script src="{{ url_for('static', filename='js/admin/dashboard.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/productos.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/drag.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/toast.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/promociones.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/historial.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/configuracion.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin/busqueda.js') }}"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<script>
+    lucide.createIcons();
+</script>
+
+{% block extra_js %}
+{% endblock %}
+
+</body>
+
+</html>

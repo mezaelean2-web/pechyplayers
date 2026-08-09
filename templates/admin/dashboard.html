@@ -1,0 +1,365 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dashboard | PECHY PLAYERS{% endblock %}
+
+{% block contenido %}
+
+    {% with mensajes = get_flashed_messages() %}
+        {% if mensajes %}
+            <div id="toast">
+                {% for mensaje in mensajes %}
+                    {{ mensaje }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <section class="dashboard-section" id="dashboard">
+
+        <header class="admin-header glass">
+
+            <div class="header-info">
+
+                <span class="header-label">
+                    PANEL DE CONTROL
+                </span>
+
+                <h1>
+                    Bienvenido al Admin
+                    <span>PECHY PLAYERS</span>
+                </h1>
+
+                <p>
+                    Administra tu catálogo, promociones y configuraciones
+                    desde un solo lugar.
+                </p>
+
+            </div>
+
+            <div class="header-actions">
+
+                <div class="admin-status">
+                    <span class="status-dot"></span>
+
+                    <div>
+                        <strong>Sistema activo</strong>
+                        <small id="horaActual">Cargando fecha...</small>
+                    </div>
+                </div>
+
+                <a href="/" class="header-button header-button-secondary">
+                    🌐 Ver página
+                </a>
+
+                <a href="/logout" class="header-button header-button-danger">
+                    🚪 Salir
+                </a>
+
+            </div>
+
+        </header>
+
+        <div class="dashboard-cards">
+
+            <article class="dashboard-card glass">
+
+                <div class="card-top">
+
+                    <div class="card-icon">
+                        📺
+                    </div>
+
+                    <span class="card-badge">
+                        Catálogo
+                    </span>
+
+                </div>
+
+                <div class="card-content">
+
+                    <p>Plataformas</p>
+
+                    <strong>
+                        {{ stats.plataformas }}
+                    </strong>
+
+                    <small>
+                        Productos registrados
+                    </small>
+
+                </div>
+
+                <div class="card-glow card-glow-red"></div>
+
+            </article>
+
+            <article class="dashboard-card glass">
+
+                <div class="card-top">
+
+                    <div class="card-icon">
+                        💰
+                    </div>
+
+                    <span class="card-badge">
+                        Planes
+                    </span>
+
+                </div>
+
+                <div class="card-content">
+
+                    <p>Planes disponibles</p>
+
+                    <strong>
+                        {{ stats.planes }}
+                    </strong>
+
+                    <small>
+                        Opciones de compra
+                    </small>
+
+                </div>
+
+                <div class="card-glow card-glow-gold"></div>
+
+            </article>
+
+            <article class="dashboard-card glass">
+
+                <div class="card-top">
+
+                    <div class="card-icon">
+                        🖼️
+                    </div>
+
+                    <span class="card-badge">
+                        Multimedia
+                    </span>
+
+                </div>
+
+                <div class="card-content">
+
+                    <p>Imágenes</p>
+
+                    <strong>
+                        {{ stats.imagenes }}
+                    </strong>
+
+                    <small>
+                        Archivos registrados
+                    </small>
+
+                </div>
+
+                <div class="card-glow card-glow-blue"></div>
+
+            </article>
+
+            <article class="dashboard-card glass">
+
+                <div class="card-top">
+
+                    <div class="card-icon">
+                        ⚡
+                    </div>
+
+                    <span class="card-badge card-badge-active">
+                        Online
+                    </span>
+
+                </div>
+
+                <div class="card-content">
+
+                    <p>Estado del sistema</p>
+
+                    <strong class="system-status-text">
+                        Activo
+                    </strong>
+
+                    <small>
+                        Panel funcionando correctamente
+                    </small>
+
+                </div>
+
+                <div class="card-glow card-glow-green"></div>
+
+            </article>
+
+        </div>
+
+        <div class="dashboard-grid">
+
+            <section class="activity-panel glass" id="historial">
+
+                <div class="panel-heading">
+
+                    <div>
+                        <span class="panel-label">
+                            ACTIVIDAD
+                        </span>
+
+                        <h2>
+                            Historial reciente
+                        </h2>
+                    </div>
+
+                    <span class="panel-heading-icon">
+                        📜
+                    </span>
+
+                </div>
+
+                <div class="activity-list">
+
+                    {% if historial %}
+
+                        {% for accion, fecha in historial %}
+
+                            <article class="activity-item">
+
+                                <div class="activity-icon">
+                                    ✓
+                                </div>
+
+                                <div class="activity-info">
+
+                                    <strong>
+                                        {{ accion }}
+                                    </strong>
+
+                                    <span>
+                                        🕒 {{ fecha }}
+                                    </span>
+
+                                </div>
+
+                            </article>
+
+                        {% endfor %}
+
+                    {% else %}
+
+                        <div class="empty-state">
+
+                            <span>📭</span>
+
+                            <h3>
+                                Sin actividad reciente
+                            </h3>
+
+                            <p>
+                                Las acciones realizadas en el panel
+                                aparecerán aquí.
+                            </p>
+
+                        </div>
+
+                    {% endif %}
+
+                </div>
+
+            </section>
+
+            <aside class="quick-panel glass">
+
+                <div class="panel-heading">
+
+                    <div>
+                        <span class="panel-label">
+                            ACCESOS
+                        </span>
+
+                        <h2>
+                            Acciones rápidas
+                        </h2>
+                    </div>
+
+                    <span class="panel-heading-icon">
+                        ⚡
+                    </span>
+
+                </div>
+
+                <div class="quick-actions">
+
+                    <a href="/admin/productos" class="quick-action">
+
+                        <span class="quick-action-icon">
+                            ➕
+                        </span>
+
+                        <div>
+                            <strong>Nuevo producto</strong>
+                            <small>Agregar al catálogo</small>
+                        </div>
+
+                        <span class="quick-arrow">
+                            →
+                        </span>
+
+                    </a>
+
+                    <a href="/admin/promociones" class="quick-action">
+
+                        <span class="quick-action-icon">
+                            🔥
+                        </span>
+
+                        <div>
+                            <strong>Nueva promoción</strong>
+                            <small>Publicar una imagen</small>
+                        </div>
+
+                        <span class="quick-arrow">
+                            →
+                        </span>
+
+                    </a>
+
+                    <a href="/admin/productos" class="quick-action">
+
+                        <span class="quick-action-icon">
+                            📺
+                        </span>
+
+                        <div>
+                            <strong>Administrar productos</strong>
+                            <small>Precios y visibilidad</small>
+                        </div>
+
+                        <span class="quick-arrow">
+                            →
+                        </span>
+
+                    </a>
+
+                    <a href="/admin/configuracion" class="quick-action">
+
+                        <span class="quick-action-icon">
+                            ⚙️
+                        </span>
+
+                        <div>
+                            <strong>Configuración</strong>
+                            <small>WhatsApp y respaldo</small>
+                        </div>
+
+                        <span class="quick-arrow">
+                            →
+                        </span>
+
+                    </a>
+
+                </div>
+
+            </aside>
+
+        </div>
+
+    </section>
+
+{% endblock %}

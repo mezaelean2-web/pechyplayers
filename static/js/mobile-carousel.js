@@ -125,6 +125,100 @@ document.addEventListener("DOMContentLoaded", function () {
     setTimeout(actualizarCatalogo, 150);
   }
 
+  function iniciarCarruselCartelera() {
+
+    console.count("Carrusel iniciado");
+
+  const cartelera =
+  document.getElementById("carteleraLista");
+
+  if (!cartelera) return;
+
+  const tarjetas = [
+    ...cartelera.querySelectorAll(".cartelera-card")
+  ];
+
+
+
+  /* ==========================
+   CLONES PARA LOOP INFINITO
+========================== */
+
+  if (tarjetas.length === 0) return;
+
+  function actualizarCartelera() {
+
+
+    const centro =
+      cartelera.scrollLeft +
+      cartelera.clientWidth / 2;
+
+    let indiceActivo = 0;
+    let menorDistancia = Infinity;
+
+    tarjetas.forEach(function (tarjeta, index) {
+
+      const centroTarjeta =
+        tarjeta.offsetLeft +
+        tarjeta.offsetWidth / 2;
+
+      const distancia =
+        Math.abs(centro - centroTarjeta);
+
+      if (distancia < menorDistancia) {
+        menorDistancia = distancia;
+        indiceActivo = index;
+      }
+
+    });
+
+    tarjetas.forEach(function (tarjeta, index) {
+
+      tarjeta.classList.toggle(
+        "card-activa",
+        index === indiceActivo
+      );
+
+    });
+
+    const contador =
+      document.getElementById("carteleraActual");
+
+    if (contador) {
+      contador.textContent = indiceActivo + 1;
+    }
+
+    document
+      .querySelectorAll(".cartelera-punto")
+      .forEach(function (punto, index) {
+
+        punto.classList.toggle(
+          "activo",
+          index === indiceActivo
+        );
+
+      });
+
+  }
+
+  cartelera.addEventListener(
+    "scroll",
+    actualizarCartelera,
+    { passive:true }
+  );
+
+  window.addEventListener(
+    "resize",
+    actualizarCartelera
+  );
+
+  setTimeout(
+    actualizarCartelera,
+    150
+  );
+
+}
+
   /* Pequeño empujón para indicar que se puede deslizar */
 setTimeout(function () {
 
@@ -147,6 +241,7 @@ setTimeout(function () {
 }, 700);
 
   iniciarCarruselCatalogo();
+  iniciarCarruselCartelera();
 
   /* ==========================
      CARRUSEL DE RECORDATORIOS

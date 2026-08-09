@@ -228,3 +228,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
   setTimeout(actualizarEstado, 150);
 });
+/* ==========================================
+   PRODUCTOS AGOTADOS: IR DIRECTO A WHATSAPP
+========================================== */
+
+document.addEventListener(
+  "click",
+  function (evento) {
+    const botonAgotado =
+      evento.target.closest(".buy-agotado");
+
+    if (!botonAgotado) return;
+
+    evento.preventDefault();
+    evento.stopPropagation();
+    evento.stopImmediatePropagation();
+
+    const enlaceWhatsApp = botonAgotado.href;
+
+    if (enlaceWhatsApp) {
+      window.location.href = enlaceWhatsApp;
+    }
+  },
+  true
+);

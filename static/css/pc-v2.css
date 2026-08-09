@@ -2026,3 +2026,634 @@ ANIMACIÓN FLOTANTE HERO
     color:white;
   }
 }
+
+/* ==========================================
+   APARIENCIA GLOBAL CONFIGURABLE — PC
+   RESPETA COLORES INDIVIDUALES DE PLATAFORMA
+========================================== */
+
+@media (min-width:769px){
+
+  /* ========================================
+     HERO Y FONDOS GENERALES
+  ======================================== */
+
+  .hero-pc-v2{
+    background:
+      radial-gradient(
+        circle at 78% 38%,
+        color-mix(
+          in srgb,
+          var(--hero-color, var(--pechy-principal)) 22%,
+          transparent
+        ),
+        transparent 34%
+      ),
+      color-mix(
+        in srgb,
+        var(--pechy-secundario) 30%,
+        #05070c
+      );
+  }
+
+
+  .hero-pc-fondo{
+    background:
+      radial-gradient(
+        circle at top right,
+        color-mix(
+          in srgb,
+          var(--hero-color, var(--pechy-principal)) 20%,
+          transparent
+        ),
+        transparent 36%
+      ),
+      radial-gradient(
+        circle at bottom left,
+        rgba(255,255,255,.035),
+        transparent 30%
+      ),
+      linear-gradient(
+        135deg,
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 35%,
+          #05070c
+        ),
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 65%,
+          #0b1019
+        )
+      );
+  }
+
+
+  /* ========================================
+     ACENTO PREMIUM
+  ======================================== */
+
+  .hero-pc-texto h1 span,
+  .top-section small,
+  .promociones-titulo small,
+  .promo-destacada-pc-info small{
+    color:var(--pechy-acento);
+  }
+
+
+  .hero-pc-badge{
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 16%,
+        transparent
+      );
+
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 70%,
+        white
+      );
+
+    color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 72%,
+        white
+      );
+  }
+
+
+  .hero-pc-beneficios{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 28%,
+        rgba(255,255,255,.08)
+      );
+
+    box-shadow:
+      0 20px 50px rgba(0,0,0,.45),
+      0 0 30px
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 10%,
+        transparent
+      );
+  }
+
+
+  .hero-beneficio-item > span{
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 14%,
+        rgba(255,255,255,.03)
+      );
+
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 36%,
+        transparent
+      );
+  }
+
+
+  /* ========================================
+     CATÁLOGO GENERAL
+  ======================================== */
+
+  .catalogo{
+    background:
+      radial-gradient(
+        circle at top center,
+        color-mix(
+          in srgb,
+          var(--pechy-acento) 8%,
+          transparent
+        ),
+        transparent 35%
+      ),
+      color-mix(
+        in srgb,
+        var(--pechy-secundario) 30%,
+        #05070c
+      );
+  }
+
+
+  #buscador{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 24%,
+        transparent
+      );
+
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-secundario) 72%,
+        #0b1018
+      );
+  }
+
+
+  #buscador:focus{
+    border-color:var(--pechy-acento);
+
+    box-shadow:
+      0 0 20px
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 14%,
+        transparent
+      );
+  }
+
+
+  /* Cada producto conserva su propio color */
+
+  #productosGrid .card{
+    --catalogo-color:
+      var(--catalogo-color, var(--pechy-principal));
+  }
+
+
+  #productosGrid .card:hover{
+    border-color:var(--catalogo-color);
+  }
+
+
+  #productosGrid .plan strong{
+    color:var(--catalogo-color);
+  }
+
+
+  #productosGrid .buy{
+    background:
+      linear-gradient(
+        135deg,
+        var(--catalogo-color),
+        color-mix(
+          in srgb,
+          var(--catalogo-color) 70%,
+          white
+        )
+      ) !important;
+
+    color:white !important;
+  }
+
+
+  /* ========================================
+     PROMOCIONES
+  ======================================== */
+
+  .promo-card{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 22%,
+        transparent
+      );
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 76%,
+          #0d121a
+        ),
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 45%,
+          #070a10
+        )
+      );
+  }
+
+
+  .promo-card:hover{
+    border-color:var(--pechy-acento);
+
+    box-shadow:
+      0 0 30px
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 18%,
+        transparent
+      ),
+      0 30px 65px rgba(0,0,0,.62);
+  }
+
+
+  .promocion-punto.activo{
+    background:var(--pechy-acento);
+
+    box-shadow:
+      0 0 14px
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 50%,
+        transparent
+      );
+  }
+
+
+  .promo-pc-flecha{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 45%,
+        transparent
+      );
+
+    color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 72%,
+        white
+      );
+  }
+
+
+  .promo-pc-flecha:hover{
+    background:var(--pechy-acento);
+    color:#171000;
+  }
+
+
+  /* ========================================
+     INFORMACIÓN, PAGOS Y FOOTER
+  ======================================== */
+
+  .info{
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-secundario) 30%,
+        #05070c
+      );
+  }
+
+
+  .info > div{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 18%,
+        transparent
+      );
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 78%,
+          #0e121b
+        ),
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 48%,
+          #070a10
+        )
+      );
+  }
+
+
+  .payments span{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 18%,
+        transparent
+      );
+  }
+
+
+  .payments span:hover{
+    border-color:var(--pechy-acento);
+
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 6%,
+        transparent
+      );
+  }
+
+
+  footer{
+    border-top-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 16%,
+        transparent
+      );
+
+    background:
+      linear-gradient(
+        180deg,
+        color-mix(
+          in srgb,
+          var(--pechy-secundario) 48%,
+          #070a10
+        ),
+        #020305
+      );
+  }
+
+
+  footer img{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 24%,
+        transparent
+      );
+  }
+
+
+  /* ========================================
+     NAVEGACIÓN
+  ======================================== */
+
+  .nav{
+    border-bottom-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 16%,
+        transparent
+      );
+  }
+
+
+  .brand img{
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 24%,
+        transparent
+      );
+
+    box-shadow:
+      0 0 18px
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 10%,
+        transparent
+      );
+  }
+
+
+  .brand span{
+    color:var(--pechy-acento);
+  }
+
+
+  .links a:not(.wa)::after{
+    background:var(--pechy-acento);
+  }
+
+
+  .links a:not(.wa):hover{
+    color:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 72%,
+        white
+      );
+
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-acento) 6%,
+        transparent
+      );
+  }
+
+
+  /* WhatsApp permanece verde */
+
+  .links .wa,
+  .float-wa{
+    border-color:#25d366 !important;
+    background:#25d366 !important;
+    color:#04110a !important;
+  }
+
+}
+
+/* ==========================================
+   COLORES INDIVIDUALES — BENEFICIOS HERO PC
+========================================== */
+
+@media (min-width:769px){
+
+  /* Color general de respaldo */
+
+  .hero-beneficio-item{
+    --beneficio-color:var(--pechy-acento);
+  }
+
+
+  /* 1. Entrega inmediata */
+
+  .hero-beneficio-item:nth-child(1){
+    --beneficio-color:#ff9f2f;
+  }
+
+
+  /* 2. Cuentas seguras */
+
+  .hero-beneficio-item:nth-child(2){
+    --beneficio-color:#3b82f6;
+  }
+
+
+  /* 3. Soporte 24/7 */
+
+  .hero-beneficio-item:nth-child(3){
+    --beneficio-color:#a78bfa;
+  }
+
+
+  /* 4. Precios bajos */
+
+  .hero-beneficio-item:nth-child(4){
+    --beneficio-color:#ff4d38;
+  }
+
+
+  /* Círculo del icono */
+
+  .hero-beneficio-item > span{
+
+    background:
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 15%,
+        rgba(255,255,255,.03)
+      ) !important;
+
+    border-color:
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 38%,
+        transparent
+      ) !important;
+
+    box-shadow:
+      0 0 18px
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 18%,
+        transparent
+      ) !important;
+
+    transition:
+      background .25s ease,
+      border-color .25s ease,
+      box-shadow .25s ease,
+      transform .25s ease;
+
+  }
+
+
+  /* Estado al pasar el mouse */
+
+  .hero-beneficio-item:hover{
+
+    background:
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 8%,
+        transparent
+      ) !important;
+
+    transform:
+      translateY(-3px);
+
+  }
+
+
+  .hero-beneficio-item:hover > span{
+
+    background:
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 22%,
+        rgba(255,255,255,.04)
+      ) !important;
+
+    border-color:
+      var(--beneficio-color) !important;
+
+    box-shadow:
+      0 0 24px
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 36%,
+        transparent
+      ) !important;
+
+    transform:
+      scale(1.08);
+
+  }
+
+
+  /* El título toma el color al pasar el mouse */
+
+  .hero-beneficio-item strong{
+
+    transition:
+      color .25s ease,
+      text-shadow .25s ease;
+
+  }
+
+
+  .hero-beneficio-item:hover strong{
+
+    color:
+      var(--beneficio-color) !important;
+
+    text-shadow:
+      0 0 16px
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 38%,
+        transparent
+      );
+
+  }
+
+
+  /* El texto pequeño también toma un tono del color */
+
+  .hero-beneficio-item small{
+
+    transition:
+      color .25s ease;
+
+  }
+
+
+  .hero-beneficio-item:hover small{
+
+    color:
+      color-mix(
+        in srgb,
+        var(--beneficio-color) 58%,
+        white
+      ) !important;
+
+  }
+
+}

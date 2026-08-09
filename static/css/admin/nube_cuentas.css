@@ -1,0 +1,3378 @@
+/* ==========================================
+   NUBE DE CUENTAS
+   ========================================== */
+
+.nube-page{
+    display:flex;
+    flex-direction:column;
+    gap:26px;
+}
+
+
+/* ==========================================
+   HERO / ENCABEZADO
+   ========================================== */
+
+.nube-hero{
+    position:relative;
+    overflow:hidden;
+
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:24px;
+
+    padding:28px 30px;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:22px;
+
+    background:
+        radial-gradient(
+            circle at 85% 20%,
+            rgba(229,9,20,.12),
+            transparent 34%
+        ),
+        linear-gradient(
+            145deg,
+            #17181c,
+            #111216
+        );
+
+    box-shadow:
+        0 20px 45px rgba(0,0,0,.22);
+}
+
+
+.nube-hero::before{
+    content:"";
+
+    position:absolute;
+    inset:0;
+
+    background:
+        linear-gradient(
+            90deg,
+            rgba(255,255,255,.025),
+            transparent 40%
+        );
+
+    pointer-events:none;
+}
+
+
+.nube-hero-texto,
+.nube-hero-acciones{
+    position:relative;
+    z-index:1;
+}
+
+
+.nube-eyebrow{
+    display:inline-flex;
+    align-items:center;
+
+    margin-bottom:10px;
+
+    font-size:11px;
+    font-weight:800;
+    letter-spacing:1.6px;
+
+    color:#ff4d55;
+}
+
+
+.nube-hero h1{
+    margin:0;
+
+    font-size:34px;
+    line-height:1.1;
+    font-weight:850;
+
+    color:#ffffff;
+}
+
+
+.nube-hero p{
+    max-width:680px;
+
+    margin:10px 0 0;
+
+    color:#9398a4;
+
+    font-size:14px;
+    line-height:1.65;
+}
+
+
+.nube-hero-acciones{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+
+.nube-btn{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    min-height:44px;
+
+    padding:0 17px;
+
+    border-radius:11px;
+
+    font-size:13px;
+    font-weight:750;
+
+    cursor:pointer;
+
+    transition:
+        transform .18s ease,
+        border-color .18s ease,
+        background .18s ease;
+}
+
+
+.nube-btn svg{
+    width:17px;
+    height:17px;
+}
+
+
+.nube-btn:hover{
+    transform:translateY(-1px);
+}
+
+
+.nube-btn-principal{
+    border:1px solid #f3262e;
+
+    color:#fff;
+
+    background:
+        linear-gradient(
+            135deg,
+            #e50914,
+            #bd0710
+        );
+
+    box-shadow:
+        0 9px 25px rgba(229,9,20,.18);
+}
+
+
+.nube-btn-secundario{
+    border:1px solid rgba(255,255,255,.09);
+
+    color:#d9dce3;
+
+    background:#202126;
+}
+
+
+.nube-btn-secundario:hover{
+    border-color:rgba(255,255,255,.16);
+}
+
+
+/* ==========================================
+   TARJETAS DE ESTADÍSTICAS
+   ========================================== */
+
+.nube-resumen{
+    display:grid;
+
+    grid-template-columns:
+        repeat(6, minmax(0,1fr));
+
+    gap:14px;
+}
+
+
+.nube-stat{
+    position:relative;
+    overflow:hidden;
+
+    display:flex;
+    align-items:center;
+    gap:14px;
+
+    min-height:115px;
+
+    padding:18px;
+
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:16px;
+
+    background:#17181c;
+
+    transition:
+        transform .18s ease,
+        border-color .18s ease;
+}
+
+
+.nube-stat:hover{
+    transform:translateY(-2px);
+
+    border-color:
+        rgba(255,255,255,.12);
+}
+
+
+.nube-stat::after{
+    content:"";
+
+    position:absolute;
+
+    width:120px;
+    height:120px;
+
+    right:-50px;
+    bottom:-65px;
+
+    border-radius:50%;
+
+    filter:blur(12px);
+
+    opacity:.16;
+
+    pointer-events:none;
+}
+
+
+.nube-stat-icon{
+    flex:0 0 46px;
+
+    width:46px;
+    height:46px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:13px;
+}
+
+
+.nube-stat-icon svg{
+    width:22px;
+    height:22px;
+}
+
+
+.nube-stat-contenido{
+    min-width:0;
+
+    display:flex;
+    flex-direction:column;
+}
+
+
+.nube-stat-label{
+    margin-bottom:3px;
+
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.7px;
+    text-transform:uppercase;
+
+    color:#a0a4ae;
+}
+
+
+.nube-stat strong{
+    font-size:27px;
+    line-height:1.1;
+
+    color:#ffffff;
+}
+
+
+.nube-stat small{
+    margin-top:6px;
+
+    font-size:11px;
+
+    color:#858a95;
+}
+
+
+/* TOTAL */
+
+.nube-stat-total .nube-stat-icon{
+    color:#9387ff;
+    background:rgba(106,90,255,.13);
+}
+
+.nube-stat-total::after{
+    background:#6a5aff;
+}
+
+
+/* ACTIVAS */
+
+.nube-stat-activa{
+    background:
+        linear-gradient(
+            145deg,
+            #131b17,
+            #121714
+        );
+}
+
+.nube-stat-activa .nube-stat-icon{
+    color:#31e879;
+    background:rgba(49,232,121,.11);
+}
+
+.nube-stat-activa .nube-stat-label{
+    color:#38df7a;
+}
+
+.nube-stat-activa::after{
+    background:#20d66a;
+}
+
+
+/* POR VENCER */
+
+.nube-stat-vencer{
+    background:
+        linear-gradient(
+            145deg,
+            #1c1910,
+            #17160f
+        );
+}
+
+.nube-stat-vencer .nube-stat-icon{
+    color:#ffc928;
+    background:rgba(255,201,40,.11);
+}
+
+.nube-stat-vencer .nube-stat-label{
+    color:#ffd23f;
+}
+
+.nube-stat-vencer::after{
+    background:#ffc928;
+}
+
+
+/* VENCIDAS */
+
+.nube-stat-vencida{
+    background:
+        linear-gradient(
+            145deg,
+            #1e1315,
+            #181214
+        );
+}
+
+.nube-stat-vencida .nube-stat-icon{
+    color:#ff4c54;
+    background:rgba(255,76,84,.11);
+}
+
+.nube-stat-vencida .nube-stat-label{
+    color:#ff5159;
+}
+
+.nube-stat-vencida::after{
+    background:#ef2530;
+}
+
+
+/* DISPONIBLES */
+
+.nube-stat-disponible{
+    background:
+        linear-gradient(
+            145deg,
+            #111722,
+            #12161d
+        );
+}
+
+.nube-stat-disponible .nube-stat-icon{
+    color:#4f8cff;
+    background:rgba(79,140,255,.11);
+}
+
+.nube-stat-disponible .nube-stat-label{
+    color:#69a0ff;
+}
+
+.nube-stat-disponible::after{
+    background:#3b78ff;
+}
+
+
+/* PAPELERA */
+
+.nube-stat-papelera{
+    background:
+        linear-gradient(
+            145deg,
+            #1a1320,
+            #17131b
+        );
+}
+
+.nube-stat-papelera .nube-stat-icon{
+    color:#d65cff;
+    background:rgba(214,92,255,.11);
+}
+
+.nube-stat-papelera .nube-stat-label{
+    color:#da73ff;
+}
+
+.nube-stat-papelera::after{
+    background:#c24bff;
+}
+
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width:1450px){
+
+    .nube-resumen{
+        grid-template-columns:
+            repeat(3,minmax(0,1fr));
+    }
+
+}
+
+
+@media (max-width:900px){
+
+    .nube-hero{
+        align-items:flex-start;
+        flex-direction:column;
+    }
+
+    .nube-resumen{
+        grid-template-columns:
+            repeat(2,minmax(0,1fr));
+    }
+
+}
+
+
+@media (max-width:580px){
+
+    .nube-hero{
+        padding:22px 18px;
+    }
+
+    .nube-hero h1{
+        font-size:28px;
+    }
+
+    .nube-hero-acciones{
+        width:100%;
+    }
+
+    .nube-btn{
+        flex:1;
+    }
+
+    .nube-resumen{
+        grid-template-columns:1fr;
+    }
+
+}
+
+/* ==========================================
+   TOOLBAR / BUSCADOR
+   ========================================== */
+
+.nube-contenido{
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+}
+
+
+.nube-toolbar-premium{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+
+    padding:14px;
+
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:15px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #15161a,
+            #111216
+        );
+}
+
+
+.nube-buscador{
+    flex:1;
+
+    min-width:280px;
+
+    height:46px;
+
+    display:flex;
+    align-items:center;
+    gap:10px;
+
+    padding:0 14px;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:11px;
+
+    background:#0f1013;
+
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease;
+}
+
+
+.nube-buscador:focus-within{
+    border-color:rgba(229,9,20,.55);
+
+    box-shadow:
+        0 0 0 3px rgba(229,9,20,.08);
+}
+
+
+.nube-buscador svg{
+    width:18px;
+    height:18px;
+
+    flex-shrink:0;
+
+    color:#7d828d;
+}
+
+
+.nube-buscador input{
+    width:100%;
+
+    border:none;
+    outline:none;
+
+    background:transparent;
+
+    color:#f4f5f7;
+
+    font-size:13px;
+}
+
+
+.nube-buscador input::placeholder{
+    color:#686d77;
+}
+
+
+/* ==========================================
+   FILTROS
+   ========================================== */
+
+.nube-filtros{
+    display:flex;
+    align-items:flex-end;
+    gap:10px;
+}
+
+
+.nube-filtro-item{
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+
+.nube-filtro-item span{
+    padding-left:2px;
+
+    font-size:9px;
+    font-weight:800;
+
+    letter-spacing:.8px;
+    text-transform:uppercase;
+
+    color:#696f7b;
+}
+
+
+.nube-filtro-item select{
+    height:46px;
+
+    min-width:145px;
+
+    padding:0 34px 0 12px;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;
+
+    outline:none;
+
+    color:#d9dce3;
+
+    background:#1b1c21;
+
+    font-size:12px;
+
+    cursor:pointer;
+}
+
+
+.nube-filtro-item select:focus{
+    border-color:
+        rgba(229,9,20,.45);
+}
+
+
+.nube-filtro-avanzado{
+    height:46px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    padding:0 15px;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;
+
+    background:#1b1c21;
+
+    color:#c8cbd2;
+
+    font-size:12px;
+    font-weight:700;
+
+    cursor:pointer;
+
+    transition:
+        background .18s ease,
+        border-color .18s ease;
+}
+
+
+.nube-filtro-avanzado:hover{
+    background:#23252b;
+
+    border-color:
+        rgba(255,255,255,.13);
+}
+
+
+.nube-filtro-avanzado svg{
+    width:16px;
+    height:16px;
+
+    color:#628cff;
+}
+
+
+/* ==========================================
+   RESPONSIVE TOOLBAR
+   ========================================== */
+
+@media (max-width:1100px){
+
+    .nube-toolbar-premium{
+        align-items:stretch;
+        flex-direction:column;
+    }
+
+    .nube-filtros{
+        width:100%;
+
+        flex-wrap:wrap;
+    }
+
+    .nube-filtro-item{
+        flex:1;
+    }
+
+    .nube-filtro-item select{
+        width:100%;
+    }
+
+}
+
+
+@media (max-width:650px){
+
+    .nube-buscador{
+        min-width:0;
+    }
+
+    .nube-filtros{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .nube-filtro-avanzado{
+        width:100%;
+    }
+
+}
+
+/* ==========================================
+   TABLA PREMIUM
+   ========================================== */
+
+.nube-tabla-card{
+    overflow:hidden;
+
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:16px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #141519,
+            #101115
+        );
+}
+
+
+.nube-tabla-wrapper{
+    width:100%;
+
+    overflow-x:auto;
+}
+
+
+.nube-tabla{
+    width:100%;
+
+    min-width:1180px;
+
+    border-collapse:collapse;
+
+    color:#dfe1e6;
+
+    font-size:12px;
+}
+
+
+.nube-tabla thead{
+    background:#191a1f;
+}
+
+
+.nube-tabla th{
+    padding:14px 13px;
+
+    border-bottom:1px solid rgba(255,255,255,.07);
+
+    color:#9297a2;
+
+    font-size:9px;
+    font-weight:850;
+
+    letter-spacing:.65px;
+    text-transform:uppercase;
+
+    text-align:left;
+
+    white-space:nowrap;
+}
+
+
+.nube-tabla td{
+    height:56px;
+
+    padding:10px 13px;
+
+    border-bottom:1px solid rgba(255,255,255,.055);
+
+    vertical-align:middle;
+}
+
+
+.nube-tabla tbody tr{
+    transition:
+        background .16s ease,
+        box-shadow .16s ease;
+}
+
+
+.nube-tabla tbody tr:hover{
+    background:
+        rgba(255,255,255,.025);
+
+    box-shadow:
+        inset 3px 0 0 rgba(229,9,20,.55);
+}
+
+
+.nube-tabla tbody tr:last-child td{
+    border-bottom:none;
+}
+
+
+/* ==========================================
+   PLATAFORMA
+   ========================================== */
+
+.nube-plataforma{
+    display:flex;
+    align-items:center;
+    gap:10px;
+
+    white-space:nowrap;
+}
+
+
+.nube-plataforma-icono{
+    width:30px;
+    height:30px;
+
+    flex:0 0 30px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:8px;
+
+    background:
+        linear-gradient(
+            145deg,
+            #2a171a,
+            #1c1315
+        );
+
+    color:#ff3942;
+
+    font-size:14px;
+    font-weight:900;
+}
+
+
+.nube-plataforma span{
+    color:#f0f1f4;
+
+    font-weight:700;
+}
+
+
+/* ==========================================
+   DATOS
+   ========================================== */
+
+.nube-correo{
+    color:#d8dbe2;
+}
+
+
+.nube-tipo{
+    display:inline-flex;
+
+    padding:5px 8px;
+
+    border-radius:7px;
+
+    background:#202126;
+
+    color:#bfc3cc;
+
+    font-size:10px;
+}
+
+
+.nube-cliente{
+    font-weight:650;
+
+    color:#e7e8eb;
+}
+
+
+.nube-telefono,
+.nube-fecha{
+    color:#9fa4ae;
+}
+
+
+.nube-numero{
+    text-align:center;
+}
+
+
+/* ==========================================
+   DÍAS RESTANTES
+   ========================================== */
+
+.nube-restantes{
+    display:inline-flex;
+
+    min-width:30px;
+
+    justify-content:center;
+
+    font-weight:850;
+}
+
+
+.nube-restantes-activo{
+    color:#37df78;
+}
+
+
+.nube-restantes-alerta{
+    color:#ffca2d;
+}
+
+
+.nube-restantes-vencido{
+    color:#ff4a52;
+}
+
+
+/* ==========================================
+   ESTADOS
+   ========================================== */
+
+.nube-estado{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    min-width:82px;
+
+    padding:6px 9px;
+
+    border-radius:7px;
+
+    font-size:9px;
+    font-weight:850;
+
+    letter-spacing:.3px;
+
+    text-transform:uppercase;
+
+    white-space:nowrap;
+}
+
+
+.nube-estado-activa{
+    color:#31e879;
+
+    border:1px solid rgba(49,232,121,.13);
+
+    background:rgba(49,232,121,.09);
+}
+
+
+.nube-estado-por_vencer{
+    color:#ffc928;
+
+    border:1px solid rgba(255,201,40,.14);
+
+    background:rgba(255,201,40,.09);
+}
+
+
+.nube-estado-vencida{
+    color:#ff4a52;
+
+    border:1px solid rgba(255,74,82,.14);
+
+    background:rgba(255,74,82,.09);
+}
+
+
+.nube-estado-disponible{
+    color:#6297ff;
+
+    border:1px solid rgba(98,151,255,.14);
+
+    background:rgba(98,151,255,.09);
+}
+
+
+.nube-estado-caida{
+    color:#ff675f;
+
+    border:1px solid rgba(255,103,95,.14);
+
+    background:rgba(255,103,95,.09);
+}
+
+
+.nube-estado-garantia{
+    color:#d05cff;
+
+    border:1px solid rgba(208,92,255,.14);
+
+    background:rgba(208,92,255,.09);
+}
+
+
+.nube-estado-reemplazada{
+    color:#ac82ff;
+
+    border:1px solid rgba(172,130,255,.14);
+
+    background:rgba(172,130,255,.09);
+}
+
+
+.nube-estado-papelera{
+    color:#a5a9b1;
+
+    border:1px solid rgba(165,169,177,.13);
+
+    background:rgba(165,169,177,.07);
+}
+
+
+/* ==========================================
+   ACCIONES
+   ========================================== */
+
+.nube-acciones-fila{
+    display:flex;
+    align-items:center;
+    gap:4px;
+}
+
+
+.nube-accion{
+    width:30px;
+    height:30px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border:1px solid transparent;
+    border-radius:7px;
+
+    background:transparent;
+
+    color:#8d929d;
+
+    cursor:pointer;
+
+    transition:
+        color .16s ease,
+        background .16s ease,
+        border-color .16s ease;
+}
+
+
+.nube-accion svg{
+    width:15px;
+    height:15px;
+}
+
+
+.nube-accion:hover{
+    color:#fff;
+
+    border-color:
+        rgba(255,255,255,.08);
+
+    background:#222329;
+}
+
+
+.nube-accion-whatsapp{
+    color:#35d973;
+}
+
+
+.nube-accion-whatsapp:hover{
+    color:#4df087;
+
+    background:
+        rgba(53,217,115,.08);
+}
+
+
+/* ==========================================
+   ESTADO VACÍO
+   ========================================== */
+
+.nube-vacio{
+    height:230px !important;
+
+    text-align:center !important;
+}
+
+
+.nube-vacio > *{
+    margin-left:auto;
+    margin-right:auto;
+}
+
+
+.nube-vacio-icono{
+    width:52px;
+    height:52px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    margin-bottom:13px;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:15px;
+
+    background:#1b1c21;
+
+    color:#747b89;
+}
+
+
+.nube-vacio-icono svg{
+    width:24px;
+    height:24px;
+}
+
+
+.nube-vacio strong{
+    display:block;
+
+    margin-bottom:6px;
+
+    color:#e8e9ec;
+
+    font-size:14px;
+}
+
+
+.nube-vacio span{
+    display:block;
+
+    color:#777d88;
+
+    font-size:11px;
+}
+
+
+/* ==========================================
+   FOOTER TABLA
+   ========================================== */
+
+.nube-tabla-footer{
+    min-height:48px;
+
+    display:flex;
+    align-items:center;
+
+    padding:0 14px;
+
+    border-top:1px solid rgba(255,255,255,.06);
+
+    background:#121317;
+
+    color:#777d88;
+
+    font-size:10px;
+}
+
+
+.nube-tabla-footer strong{
+    color:#c8ccd3;
+}
+
+
+/* ==========================================
+   MODAL NUEVA CUENTA
+   ========================================== */
+
+body.nube-modal-abierto{
+    overflow:hidden;
+}
+
+
+.nube-modal{
+    position:fixed;
+    inset:0;
+
+    z-index:9999;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    padding:24px;
+
+    opacity:0;
+    visibility:hidden;
+    pointer-events:none;
+
+    transition:
+        opacity .18s ease,
+        visibility .18s ease;
+}
+
+
+.nube-modal.abierto{
+    opacity:1;
+    visibility:visible;
+    pointer-events:auto;
+}
+
+
+.nube-modal-backdrop{
+    position:absolute;
+    inset:0;
+
+    background:
+        rgba(0,0,0,.72);
+
+    backdrop-filter:
+        blur(7px);
+}
+
+
+.nube-modal-panel{
+    position:relative;
+    z-index:2;
+
+    width:min(
+        760px,
+        100%
+    );
+
+    max-height:92vh;
+
+    display:flex;
+    flex-direction:column;
+
+    overflow:hidden;
+
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:20px;
+
+    background:
+        radial-gradient(
+            circle at 90% 0%,
+            rgba(229,9,20,.13),
+            transparent 32%
+        ),
+        linear-gradient(
+            145deg,
+            #18191d,
+            #111216
+        );
+
+    box-shadow:
+        0 35px 90px rgba(0,0,0,.62);
+
+    transform:
+        translateY(12px)
+        scale(.985);
+
+    transition:
+        transform .2s ease;
+}
+
+
+.nube-modal.abierto .nube-modal-panel{
+    transform:
+        translateY(0)
+        scale(1);
+}
+
+
+/* ==========================================
+   HEADER MODAL
+   ========================================== */
+
+.nube-modal-header{
+    flex-shrink:0;
+
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:20px;
+
+    padding:24px 26px 20px;
+
+    border-bottom:
+        1px solid rgba(255,255,255,.07);
+}
+
+
+.nube-modal-header > div > span{
+    display:inline-flex;
+
+    margin-bottom:7px;
+
+    color:#ff444c;
+
+    font-size:10px;
+    font-weight:850;
+
+    letter-spacing:1.4px;
+}
+
+
+.nube-modal-header h2{
+    margin:0;
+
+    color:#fff;
+
+    font-size:25px;
+    line-height:1.15;
+}
+
+
+.nube-modal-header p{
+    margin:7px 0 0;
+
+    color:#858b96;
+
+    font-size:12px;
+    line-height:1.55;
+}
+
+
+.nube-modal-cerrar{
+    flex:0 0 36px;
+
+    width:36px;
+    height:36px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:10px;
+
+    background:#202126;
+
+    color:#9da2ad;
+
+    cursor:pointer;
+
+    transition:
+        background .16s ease,
+        color .16s ease,
+        transform .16s ease;
+}
+
+
+.nube-modal-cerrar:hover{
+    background:#292a30;
+
+    color:#fff;
+
+    transform:rotate(4deg);
+}
+
+
+.nube-modal-cerrar svg{
+    width:17px;
+    height:17px;
+}
+
+
+/* ==========================================
+   FORMULARIO
+   ========================================== */
+
+.nube-form{
+    min-height:0;
+
+    display:flex;
+    flex-direction:column;
+
+    overflow:hidden;
+}
+
+
+.nube-form-grid{
+    min-height:0;
+
+    display:grid;
+
+    grid-template-columns:
+        repeat(2,minmax(0,1fr));
+
+    gap:17px;
+
+    padding:24px 26px;
+
+    overflow-y:auto;
+}
+
+
+.nube-form-grid label{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+}
+
+
+.nube-form-grid label > span{
+    padding-left:2px;
+
+    color:#969ba6;
+
+    font-size:10px;
+    font-weight:800;
+
+    letter-spacing:.55px;
+    text-transform:uppercase;
+}
+
+
+.nube-form-full{
+    grid-column:1 / -1;
+}
+
+
+.nube-form-grid input,
+.nube-form-grid textarea{
+    width:100%;
+
+    box-sizing:border-box;
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius:10px;
+
+    outline:none;
+
+    background:#101115;
+
+    color:#eff0f3;
+
+    font-family:inherit;
+
+    font-size:13px;
+
+    transition:
+        border-color .16s ease,
+        box-shadow .16s ease,
+        background .16s ease;
+}
+
+
+.nube-form-grid input{
+    height:44px;
+
+    padding:0 13px;
+}
+
+
+.nube-form-grid textarea{
+    min-height:90px;
+
+    resize:vertical;
+
+    padding:12px 13px;
+
+    line-height:1.5;
+}
+
+
+.nube-form-grid input::placeholder,
+.nube-form-grid textarea::placeholder{
+    color:#565b65;
+}
+
+
+.nube-form-grid input:focus,
+.nube-form-grid textarea:focus{
+    border-color:
+        rgba(229,9,20,.52);
+
+    background:#121317;
+
+    box-shadow:
+        0 0 0 3px rgba(229,9,20,.07);
+}
+
+
+/* INPUT DATE */
+
+.nube-form-grid input[type="date"]{
+    color-scheme:dark;
+}
+
+
+/* ==========================================
+   FOOTER MODAL
+   ========================================== */
+
+.nube-modal-footer{
+    flex-shrink:0;
+
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:10px;
+
+    padding:17px 26px;
+
+    border-top:
+        1px solid rgba(255,255,255,.07);
+
+    background:
+        rgba(12,13,16,.78);
+
+    backdrop-filter:blur(8px);
+}
+
+
+.nube-modal-cancelar,
+.nube-modal-guardar{
+    min-height:42px;
+
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    padding:0 16px;
+
+    border-radius:10px;
+
+    font-size:12px;
+    font-weight:800;
+
+    cursor:pointer;
+
+    transition:
+        transform .16s ease,
+        background .16s ease,
+        border-color .16s ease;
+}
+
+
+.nube-modal-cancelar{
+    border:
+        1px solid rgba(255,255,255,.09);
+
+    background:#202126;
+
+    color:#c8cbd2;
+}
+
+
+.nube-modal-cancelar:hover{
+    background:#292a30;
+}
+
+
+.nube-modal-guardar{
+    border:
+        1px solid #f12a32;
+
+    background:
+        linear-gradient(
+            135deg,
+            #e50914,
+            #b80710
+        );
+
+    color:#fff;
+
+    box-shadow:
+        0 9px 26px rgba(229,9,20,.17);
+}
+
+
+.nube-modal-guardar:hover{
+    transform:translateY(-1px);
+}
+
+
+.nube-modal-guardar svg{
+    width:16px;
+    height:16px;
+}
+
+
+/* ==========================================
+   SCROLLBAR MODAL
+   ========================================== */
+
+.nube-form-grid::-webkit-scrollbar{
+    width:7px;
+}
+
+
+.nube-form-grid::-webkit-scrollbar-track{
+    background:transparent;
+}
+
+
+.nube-form-grid::-webkit-scrollbar-thumb{
+    border-radius:20px;
+
+    background:#30323a;
+}
+
+
+/* ==========================================
+   RESPONSIVE MODAL
+   ========================================== */
+
+@media (max-width:700px){
+
+    .nube-modal{
+        padding:12px;
+    }
+
+    .nube-modal-panel{
+        max-height:95vh;
+
+        border-radius:16px;
+    }
+
+    .nube-form-grid{
+        grid-template-columns:1fr;
+
+        padding:20px;
+    }
+
+    .nube-form-full{
+        grid-column:auto;
+    }
+
+    .nube-modal-header{
+        padding:21px 20px 17px;
+    }
+
+    .nube-modal-footer{
+        padding:15px 20px;
+    }
+
+}
+
+/* ==========================================
+   DRAWER DETALLE CUENTA
+   ========================================== */
+
+.nube-drawer{
+    position:fixed;
+    inset:0;
+
+    z-index:9998;
+
+    visibility:hidden;
+    pointer-events:none;
+}
+
+
+.nube-drawer.abierto{
+    visibility:visible;
+    pointer-events:auto;
+}
+
+
+.nube-drawer-backdrop{
+    position:absolute;
+    inset:0;
+
+    background:rgba(0,0,0,.42);
+
+    opacity:0;
+
+    transition:opacity .2s ease;
+}
+
+
+.nube-drawer.abierto
+.nube-drawer-backdrop{
+    opacity:1;
+}
+
+
+.nube-drawer-panel{
+    position:absolute;
+
+    top:0;
+    right:0;
+    bottom:0;
+
+    width:min(
+        420px,
+        94vw
+    );
+
+    display:flex;
+    flex-direction:column;
+
+    border-left:
+        1px solid rgba(255,255,255,.08);
+
+    background:
+        linear-gradient(
+            160deg,
+            #17181d,
+            #0f1014
+        );
+
+    box-shadow:
+        -30px 0 70px rgba(0,0,0,.4);
+
+    transform:
+        translateX(100%);
+
+    transition:
+        transform .24s ease;
+}
+
+
+.nube-drawer.abierto
+.nube-drawer-panel{
+    transform:
+        translateX(0);
+}
+
+
+.nube-drawer-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:15px;
+
+    padding:22px;
+
+    border-bottom:
+        1px solid rgba(255,255,255,.07);
+}
+
+
+.nube-drawer-identidad{
+    display:flex;
+    align-items:center;
+    gap:13px;
+}
+
+
+.nube-drawer-logo{
+    width:44px;
+    height:52px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:9px;
+
+    background:#200d10;
+
+    color:#ff2530;
+
+    font-size:27px;
+    font-weight:900;
+}
+
+
+.nube-drawer-titulo-linea{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+
+.nube-drawer-header h2{
+    margin:0;
+
+    color:#fff;
+
+    font-size:17px;
+}
+
+
+.nube-drawer-header small{
+    display:block;
+
+    margin-top:5px;
+
+    color:#737986;
+
+    font-size:10px;
+}
+
+
+.nube-drawer-tabs{
+    display:flex;
+
+    padding:0 20px;
+
+    border-bottom:
+        1px solid rgba(255,255,255,.07);
+}
+
+
+.nube-drawer-tabs button{
+    padding:14px 11px;
+
+    border:none;
+    border-bottom:2px solid transparent;
+
+    background:transparent;
+
+    color:#7f8590;
+
+    font-size:11px;
+
+    cursor:pointer;
+}
+
+
+.nube-drawer-tabs button.activo{
+    border-bottom-color:#e50914;
+
+    color:#fff;
+}
+
+
+.nube-drawer-contenido{
+    display:flex;
+    flex-direction:column;
+    gap:11px;
+
+    padding:15px;
+
+    overflow-y:auto;
+}
+
+
+.nube-drawer-card{
+    padding:15px;
+
+    border:
+        1px solid rgba(255,255,255,.07);
+
+    border-radius:11px;
+
+    background:#17181d;
+}
+
+
+.nube-drawer-card h3{
+    margin:0 0 13px;
+
+    color:#f1f2f4;
+
+    font-size:12px;
+}
+
+
+.nube-drawer-dato{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:20px;
+
+    min-height:27px;
+}
+
+
+.nube-drawer-dato span{
+    color:#858b96;
+
+    font-size:10px;
+}
+
+
+.nube-drawer-dato strong{
+    max-width:235px;
+
+    overflow:hidden;
+
+    color:#e6e8ec;
+
+    font-size:11px;
+    font-weight:650;
+
+    text-align:right;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+
+.nube-drawer-restantes{
+    color:#38df78 !important;
+}
+
+
+.nube-drawer-secreto{
+    display:flex;
+    align-items:center;
+    gap:7px;
+}
+
+
+.nube-drawer-secreto button{
+    width:25px;
+    height:25px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border:none;
+
+    background:transparent;
+
+    color:#8a909a;
+
+    cursor:pointer;
+}
+
+
+.nube-drawer-secreto svg{
+    width:14px;
+    height:14px;
+}
+
+
+.nube-drawer-acciones{
+    display:grid;
+
+    grid-template-columns:
+        repeat(2,minmax(0,1fr));
+
+    gap:7px;
+}
+
+
+.drawer-btn{
+    min-height:36px;
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius:7px;
+
+    background:#23242a;
+
+    color:#e4e6e9;
+
+    font-size:9px;
+    font-weight:750;
+
+    cursor:pointer;
+}
+
+
+.drawer-btn-verde{
+    background:#168f48;
+}
+
+.drawer-btn-amarillo{
+    background:#b98809;
+}
+
+.drawer-btn-rojo{
+    background:#c91a23;
+}
+
+.drawer-btn-azul{
+    background:#1d64d8;
+}
+
+.drawer-btn-morado{
+    background:#6d35ca;
+}
+
+
+.nube-drawer-papelera{
+    min-height:43px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    border:1px solid rgba(229,9,20,.65);
+    border-radius:9px;
+
+    background:transparent;
+
+    color:#ff4048;
+
+    font-size:11px;
+    font-weight:800;
+
+    cursor:pointer;
+}
+
+
+.nube-drawer-papelera svg{
+    width:15px;
+    height:15px;
+}
+
+/* ==========================================
+   RESPETAR CAMPOS OCULTOS
+   ========================================== */
+
+#grupoCantidadPerfiles[hidden],
+#grupoConfiguracionPin[hidden],
+#grupoValorPinOtro[hidden]{
+    display:none !important;
+}
+
+/* ==========================================
+   CUENTA MADRE + PERFILES DESPLEGABLES
+   ========================================== */
+
+.nube-cuenta-madre{
+    position:relative;
+}
+
+
+.nube-expandir-cuenta{
+    width:25px;
+    height:25px;
+
+    flex:0 0 25px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border:1px solid rgba(255,255,255,.07);
+    border-radius:7px;
+
+    background:#202126;
+
+    color:#949aa5;
+
+    cursor:pointer;
+
+    transition:
+        transform .16s ease,
+        background .16s ease,
+        color .16s ease;
+}
+
+
+.nube-expandir-cuenta:hover{
+    background:#292a30;
+    color:#fff;
+}
+
+
+.nube-expandir-cuenta svg{
+    width:14px;
+    height:14px;
+
+    transition:transform .2s ease;
+}
+
+
+.nube-expandir-cuenta.abierto svg{
+    transform:rotate(90deg);
+}
+
+
+.nube-expandir-espacio{
+    width:25px;
+    flex:0 0 25px;
+}
+
+
+.nube-plataforma-info{
+    min-width:0;
+
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+}
+
+
+.nube-plataforma-info small{
+    color:#717783;
+
+    font-size:8px;
+
+    white-space:nowrap;
+}
+
+
+/* ==========================================
+   FILAS DE PERFIL
+   ========================================== */
+
+.nube-perfil-row{
+    background:
+        linear-gradient(
+            90deg,
+            rgba(87,95,115,.07),
+            rgba(255,255,255,.01)
+        );
+}
+
+
+.nube-perfil-row td{
+    height:49px;
+
+    border-bottom:
+        1px solid rgba(255,255,255,.035);
+}
+
+
+.nube-perfil-row:hover{
+    background:
+        rgba(255,255,255,.028) !important;
+
+    box-shadow:
+        inset 3px 0 0
+        rgba(99,132,255,.55) !important;
+}
+
+
+.nube-perfil-identidad{
+    position:relative;
+
+    display:flex;
+    align-items:center;
+
+    padding-left:35px;
+
+    gap:9px;
+}
+
+
+.nube-perfil-linea{
+    position:absolute;
+
+    left:10px;
+
+    width:18px;
+    height:19px;
+
+    border-left:
+        1px solid rgba(255,255,255,.13);
+
+    border-bottom:
+        1px solid rgba(255,255,255,.13);
+
+    border-bottom-left-radius:7px;
+}
+
+
+.nube-perfil-icono{
+    width:27px;
+    height:27px;
+
+    flex:0 0 27px;
+
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    border-radius:8px;
+
+    background:
+        rgba(87,120,255,.1);
+
+    color:#7799ff;
+}
+
+
+.nube-perfil-icono svg{
+    width:13px;
+    height:13px;
+}
+
+
+.nube-perfil-identidad > div:last-child{
+    display:flex;
+    flex-direction:column;
+    gap:2px;
+}
+
+
+.nube-perfil-identidad strong{
+    color:#dde0e6;
+
+    font-size:10px;
+}
+
+
+.nube-perfil-identidad small{
+    color:#646b77;
+
+    font-size:8px;
+}
+
+
+.nube-perfil-herencia{
+    color:#686f7c;
+
+    font-size:9px;
+    font-style:italic;
+}
+
+
+/* MUY IMPORTANTE:
+   mantener ocultas las filas hasta desplegar */
+
+.nube-perfil-row[hidden]{
+    display:none !important;
+}
+
+/* ==========================================
+   PINES INDIVIDUALES DE PERFILES
+   ========================================== */
+
+#grupoPinesPerfiles[hidden]{
+    display:none !important;
+}
+
+
+.nube-pines-perfiles-box{
+    padding:16px;
+
+    border:
+        1px solid rgba(255,255,255,.07);
+
+    border-radius:14px;
+
+    background:
+        rgba(255,255,255,.025);
+}
+
+
+.nube-pines-perfiles-header{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+
+    margin-bottom:12px;
+}
+
+
+.nube-pines-perfiles-header span{
+    font-size:10px;
+    font-weight:700;
+    color:#f0f1f4;
+}
+
+
+.nube-pines-perfiles-header small{
+    font-size:9px;
+    color:#737987;
+}
+
+
+.nube-pines-perfiles-lista{
+    display:grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+
+    gap:10px;
+}
+
+
+.nube-pin-perfil-item{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+}
+
+
+.nube-pin-perfil-item span{
+    font-size:9px;
+    color:#9ca2ad;
+}
+
+
+.nube-pin-perfil-item input{
+    width:100%;
+
+    padding:10px 12px;
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius:10px;
+
+    background:#16171b;
+
+    color:#fff;
+
+    outline:none;
+}
+
+
+.nube-pin-perfil-item input:focus{
+    border-color:
+        rgba(255,255,255,.2);
+}
+
+
+@media (
+    max-width:700px
+){
+
+    .nube-pines-perfiles-lista{
+        grid-template-columns:1fr;
+    }
+
+}
+
+/* ==========================================
+   SELECTS PREMIUM — NUBE DE CUENTAS
+   ========================================== */
+
+.nube-form select{
+    width:100%;
+
+    padding:11px 40px 11px 13px;
+
+    border:
+        1px solid rgba(255,255,255,.09);
+
+    border-radius:10px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #17181d,
+            #111216
+        );
+
+    color:#f4f4f5;
+
+    font-size:11px;
+    font-weight:600;
+
+    outline:none;
+
+    cursor:pointer;
+
+    appearance:none;
+    -webkit-appearance:none;
+
+    transition:
+        border-color .18s ease,
+        background .18s ease,
+        box-shadow .18s ease;
+}
+
+
+/* flecha personalizada */
+
+.nube-form label:has(select){
+    position:relative;
+}
+
+
+.nube-form label:has(select)::after{
+    content:"";
+
+    position:absolute;
+
+    right:14px;
+    bottom:16px;
+
+    width:6px;
+    height:6px;
+
+    border-right:2px solid #777e89;
+    border-bottom:2px solid #777e89;
+
+    transform:rotate(45deg);
+
+    pointer-events:none;
+
+    transition:
+        border-color .18s ease,
+        transform .18s ease;
+}
+
+
+.nube-form label:has(select):focus-within::after{
+    border-color:#ffffff;
+}
+
+
+/* hover */
+
+.nube-form select:hover{
+    border-color:
+        rgba(255,255,255,.17);
+
+    background:
+        linear-gradient(
+            180deg,
+            #1c1d22,
+            #141519
+        );
+}
+
+
+/* focus */
+
+.nube-form select:focus{
+    border-color:
+        rgba(229,9,20,.7);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(229,9,20,.10);
+
+    background:#17181d;
+}
+
+
+/* opciones del desplegable */
+
+.nube-form select option{
+    background:#18191e;
+    color:#f5f5f5;
+}
+
+
+/* opción inicial */
+
+.nube-form select option[value=""]{
+    color:#777d87;
+}
+
+
+/* ==========================================
+   NUEVA CUENTA — CONTROLES PREMIUM
+   ========================================== */
+
+.nube-pin-config{
+    position:relative;
+
+    padding:18px;
+
+    border:
+        1px solid rgba(255,255,255,.075);
+
+    border-radius:16px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.035),
+            rgba(255,255,255,.012)
+        );
+
+    box-shadow:
+        inset 0 1px 0
+        rgba(255,255,255,.03);
+}
+
+
+/* encabezado del control PIN */
+
+.nube-pin-titulo{
+    display:flex;
+    align-items:center;
+    gap:9px;
+
+    margin-bottom:15px;
+}
+
+
+.nube-pin-titulo::before{
+    content:"";
+
+    width:30px;
+    height:30px;
+
+    flex:0 0 30px;
+
+    border-radius:9px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(229,9,20,.18),
+            rgba(229,9,20,.05)
+        );
+
+    border:
+        1px solid rgba(229,9,20,.25);
+
+    box-shadow:
+        0 0 18px
+        rgba(229,9,20,.08);
+}
+
+
+.nube-pin-titulo strong{
+    color:#f3f3f5;
+
+    font-size:12px;
+    font-weight:750;
+}
+
+
+.nube-pin-titulo span,
+.nube-pin-titulo small{
+    color:#777e89;
+
+    font-size:9px;
+}
+
+
+/* ==========================================
+   INPUTS Y SELECTS DEL MODAL
+   ========================================== */
+
+.nube-form input,
+.nube-form textarea,
+.nube-form select{
+    min-height:39px;
+
+    border:
+        1px solid rgba(255,255,255,.075);
+
+    border-radius:10px;
+
+    background:
+        linear-gradient(
+            180deg,
+            #15161a,
+            #111216
+        );
+
+    color:#f4f4f5;
+
+    transition:
+        border-color .18s ease,
+        background .18s ease,
+        box-shadow .18s ease,
+        transform .18s ease;
+}
+
+
+.nube-form input:hover,
+.nube-form textarea:hover,
+.nube-form select:hover{
+    border-color:
+        rgba(255,255,255,.14);
+
+    background:#17181d;
+}
+
+
+.nube-form input:focus,
+.nube-form textarea:focus,
+.nube-form select:focus{
+    border-color:
+        rgba(229,9,20,.65);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(229,9,20,.08);
+
+    background:#17181d;
+}
+
+
+/* etiquetas */
+
+.nube-form label > span{
+    display:block;
+
+    margin-bottom:7px;
+
+    color:#868d99;
+
+    font-size:9px;
+    font-weight:700;
+
+    letter-spacing:.04em;
+
+    text-transform:uppercase;
+}
+
+
+/* ==========================================
+   PREVIEW DURACIÓN DEL PIN
+   ========================================== */
+
+.nube-pin-preview{
+    display:grid;
+
+    grid-template-columns:
+        repeat(3, minmax(0,1fr));
+
+    gap:9px;
+
+    margin-top:14px;
+}
+
+
+.nube-pin-preview > div{
+    min-height:62px;
+
+    padding:11px 12px;
+
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    gap:4px;
+
+    border:
+        1px solid rgba(255,255,255,.055);
+
+    border-radius:11px;
+
+    background:
+        rgba(0,0,0,.18);
+}
+
+
+.nube-pin-preview span{
+    color:#6f7682;
+
+    font-size:8px;
+
+    text-transform:uppercase;
+
+    letter-spacing:.05em;
+}
+
+
+.nube-pin-preview strong{
+    color:#f3f3f5;
+
+    font-size:11px;
+    font-weight:700;
+}
+
+
+/* alerta */
+
+.nube-pin-preview > div:last-child{
+    border-color:
+        rgba(245,174,45,.11);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(245,174,45,.06),
+            rgba(0,0,0,.15)
+        );
+}
+
+
+.nube-pin-preview > div:last-child strong{
+    color:#e8b85d;
+}
+
+
+/* ==========================================
+   CANTIDAD DE PERFILES
+   ========================================== */
+
+#grupoCantidadPerfiles{
+    position:relative;
+}
+
+
+#grupoCantidadPerfiles input{
+    font-weight:700;
+}
+
+
+/* ==========================================
+   PINES POR PERFIL
+   ========================================== */
+
+.nube-pines-perfiles-box{
+    position:relative;
+
+    overflow:hidden;
+
+    padding:16px;
+
+    border:
+        1px solid rgba(255,255,255,.07);
+
+    border-radius:14px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.03),
+            rgba(255,255,255,.012)
+        );
+}
+
+
+.nube-pines-perfiles-box::before{
+    content:"";
+
+    position:absolute;
+
+    top:0;
+    left:18px;
+    right:18px;
+
+    height:1px;
+
+    background:
+        linear-gradient(
+            90deg,
+            transparent,
+            rgba(229,9,20,.45),
+            transparent
+        );
+}
+
+
+.nube-pines-perfiles-header{
+    margin-bottom:14px;
+}
+
+
+.nube-pines-perfiles-header span{
+    color:#f0f1f4;
+
+    font-size:10px;
+    font-weight:800;
+
+    letter-spacing:.04em;
+}
+
+
+.nube-pines-perfiles-header small{
+    display:block;
+
+    margin-top:4px;
+
+    color:#707783;
+
+    font-size:8px;
+}
+
+
+.nube-pin-perfil-item input{
+    font-weight:700;
+
+    letter-spacing:.08em;
+}
+
+
+/* ==========================================
+   MEJORAR FECHA
+   ========================================== */
+
+.nube-form input[type="date"]{
+    color-scheme:dark;
+}
+
+
+.nube-form input[type="date"]::-webkit-calendar-picker-indicator{
+    opacity:.7;
+
+    cursor:pointer;
+
+    filter:invert(1);
+}
+
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width:700px){
+
+    .nube-pin-preview{
+        grid-template-columns:1fr;
+    }
+
+}
+
+
+/* ==========================================
+   RENOVACIÓN RÁPIDA DE PERFIL
+   ========================================== */
+
+.nube-modal-footer{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+}
+
+
+.nube-renovacion-rapida{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+
+.nube-renovacion-rapida input{
+    width:90px;
+    min-height:37px;
+
+    padding:9px 10px;
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius:9px;
+
+    background:#15161a;
+
+    color:#fff;
+
+    outline:none;
+}
+
+
+.nube-renovacion-rapida input:focus{
+    border-color:
+        rgba(229,9,20,.65);
+
+    box-shadow:
+        0 0 0 3px
+        rgba(229,9,20,.08);
+}
+
+
+.nube-modal-renovar{
+    min-height:37px;
+
+    padding:9px 13px;
+
+    display:flex;
+    align-items:center;
+    gap:7px;
+
+    border:
+        1px solid rgba(245,174,45,.18);
+
+    border-radius:9px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(245,174,45,.12),
+            rgba(245,174,45,.04)
+        );
+
+    color:#e8b85d;
+
+    font-size:10px;
+    font-weight:700;
+
+    cursor:pointer;
+}
+
+
+.nube-modal-renovar:hover{
+    border-color:
+        rgba(245,174,45,.35);
+
+    background:
+        rgba(245,174,45,.15);
+}
+
+
+.nube-modal-renovar svg{
+    width:14px;
+    height:14px;
+}
+
+
+.nube-modal-footer-derecha{
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+
+@media (max-width:700px){
+
+    .nube-modal-footer{
+        flex-direction:column;
+        align-items:stretch;
+    }
+
+    .nube-renovacion-rapida,
+    .nube-modal-footer-derecha{
+        width:100%;
+    }
+
+    .nube-renovacion-rapida input{
+        flex:1;
+    }
+
+}
+
+
+/* ==========================================
+   MENSAJE PREMIUM — GESTIÓN DE PERFIL
+   ========================================== */
+
+.nube-perfil-mensaje[hidden]{
+    display:none !important;
+}
+
+
+.nube-perfil-mensaje{
+    margin-top:14px;
+    padding:11px 13px;
+
+    display:flex;
+    align-items:center;
+    gap:9px;
+
+    border:
+        1px solid rgba(52,211,153,.18);
+
+    border-radius:10px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(52,211,153,.10),
+            rgba(52,211,153,.03)
+        );
+
+    color:#9ee8cb;
+
+    font-size:10px;
+    font-weight:650;
+}
+
+
+.nube-perfil-mensaje svg{
+    width:15px;
+    height:15px;
+
+    flex:0 0 15px;
+}
+
+
+.nube-perfil-mensaje.error{
+    border-color:
+        rgba(239,68,68,.22);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(239,68,68,.11),
+            rgba(239,68,68,.03)
+        );
+
+    color:#ff9d9d;
+}
+
+/* ==========================================
+   MARCAR CAÍDA — PERFIL
+   ========================================== */
+
+.nube-caida-box{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.nube-modal-caida{
+    min-height:37px;
+
+    padding:9px 13px;
+
+    display:flex;
+    align-items:center;
+    gap:7px;
+
+    border:
+        1px solid rgba(239,68,68,.22);
+
+    border-radius:9px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(239,68,68,.12),
+            rgba(239,68,68,.04)
+        );
+
+    color:#ff8c8c;
+
+    font-size:10px;
+    font-weight:700;
+
+    cursor:pointer;
+}
+
+.nube-modal-caida:hover{
+    background:
+        rgba(239,68,68,.16);
+
+    border-color:
+        rgba(239,68,68,.35);
+}
+
+.nube-modal-caida svg{
+    width:14px;
+    height:14px;
+}
+
+.nube-caida-panel[hidden]{
+    display:none !important;
+}
+
+.nube-caida-panel{
+    padding:12px;
+
+    border:
+        1px solid rgba(239,68,68,.15);
+
+    border-radius:10px;
+
+    background:
+        rgba(239,68,68,.045);
+}
+
+.nube-caida-panel textarea{
+    width:100%;
+    min-height:60px;
+
+    margin-top:6px;
+    padding:10px;
+
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    border-radius:8px;
+
+    background:#15161a;
+
+    color:#fff;
+
+    resize:vertical;
+
+    outline:none;
+}
+
+.nube-caida-acciones{
+    margin-top:10px;
+
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+}
+
+.nube-caida-cancelar,
+.nube-caida-confirmar{
+    min-height:34px;
+
+    padding:8px 11px;
+
+    border-radius:8px;
+
+    font-size:9px;
+    font-weight:700;
+
+    cursor:pointer;
+}
+
+.nube-caida-cancelar{
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    background:#191a1f;
+
+    color:#b7bcc5;
+}
+
+.nube-caida-confirmar{
+    border:
+        1px solid rgba(239,68,68,.28);
+
+    background:
+        rgba(239,68,68,.16);
+
+    color:#ff9696;
+}
+
+/* ==========================================
+   REEMPLAZO DE PERFIL
+   ========================================== */
+
+#grupoReemplazoPerfil[hidden],
+#panelReemplazoPerfil[hidden]{
+    display:none !important;
+}
+
+
+.nube-reemplazo-box{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+
+.nube-modal-reemplazo{
+    min-height:37px;
+
+    padding:9px 13px;
+
+    display:flex;
+    align-items:center;
+    gap:7px;
+
+    border:
+        1px solid rgba(96,165,250,.20);
+
+    border-radius:9px;
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(59,130,246,.12),
+            rgba(59,130,246,.04)
+        );
+
+    color:#8fbbff;
+
+    font-size:10px;
+    font-weight:700;
+
+    cursor:pointer;
+}
+
+
+.nube-modal-reemplazo:hover{
+    border-color:
+        rgba(96,165,250,.38);
+
+    background:
+        rgba(59,130,246,.14);
+}
+
+
+.nube-modal-reemplazo svg{
+    width:14px;
+    height:14px;
+}
+
+
+.nube-reemplazo-panel{
+    padding:13px;
+
+    border:
+        1px solid rgba(96,165,250,.14);
+
+    border-radius:11px;
+
+    background:
+        rgba(59,130,246,.035);
+}
+
+
+.nube-reemplazo-header{
+    margin-bottom:10px;
+}
+
+
+.nube-reemplazo-header strong{
+    display:block;
+
+    color:#f2f4f7;
+
+    font-size:10px;
+}
+
+
+.nube-reemplazo-header span{
+    display:block;
+
+    margin-top:3px;
+
+    color:#707783;
+
+    font-size:8px;
+}
+
+
+.nube-reemplazo-lista{
+    max-height:240px;
+
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+
+    overflow-y:auto;
+}
+
+
+.nube-reemplazo-item{
+    width:100%;
+
+    padding:11px 12px;
+
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+
+    border:
+        1px solid rgba(255,255,255,.06);
+
+    border-radius:10px;
+
+    background:#15161a;
+
+    text-align:left;
+
+    cursor:pointer;
+
+    transition:
+        border-color .15s ease,
+        background .15s ease;
+}
+
+
+.nube-reemplazo-item:hover{
+    border-color:
+        rgba(96,165,250,.25);
+
+    background:#191b21;
+}
+
+
+.nube-reemplazo-item.seleccionado{
+    border-color:
+        rgba(96,165,250,.55);
+
+    background:
+        rgba(59,130,246,.10);
+
+    box-shadow:
+        0 0 0 2px
+        rgba(59,130,246,.06);
+}
+
+
+.nube-reemplazo-item-principal{
+    min-width:0;
+
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+}
+
+
+.nube-reemplazo-item-principal strong{
+    color:#f4f5f7;
+
+    font-size:10px;
+}
+
+
+.nube-reemplazo-item-principal span{
+    color:#777e89;
+
+    font-size:8px;
+}
+
+
+.nube-reemplazo-item-meta{
+    flex:0 0 auto;
+
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:3px;
+
+    color:#aab1bc;
+
+    font-size:8px;
+}
+
+
+.nube-reemplazo-acciones{
+    margin-top:11px;
+
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+}
+
+
+.nube-reemplazo-cancelar,
+.nube-reemplazo-confirmar{
+    min-height:34px;
+
+    padding:8px 11px;
+
+    border-radius:8px;
+
+    font-size:9px;
+    font-weight:700;
+
+    cursor:pointer;
+}
+
+
+.nube-reemplazo-cancelar{
+    border:
+        1px solid rgba(255,255,255,.08);
+
+    background:#191a1f;
+
+    color:#b9bec7;
+}
+
+
+.nube-reemplazo-confirmar{
+    border:
+        1px solid rgba(96,165,250,.28);
+
+    background:
+        rgba(59,130,246,.15);
+
+    color:#9bc3ff;
+}
+
+
+.nube-reemplazo-confirmar:disabled{
+    opacity:.35;
+    cursor:not-allowed;
+}
+
+
+.nube-reemplazo-vacio,
+.nube-reemplazo-cargando{
+    padding:18px;
+
+    text-align:center;
+
+    border:
+        1px dashed rgba(255,255,255,.07);
+
+    border-radius:9px;
+
+    color:#737a86;
+
+    font-size:9px;
+}

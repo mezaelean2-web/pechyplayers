@@ -1,0 +1,1984 @@
+{% extends "admin/base_admin.html" %}
+
+
+{% block title %}
+Nube de cuentas
+{% endblock %}
+
+
+{% block extra_css %}
+
+<link
+    rel="stylesheet"
+    href="{{ url_for(
+        'static',
+        filename='css/admin/nube_cuentas.css'
+    ) }}"
+>
+
+{% endblock %}
+
+
+{% block contenido %}
+
+<div class="nube-page">
+
+
+<div class="nube-page">
+
+    <header class="nube-hero">
+
+        <div class="nube-hero-texto">
+
+            <span class="nube-eyebrow">
+                INVENTARIO / NUBE DE CUENTAS
+            </span>
+
+            <h1>
+                Nube de cuentas
+            </h1>
+
+            <p>
+                Controla inventario, clientes,
+                vencimientos, garantías y reemplazos
+                desde un solo lugar.
+            </p>
+
+        </div>
+
+
+        <div class="nube-hero-acciones">
+
+            <button
+                type="button"
+                class="nube-btn nube-btn-secundario"
+            >
+                <i data-lucide="layers-3"></i>
+                Carga rápida
+            </button>
+
+            <button
+    type="button"
+    class="nube-btn nube-btn-principal"
+    id="abrirNuevaCuenta"
+>
+    
+                <i data-lucide="plus"></i>
+                Nueva cuenta
+            </button>
+
+        </div>
+
+    </header>
+
+
+    <section class="nube-resumen">
+
+        <article class="nube-stat nube-stat-total">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="layers-3"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Total servicios
+                </span>
+
+                <strong>
+                    {{ estadisticas.total }}
+                </strong>
+
+                <small>
+                    Todos los registros
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="nube-stat nube-stat-activa">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="shield-check"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Activas
+                </span>
+
+                <strong>
+                    {{ estadisticas.activas }}
+                </strong>
+
+                <small>
+                    Servicios vigentes
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="nube-stat nube-stat-vencer">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="clock-3"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Por vencer
+                </span>
+
+                <strong>
+                    {{ estadisticas.por_vencer }}
+                </strong>
+
+                <small>
+                    Próximos 3 días
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="nube-stat nube-stat-vencida">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="triangle-alert"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Vencidas
+                </span>
+
+                <strong>
+                    {{ estadisticas.vencidas }}
+                </strong>
+
+                <small>
+                    Requieren atención
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="nube-stat nube-stat-disponible">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="package-open"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Disponibles
+                </span>
+
+                <strong>
+                    {{ estadisticas.disponibles }}
+                </strong>
+
+                <small>
+                    Listas para asignar
+                </small>
+
+            </div>
+
+        </article>
+
+
+        <article class="nube-stat nube-stat-papelera">
+
+            <div class="nube-stat-icon">
+                <i data-lucide="trash-2"></i>
+            </div>
+
+            <div class="nube-stat-contenido">
+
+                <span class="nube-stat-label">
+                    Caídas / Papelera
+                </span>
+
+                <strong>
+                    {{ estadisticas.caidas_papelera }}
+                </strong>
+
+                <small>
+                    En revisión
+                </small>
+
+            </div>
+
+        </article>
+
+    </section>
+
+
+
+    <section class="nube-contenido">
+
+        <div class="nube-toolbar-premium">
+
+    <div class="nube-buscador">
+
+        <i data-lucide="search"></i>
+
+        <input
+            type="search"
+            id="nubeBuscar"
+            placeholder="Buscar cuentas, clientes, correo, teléfono, PIN..."
+            autocomplete="off"
+        >
+
+    </div>
+
+
+    <div class="nube-filtros">
+
+        <div class="nube-filtro-item">
+
+            <span>Plataforma</span>
+
+            <select id="nubeFiltroPlataforma">
+
+                <option value="">
+                    Todas
+                </option>
+
+                {% for plataforma in plataformas %}
+
+                    <option value="{{ plataforma }}">
+                        {{ plataforma }}
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <div class="nube-filtro-item">
+
+            <span>Tipo de cuenta</span>
+
+            <select id="nubeFiltroTipo">
+
+                <option value="">
+                    Todos
+                </option>
+
+                {% for tipo in tipos_cuenta %}
+
+                    <option value="{{ tipo }}">
+                        {{ tipo }}
+                    </option>
+
+                {% endfor %}
+
+            </select>
+
+        </div>
+
+
+        <button
+            type="button"
+            class="nube-filtro-avanzado"
+        >
+            <i data-lucide="sliders-horizontal"></i>
+            Filtros avanzados
+        </button>
+
+    </div>
+
+</div>
+
+
+        <div class="nube-tabla-card">
+
+    <div class="nube-tabla-wrapper">
+
+        <table class="nube-tabla">
+
+            <thead>
+
+                <tr>
+
+                    <th>Plataforma</th>
+                    <th>Correo</th>
+                    <th>Tipo</th>
+                    <th>Cliente</th>
+                    <th>Teléfono</th>
+                    <th>Entrega</th>
+                    <th>Días</th>
+                    <th>Restantes</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+
+                </tr>
+
+            </thead>
+
+
+            <tbody>
+
+                {% for cuenta in cuentas %}
+
+    <!-- ======================================
+         CUENTA MADRE
+         ====================================== -->
+
+    <tr class="nube-cuenta-madre">
+
+        <td>
+
+            <div class="nube-plataforma">
+
+                {% if cuenta.modalidad == "perfiles" %}
+
+                    <button
+                        type="button"
+                        class="nube-expandir-cuenta"
+                        data-cuenta-id="{{ cuenta.id }}"
+                        title="Mostrar perfiles"
+                    >
+                        <i data-lucide="chevron-right"></i>
+                    </button>
+
+                {% else %}
+
+                    <span class="nube-expandir-espacio"></span>
+
+                {% endif %}
+
+
+                <div class="nube-plataforma-icono">
+                    {{ cuenta.plataforma[:1] | upper }}
+                </div>
+
+
+                <div class="nube-plataforma-info">
+
+                    <span>
+                        {{ cuenta.plataforma }}
+                    </span>
+
+
+                    {% if cuenta.modalidad == "perfiles" %}
+
+                        <small>
+                            {{ cuenta.perfiles_totales }} perfiles ·
+                            {{ cuenta.perfiles_ocupados }} ocupados ·
+                            {{ cuenta.perfiles_disponibles }} disponibles
+                        </small>
+
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+        </td>
+
+
+        <td>
+            <span class="nube-correo">
+                {{ cuenta.correo }}
+            </span>
+        </td>
+
+
+        <td>
+
+            <span class="nube-tipo">
+
+                {% if cuenta.modalidad == "perfiles" %}
+                    Perfiles
+                {% elif cuenta.tipo_cuenta == "plan_estandar" %}
+                    Plan estándar
+                {% else %}
+                    Cuenta completa
+                {% endif %}
+
+            </span>
+
+        </td>
+
+
+        <td>
+
+            <span class="nube-cliente">
+
+                {% if cuenta.modalidad == "perfiles" %}
+                    Cuenta madre
+                {% else %}
+                    {{ cuenta.nombre_cliente or "Sin asignar" }}
+                {% endif %}
+
+            </span>
+
+        </td>
+
+
+        <td>
+
+            {% if cuenta.modalidad == "perfiles" %}
+                <span class="nube-telefono">—</span>
+            {% else %}
+                <span class="nube-telefono">
+                    {{ cuenta.telefono or "—" }}
+                </span>
+            {% endif %}
+
+        </td>
+
+
+        <td>
+
+            {% if cuenta.modalidad == "perfiles" %}
+                <span class="nube-fecha">—</span>
+            {% else %}
+                <span class="nube-fecha">
+                    {{ cuenta.fecha_entrega or "—" }}
+                </span>
+            {% endif %}
+
+        </td>
+
+
+        <td class="nube-numero">
+
+            {% if cuenta.modalidad == "perfiles" %}
+                —
+            {% else %}
+                {{ cuenta.dias_cuenta }}
+            {% endif %}
+
+        </td>
+
+
+        <td class="nube-numero">
+
+            {% if cuenta.modalidad == "perfiles" %}
+
+                —
+
+            {% else %}
+
+                <span
+                    class="
+                        nube-restantes
+                        {% if cuenta.dias_restantes <= 0 %}
+                            nube-restantes-vencido
+                        {% elif cuenta.dias_restantes <= 3 %}
+                            nube-restantes-alerta
+                        {% else %}
+                            nube-restantes-activo
+                        {% endif %}
+                    "
+                >
+                    {{ cuenta.dias_restantes }}
+                </span>
+
+            {% endif %}
+
+        </td>
+
+
+        <td>
+
+            <span
+                class="
+                    nube-estado
+                    nube-estado-{{ cuenta.estado_calculado }}
+                "
+            >
+
+                {% if cuenta.estado_calculado == "activa" %}
+                    Activa
+
+                {% elif cuenta.estado_calculado == "por_vencer" %}
+                    Por vencer
+
+                {% elif cuenta.estado_calculado == "vencida" %}
+                    Vencida
+
+                {% elif cuenta.estado_calculado == "disponible" %}
+                    Disponible
+
+                {% elif cuenta.estado_calculado == "caida" %}
+                    Caída
+
+                {% elif cuenta.estado_calculado == "garantia" %}
+                    Garantía
+
+                {% elif cuenta.estado_calculado == "reemplazada" %}
+                    Reemplazada
+
+                {% elif cuenta.estado_calculado == "papelera" %}
+                    Papelera
+
+                {% else %}
+                    {{ cuenta.estado_calculado }}
+                {% endif %}
+
+            </span>
+
+        </td>
+
+
+        <td>
+
+            <div class="nube-acciones-fila">
+
+                <button
+                    type="button"
+                    class="nube-accion nube-ver-cuenta"
+                    title="Ver información"
+
+                    data-id="{{ cuenta.id }}"
+                    data-plataforma="{{ cuenta.plataforma }}"
+                    data-correo="{{ cuenta.correo }}"
+                    data-contrasena="{{ cuenta.contrasena }}"
+                    data-pin="{{ cuenta.pin }}"
+                    data-tipo="{{ cuenta.tipo_cuenta }}"
+                    data-cliente="{{ cuenta.nombre_cliente }}"
+                    data-telefono="{{ cuenta.telefono }}"
+                    data-entrega="{{ cuenta.fecha_entrega }}"
+                    data-dias="{{ cuenta.dias_cuenta }}"
+                    data-restantes="{{ cuenta.dias_restantes }}"
+                    data-vencimiento="{{ cuenta.fecha_vencimiento }}"
+                    data-estado="{{ cuenta.estado_calculado }}"
+                    data-garantias="{{ cuenta.cantidad_garantias }}"
+                    data-notas="{{ cuenta.notas }}"
+                >
+                    <i data-lucide="eye"></i>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="nube-accion"
+                    title="Editar"
+                >
+                    <i data-lucide="pencil"></i>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="nube-accion nube-accion-whatsapp"
+                    title="WhatsApp"
+                >
+                    <i data-lucide="message-circle"></i>
+                </button>
+
+
+                <button
+                    type="button"
+                    class="nube-accion"
+                    title="Más acciones"
+                >
+                    <i data-lucide="ellipsis-vertical"></i>
+                </button>
+
+            </div>
+
+        </td>
+
+    </tr>
+
+
+    <!-- ======================================
+         PERFILES HIJOS
+         ====================================== -->
+
+    {% if cuenta.modalidad == "perfiles" %}
+
+        {% for perfil in cuenta.perfiles %}
+
+            <tr
+                class="nube-perfil-row"
+                data-parent-id="{{ cuenta.id }}"
+                hidden
+            >
+
+                <td>
+
+                    <div class="nube-perfil-identidad">
+
+                        <span class="nube-perfil-linea"></span>
+
+                        <div class="nube-perfil-icono">
+                            <i data-lucide="user"></i>
+                        </div>
+
+                        <div>
+
+                            <strong>
+                                {{ perfil.nombre_perfil }}
+                            </strong>
+
+                            <small>
+                                Espacio de {{ cuenta.plataforma }}
+                            </small>
+
+                        </div>
+
+                    </div>
+
+                </td>
+
+
+                <td>
+
+                    <span class="nube-perfil-herencia">
+                        Usa cuenta madre
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="nube-tipo">
+                        Perfil
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="nube-cliente">
+
+                        {{ perfil.nombre_cliente or "Sin asignar" }}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="nube-telefono">
+                        {{ perfil.telefono or "—" }}
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span class="nube-fecha">
+                        {{ perfil.fecha_entrega or "—" }}
+                    </span>
+
+                </td>
+
+
+                <td class="nube-numero">
+
+                    {{ perfil.dias_cuenta or 0 }}
+
+                </td>
+
+
+                <td class="nube-numero">
+
+                    <span
+                        class="
+                            nube-restantes
+
+                            {% if perfil.estado_calculado == "disponible" %}
+
+                            {% elif perfil.dias_restantes <= 0 %}
+                                nube-restantes-vencido
+
+                            {% elif perfil.dias_restantes <= 3 %}
+                                nube-restantes-alerta
+
+                            {% else %}
+                                nube-restantes-activo
+                            {% endif %}
+                        "
+                    >
+
+                        {% if perfil.estado_calculado == "disponible" %}
+                            —
+                        {% else %}
+                            {{ perfil.dias_restantes }}
+                        {% endif %}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <span
+                        class="
+                            nube-estado
+                            nube-estado-{{ perfil.estado_calculado }}
+                        "
+                    >
+
+                        {% if perfil.estado_calculado == "activa" %}
+                            Activa
+
+                        {% elif perfil.estado_calculado == "por_vencer" %}
+                            Por vencer
+
+                        {% elif perfil.estado_calculado == "vencida" %}
+                            Vencida
+
+                        {% elif perfil.estado_calculado == "disponible" %}
+                            Disponible
+
+                        {% elif perfil.estado_calculado == "caida" %}
+                            Caída
+
+                        {% elif perfil.estado_calculado == "garantia" %}
+                            Garantía
+
+                        {% elif perfil.estado_calculado == "reemplazada" %}
+                            Reemplazada
+
+                        {% elif perfil.estado_calculado == "papelera" %}
+                            Papelera
+
+                        {% else %}
+                            {{ perfil.estado_calculado }}
+                        {% endif %}
+
+                    </span>
+
+                </td>
+
+
+                <td>
+
+                    <div class="nube-acciones-fila">
+
+                        <button
+    type="button"
+    class="nube-accion nube-gestionar-perfil"
+    title="Gestionar perfil"
+
+    data-id="{{ perfil.id }}"
+    data-nombre="{{ perfil.nombre_perfil }}"
+    data-plataforma="{{ cuenta.plataforma }}"
+    data-pin="{{ perfil.pin }}"
+    data-cliente="{{ perfil.nombre_cliente }}"
+    data-telefono="{{ perfil.telefono }}"
+    data-entrega="{{ perfil.fecha_entrega }}"
+    data-dias="{{ perfil.dias_cuenta }}"
+    data-vencimiento="{{ perfil.fecha_vencimiento }}"
+    data-restantes="{{ perfil.dias_restantes }}"
+    data-estado="{{ perfil.estado_calculado }}"
+    data-notas="{{ perfil.notas }}"
+>
+    <i data-lucide="user-round-cog"></i>
+</button>
+
+                    </div>
+
+                </td>
+
+            </tr>
+
+        {% endfor %}
+
+    {% endif %}
+
+{% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+
+    <div class="nube-tabla-footer">
+
+        <span>
+            Mostrando
+            <strong>{{ cuentas | length }}</strong>
+            servicios
+        </span>
+
+    </div>
+
+</div>
+
+    </section>
+
+</div>
+
+<div
+    class="nube-modal"
+    id="modalNuevaCuenta"
+    aria-hidden="true"
+>
+
+    <div
+        class="nube-modal-backdrop"
+        id="cerrarNuevaCuentaBackdrop"
+    ></div>
+
+
+    <div class="nube-modal-panel">
+
+        <div class="nube-modal-header">
+
+            <div>
+
+                <span>
+                    INVENTARIO
+                </span>
+
+                <h2>
+                    Nueva cuenta
+                </h2>
+
+                <p>
+                    Agrega una cuenta al inventario
+                    de la Nube.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="nube-modal-cerrar"
+                id="cerrarNuevaCuenta"
+            >
+                <i data-lucide="x"></i>
+            </button>
+
+        </div>
+
+
+        <form
+            action="/admin/nube-cuentas/nueva"
+            method="POST"
+            class="nube-form"
+            id="formNuevaCuenta"
+        >
+
+            <div class="nube-form-grid">
+
+                <label>
+
+                    <span>
+                        Plataforma *
+                    </span>
+
+                    <input
+                        type="text"
+                        name="plataforma"
+                        placeholder="Netflix"
+                        required
+                    >
+
+                </label>
+
+
+                <label>
+
+    <span>
+        Tipo de cuenta *
+    </span>
+
+    <select
+        name="tipo_cuenta"
+        id="nubeTipoCuenta"
+        required
+    >
+
+        <option value="">
+            Seleccionar...
+        </option>
+
+        <option value="cuenta_completa">
+            Cuenta completa
+        </option>
+
+        <option value="perfil">
+            Perfil
+        </option>
+
+        <option value="plan_estandar">
+            Plan estándar
+        </option>
+
+    </select>
+
+</label>
+
+<label
+    id="grupoCantidadPerfiles"
+    class="nube-campo-condicional"
+    hidden>
+
+
+
+    <div
+    id="grupoPinesPerfiles"
+    class="nube-form-full"
+    hidden
+>
+
+    <div class="nube-pines-perfiles-box">
+
+        <div class="nube-pines-perfiles-header">
+            <span>PIN DE LOS PERFILES</span>
+            <small>
+                Define el PIN inicial de cada perfil
+            </small>
+        </div>
+
+        <div
+            id="listaPinesPerfiles"
+            class="nube-pines-perfiles-lista"
+        ></div>
+
+    </div>
+
+</div>
+
+
+    <span>
+        Perfiles que vas a manejar *
+    </span>
+
+    <input
+        type="number"
+        name="cantidad_perfiles"
+        id="cantidadPerfiles"
+        min="1"
+        max="10"
+        placeholder="Ej: 5"
+    >
+
+    <small class="nube-ayuda">
+        Escoge manualmente entre 1 y 10.
+    </small>
+
+</label>
+
+
+<label>
+
+    <span>
+        Control de pago
+    </span>
+
+    <select
+        name="tipo_pago"
+        id="nubeTipoPago"
+    >
+
+        <option value="">
+            Sin control especial
+        </option>
+
+        <option value="autopagable">
+            Autopagable
+        </option>
+
+        <option value="pin">
+            PIN
+        </option>
+
+    </select>
+
+</label>
+
+<div
+    class="nube-form-full nube-pin-config"
+    id="grupoConfiguracionPin"
+    hidden
+>
+
+    <div class="nube-pin-titulo">
+
+        <div>
+            <strong>
+                Control del PIN
+            </strong>
+
+            <span>
+                Calcularemos automáticamente
+                cuánto tiempo cubre el saldo.
+            </span>
+        </div>
+
+        <i data-lucide="credit-card"></i>
+
+    </div>
+
+
+    <div class="nube-pin-grid">
+
+        <label>
+
+            <span>
+                Valor del PIN *
+            </span>
+
+            <select
+                id="nubeValorPinSelector"
+            >
+
+                <option value="">
+                    Seleccionar...
+                </option>
+
+                <option value="20000">
+                    $20.000
+                </option>
+
+                <option value="40000">
+                    $40.000
+                </option>
+
+                <option value="otro">
+                    Otro valor
+                </option>
+
+            </select>
+
+        </label>
+
+
+        <label
+            id="grupoValorPinOtro"
+            hidden
+        >
+
+            <span>
+                Otro valor *
+            </span>
+
+            <input
+    type="text"
+    id="nubeValorPinOtro"
+    inputmode="numeric"
+    autocomplete="off"
+    placeholder="Ej: 30.000"
+>
+
+        </label>
+
+
+        <input
+            type="hidden"
+            name="valor_pin"
+            id="nubeValorPin"
+            value="0"
+        >
+
+
+        <label>
+
+            <span>
+                Plan de la cuenta *
+            </span>
+
+            <select
+                name="plan_pago"
+                id="nubePlanPago"
+            >
+
+                <option value="">
+                    Seleccionar...
+                </option>
+
+                <option value="Premium">
+                    Premium
+                </option>
+
+                <option value="Estándar">
+                    Estándar
+                </option>
+
+                <option value="Básico / Otro">
+                    Básico / Otro
+                </option>
+
+            </select>
+
+        </label>
+
+
+        <label>
+
+            <span>
+                Precio mensual del plan *
+            </span>
+
+            <input
+    type="text"
+    name="precio_plan_referencia"
+    id="nubePrecioPlan"
+    inputmode="numeric"
+    autocomplete="off"
+    placeholder="Ej: 40.000"
+>
+
+        </label>
+
+
+        <label>
+
+            <span>
+                Fecha de aplicación del PIN *
+            </span>
+
+            <input
+                type="date"
+                name="fecha_aplicacion_pin"
+                id="nubeFechaAplicacionPin"
+            >
+
+        </label>
+
+    </div>
+
+
+    <div class="nube-pin-preview">
+
+        <div>
+
+            <span>
+                Duración estimada
+            </span>
+
+            <strong id="previewDiasPin">
+                —
+            </strong>
+
+        </div>
+
+
+        <div>
+
+            <span>
+                Próxima actualización
+            </span>
+
+            <strong id="previewFechaPin">
+                —
+            </strong>
+
+        </div>
+
+
+        <div>
+
+            <span>
+                Alerta
+            </span>
+
+            <strong>
+                1 día antes
+            </strong>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+                <label class="nube-form-full">
+
+                    <span>
+                        Correo *
+                    </span>
+
+                    <input
+                        type="text"
+                        name="correo"
+                        placeholder="correo@ejemplo.com"
+                        required
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Contraseña
+                    </span>
+
+                    <input
+                        type="text"
+                        name="contrasena"
+                        autocomplete="off"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        PIN
+                    </span>
+
+                    <input
+                        type="text"
+                        name="pin"
+                        autocomplete="off"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Cliente
+                    </span>
+
+                    <input
+                        type="text"
+                        name="nombre_cliente"
+                        placeholder="Nombre del cliente"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Teléfono
+                    </span>
+
+                    <input
+                        type="text"
+                        name="telefono"
+                        placeholder="+57..."
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Fecha de entrega
+                    </span>
+
+                    <input
+                        type="date"
+                        name="fecha_entrega"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Días de la cuenta
+                    </span>
+
+                    <input
+                        type="number"
+                        name="dias_cuenta"
+                        min="0"
+                        placeholder="30"
+                    >
+
+                </label>
+
+
+                <label class="nube-form-full">
+
+                    <span>
+                        Notas
+                    </span>
+
+                    <textarea
+                        name="notas"
+                        rows="3"
+                        placeholder="Información adicional..."
+                    ></textarea>
+
+                </label>
+
+            </div>
+
+
+            <div class="nube-modal-footer">
+
+                <button
+                    type="button"
+                    class="nube-modal-cancelar"
+                    id="cancelarNuevaCuenta"
+                >
+                    Cancelar
+                </button>
+
+
+                <button
+                    type="submit"
+                    class="nube-modal-guardar"
+                >
+                    <i data-lucide="cloud-upload"></i>
+                    Guardar cuenta
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+<div
+    class="nube-drawer"
+    id="nubeDrawer"
+    aria-hidden="true"
+>
+
+    <div
+        class="nube-drawer-backdrop"
+        id="nubeDrawerBackdrop"
+    ></div>
+
+    <aside class="nube-drawer-panel">
+
+        <div class="nube-drawer-header">
+
+            <div class="nube-drawer-identidad">
+
+                <div
+                    class="nube-drawer-logo"
+                    id="drawerLogo"
+                >
+                    N
+                </div>
+
+                <div>
+
+                    <div class="nube-drawer-titulo-linea">
+
+                        <h2 id="drawerTitulo">
+                            Cuenta
+                        </h2>
+
+                        <span
+                            class="nube-estado"
+                            id="drawerEstado"
+                        >
+                            Activa
+                        </span>
+
+                    </div>
+
+                    <small id="drawerId">
+                        ID
+                    </small>
+
+                </div>
+
+            </div>
+
+            <button
+                type="button"
+                class="nube-modal-cerrar"
+                id="cerrarDrawer"
+            >
+                <i data-lucide="x"></i>
+            </button>
+
+        </div>
+
+
+        <div class="nube-drawer-tabs">
+
+            <button
+                type="button"
+                class="activo"
+            >
+                Información
+            </button>
+
+            <button type="button">
+                Historial
+            </button>
+
+            <button type="button">
+                Garantías
+            </button>
+
+            <button type="button">
+                Notas
+            </button>
+
+        </div>
+
+
+        <div class="nube-drawer-contenido">
+
+            <section class="nube-drawer-card">
+
+                <h3>
+                    Datos de la cuenta
+                </h3>
+
+                <div class="nube-drawer-dato">
+                    <span>Correo</span>
+                    <strong id="drawerCorreo">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Contraseña</span>
+
+                    <div class="nube-drawer-secreto">
+
+                        <strong id="drawerContrasena">
+                            ••••••••
+                        </strong>
+
+                        <button
+                            type="button"
+                            id="toggleDrawerPassword"
+                        >
+                            <i data-lucide="eye"></i>
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>PIN</span>
+                    <strong id="drawerPin">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Tipo</span>
+                    <strong id="drawerTipo">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Plataforma</span>
+                    <strong id="drawerPlataforma">—</strong>
+                </div>
+
+            </section>
+
+
+            <section class="nube-drawer-card">
+
+                <h3>
+                    Datos del cliente
+                </h3>
+
+                <div class="nube-drawer-dato">
+                    <span>Nombre</span>
+                    <strong id="drawerCliente">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Teléfono</span>
+                    <strong id="drawerTelefono">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Fecha de entrega</span>
+                    <strong id="drawerEntrega">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Duración contratada</span>
+                    <strong id="drawerDias">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Fecha de vencimiento</span>
+                    <strong id="drawerVencimiento">—</strong>
+                </div>
+
+                <div class="nube-drawer-dato">
+                    <span>Días restantes</span>
+                    <strong
+                        id="drawerRestantes"
+                        class="nube-drawer-restantes"
+                    >
+                        —
+                    </strong>
+                </div>
+
+            </section>
+
+
+            <section class="nube-drawer-card">
+
+                <h3>
+                    Acciones rápidas
+                </h3>
+
+                <div class="nube-drawer-acciones">
+
+                    <button
+                        type="button"
+                        class="drawer-btn drawer-btn-verde"
+                    >
+                        Renovar / Extender
+                    </button>
+
+                    <button
+                        type="button"
+                        class="drawer-btn drawer-btn-amarillo"
+                    >
+                        Reemplazar cuenta
+                    </button>
+
+                    <button
+                        type="button"
+                        class="drawer-btn drawer-btn-rojo"
+                    >
+                        Marcar caída
+                    </button>
+
+                    <button
+                        type="button"
+                        class="drawer-btn drawer-btn-azul"
+                    >
+                        Copiar datos
+                    </button>
+
+                    <button
+                        type="button"
+                        class="drawer-btn drawer-btn-morado"
+                    >
+                        WhatsApp
+                    </button>
+
+                    <button
+                        type="button"
+                        class="drawer-btn"
+                    >
+                        Editar cuenta
+                    </button>
+
+                </div>
+
+            </section>
+
+
+            <button
+                type="button"
+                class="nube-drawer-papelera"
+            >
+                <i data-lucide="trash-2"></i>
+                Mover a papelera
+            </button>
+
+        </div>
+
+    </aside>
+
+</div>
+
+<div
+    class="nube-modal"
+    id="modalGestionarPerfil"
+    aria-hidden="true"
+>
+
+    <div
+        class="nube-modal-backdrop"
+        id="cerrarPerfilBackdrop"
+    ></div>
+
+
+    <div class="nube-modal-panel">
+
+        <div class="nube-modal-header">
+
+            <div>
+
+                <span>
+                    PERFIL / ESPACIO
+                </span>
+
+                <h2 id="tituloGestionPerfil">
+                    Gestionar perfil
+                </h2>
+
+                <p id="subtituloGestionPerfil">
+                    Asigna o actualiza los datos del cliente.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                class="nube-modal-cerrar"
+                id="cerrarGestionPerfil"
+            >
+                <i data-lucide="x"></i>
+            </button>
+
+        </div>
+
+
+        <form
+            action="/admin/nube-cuentas/perfil/guardar"
+            method="POST"
+            class="nube-form"
+            id="formGestionPerfil"
+        >
+
+            <input
+                type="hidden"
+                name="perfil_id"
+                id="perfilGestionId"
+            >
+
+
+            <div class="nube-form-grid">
+
+                <label>
+
+                    <span>
+                        Cliente
+                    </span>
+
+                    <input
+    type="text"
+    name="nombre_cliente"
+    id="perfilGestionCliente"
+    placeholder="Nombre del cliente"
+    required
+>
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Teléfono
+                    </span>
+
+                    <input
+                        type="text"
+                        name="telefono"
+                        id="perfilGestionTelefono"
+                        placeholder="+57..."
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        PIN del perfil
+                    </span>
+
+                    <input
+                        type="text"
+                        name="pin"
+                        id="perfilGestionPin"
+                        autocomplete="off"
+                    >
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Fecha de entrega
+                    </span>
+
+                    <input
+    type="date"
+    name="fecha_entrega"
+    id="perfilGestionEntrega"
+    required
+>
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Días de servicio
+                    </span>
+
+                    <input
+    type="number"
+    name="dias_cuenta"
+    id="perfilGestionDias"
+    min="1"
+    placeholder="30"
+    required
+>
+
+                </label>
+
+
+                <label>
+
+                    <span>
+                        Vencimiento actual
+                    </span>
+
+                    <input
+                        type="text"
+                        id="perfilGestionVencimiento"
+                        disabled
+                    >
+
+                </label>
+
+
+                <label class="nube-form-full">
+
+                    <span>
+                        Notas
+                    </span>
+
+                    <textarea
+                        name="notas"
+                        id="perfilGestionNotas"
+                        rows="3"
+                        placeholder="Información adicional..."
+                    ></textarea>
+
+                </label>
+
+            </div>
+
+
+<div
+    id="mensajeGestionPerfil"
+    class="nube-perfil-mensaje"
+    hidden
+>
+    <i data-lucide="circle-check"></i>
+
+    <span id="mensajeGestionPerfilTexto">
+        Perfil actualizado correctamente.
+    </span>
+</div>
+
+<div class="nube-caida-box">
+
+    <button
+        type="button"
+        class="nube-modal-caida"
+        id="abrirCaidaPerfil"
+    >
+        <i data-lucide="triangle-alert"></i>
+        Marcar caída
+    </button>
+
+
+    <div
+        id="panelCaidaPerfil"
+        class="nube-caida-panel"
+        hidden
+    >
+
+        <label>
+            <span>Motivo de la caída</span>
+
+            <textarea
+                id="motivoCaidaPerfil"
+                rows="2"
+                placeholder="Ej: dejó de funcionar, contraseña cambiada..."
+            ></textarea>
+        </label>
+
+
+        <div class="nube-caida-acciones">
+
+            <button
+                type="button"
+                class="nube-caida-cancelar"
+                id="cancelarCaidaPerfil"
+            >
+                Cancelar
+            </button>
+
+            <button
+                type="button"
+                class="nube-caida-confirmar"
+                id="confirmarCaidaPerfil"
+            >
+                Confirmar caída
+            </button>
+
+        </div>
+
+    </div>
+
+
+<div
+    id="grupoReemplazoPerfil"
+    class="nube-reemplazo-box"
+    hidden
+>
+
+    <button
+        type="button"
+        class="nube-modal-reemplazo"
+        id="abrirReemplazoPerfil"
+    >
+        <i data-lucide="repeat-2"></i>
+        Reemplazar perfil
+    </button>
+
+
+    <div
+        id="panelReemplazoPerfil"
+        class="nube-reemplazo-panel"
+        hidden
+    >
+
+        <div class="nube-reemplazo-header">
+
+            <div>
+                <strong>
+                    Perfiles disponibles
+                </strong>
+
+                <span>
+                    Selecciona el perfil que recibirá el cliente.
+                </span>
+            </div>
+
+        </div>
+
+
+        <div
+            id="listaReemplazosPerfil"
+            class="nube-reemplazo-lista"
+        >
+        </div>
+
+
+        <div class="nube-reemplazo-acciones">
+
+            <button
+                type="button"
+                class="nube-reemplazo-cancelar"
+                id="cancelarReemplazoPerfil"
+            >
+                Cancelar
+            </button>
+
+            <button
+                type="button"
+                class="nube-reemplazo-confirmar"
+                id="confirmarReemplazoPerfil"
+                disabled
+            >
+                Confirmar reemplazo
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+
+</div>
+
+            <div class="nube-modal-footer">
+
+    <div class="nube-renovacion-rapida">
+
+        <input
+            type="number"
+            id="diasRenovacionPerfil"
+            min="1"
+            placeholder="30 días"
+        >
+
+        <button
+            type="button"
+            class="nube-modal-renovar"
+            id="renovarPerfil"
+        >
+            <i data-lucide="refresh-cw"></i>
+            Renovar
+        </button>
+
+    </div>
+
+
+    <div class="nube-modal-footer-derecha">
+
+        <button
+            type="button"
+            class="nube-modal-cancelar"
+            id="cancelarGestionPerfil"
+        >
+            Cancelar
+        </button>
+
+
+        <button
+            type="submit"
+            class="nube-modal-guardar"
+        >
+            <i data-lucide="save"></i>
+            Guardar perfil
+        </button>
+
+    </div>
+
+</div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+
+<script
+    src="{{ url_for(
+        'static',
+        filename='js/admin/nube_cuentas.js'
+    ) }}"
+></script>
+
+{% endblock %}

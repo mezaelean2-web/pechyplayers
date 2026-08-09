@@ -2,19 +2,660 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Pechy Players</title>
+  <title>
+  {{ config.get("titulo_navegador", "PECHY PLAYERS") }}
+</title>
+  <meta
+  name="description"
+  content="{{ config.get(
+    'descripcion_negocio',
+    'Entretenimiento, streaming y servicios digitales en un solo lugar.'
+  ) }}">
+
+<meta name="keywords" content="Netflix, Disney+, Max, Prime Video, Paramount+, Spotify, IPTV, cuentas streaming, perfiles streaming, PECHY PLAYERS">
+
+<meta
+  name="author"
+  content="{{ config.get('nombre_negocio', 'PECHY PLAYERS') }}">
+
+<meta name="robots" content="index, follow">
+
+<meta
+  property="og:title"
+  content="{{ config.get('nombre_negocio', 'PECHY PLAYERS') }}">
+
+<meta
+  property="og:description"
+  content="{{ config.get(
+    'descripcion_negocio',
+    'Entretenimiento, streaming y servicios digitales en un solo lugar.'
+  ) }}">
+
+<meta property="og:type" content="website">
+
+<meta property="og:image" content="{{ url_for('static', filename='img/logo.jpg', _external=True) }}">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="preload"
+      href="{{ url_for('static', filename='img/logo.jpg') }}"
+      as="image">
+
+<link rel="preload"
+      href="{{ url_for('static', filename='img/platforms/netflix.jpg') }}"
+      as="image">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/recordatorios.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/pc-v2.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=11">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/recordatorios.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/pc-v2.css') }}">
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cartelera-lobby.css') }}?v=999">
+
+<style>
+
+  :root{
+
+    --pechy-principal:
+      {{ config.get(
+        "color_principal",
+        "#e50914"
+      ) }};
+
+    --pechy-secundario:
+      {{ config.get(
+        "color_secundario",
+        "#18191d"
+      ) }};
+
+    --pechy-acento:
+      {{ config.get(
+        "color_acento",
+        "#d4af37"
+      ) }};
+
+    --pechy-intensidad:
+      {{ config.get(
+        "intensidad_fondo",
+        "100"
+      ) }};
+
+  }
+
+
+  /* ========================================
+     COLOR PRINCIPAL
+  ======================================== */
+
+  .hero-pc-catalogo,
+  .hero-pc-whatsapp,
+  .mobile-featured-btn,
+  .promo-destacada-pc-info a,
+  .buy,
+  .modal-producto-comprar,
+  .cartelera-modal-ver-ahora{
+
+    background:
+      linear-gradient(
+        135deg,
+        var(--pechy-principal),
+        color-mix(
+          in srgb,
+          var(--pechy-principal) 65%,
+          #000
+        )
+      ) !important;
+
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-principal) 55%,
+        transparent
+      ) !important;
+
+    box-shadow:
+      0 12px 28px
+      color-mix(
+        in srgb,
+        var(--pechy-principal) 24%,
+        transparent
+      ) !important;
+
+  }
+
+
+  .hero-pc-texto h1 span,
+  .mobile-featured-tag,
+  .promo-destacada-pc-info small,
+  .cartelera-header small,
+  .top-section small,
+  .modal-producto-etiqueta{
+
+    color:
+      var(--pechy-principal) !important;
+
+  }
+
+
+  /* ========================================
+     COLOR DE ACENTO PREMIUM
+  ======================================== */
+
+  .badge-oferta,
+  .badge-destacado,
+  .hero-pc-badge,
+  .modal-oferta-inteligente small,
+  .configuracion-acento-global{
+
+    color:
+      var(--pechy-acento) !important;
+
+  }
+
+
+  .brand span,
+  footer h3{
+
+    color:
+      var(--pechy-acento);
+
+  }
+
+
+  /* ========================================
+     COLOR SECUNDARIO
+  ======================================== */
+
+  .card,
+  .plan,
+  .info,
+  footer,
+  .producto-modal-contenido,
+  .categorias-modal-contenido,
+  .cartelera-modal-contenido{
+
+    background-color:
+      var(--pechy-secundario);
+
+  }
+
+
+  /* ========================================
+     FONDO E INTENSIDAD
+  ======================================== */
+
+  body{
+
+    background:
+      color-mix(
+        in srgb,
+        var(--pechy-secundario)
+        calc(var(--pechy-intensidad) * 1%),
+        #25262b
+      );
+
+  }
+
+
+  .hero-pc-v2{
+
+    background:
+      radial-gradient(
+        circle at 78% 20%,
+        color-mix(
+          in srgb,
+          var(--pechy-principal) 20%,
+          transparent
+        ),
+        transparent 42%
+      ),
+      linear-gradient(
+        145deg,
+        color-mix(
+          in srgb,
+          var(--pechy-secundario)
+          calc(var(--pechy-intensidad) * 1%),
+          #292a30
+        ),
+        #08090b
+      );
+
+  }
+
+
+  /* ========================================
+     ENLACES Y DETALLES
+  ======================================== */
+
+  .nav .wa,
+  .float-wa{
+
+    background:
+      var(--pechy-principal) !important;
+
+    box-shadow:
+      0 10px 28px
+      color-mix(
+        in srgb,
+        var(--pechy-principal) 28%,
+        transparent
+      ) !important;
+
+  }
+
+
+  .promo-card:hover,
+  .card:hover{
+
+    border-color:
+      color-mix(
+        in srgb,
+        var(--pechy-principal) 45%,
+        transparent
+      ) !important;
+
+  }
+
+
+
+  /* ========================================
+     CORRECCIÓN DE COLORES ESPECIALES
+  ======================================== */
+
+
+  /* WHATSAPP SIEMPRE CONSERVA SU VERDE */
+
+  .nav .wa,
+  .links .wa,
+  .float-wa,
+  .mobile-featured-btn,
+  .promo-destacada-pc-info a,
+  .promo-card-info span,
+  .promo-slide-footer button{
+
+    background:
+      #25d366 !important;
+
+    color:
+      #04110a !important;
+
+    border-color:
+      #25d366 !important;
+
+    box-shadow:
+      0 10px 28px
+      rgba(37,211,102,.30) !important;
+
+  }
+
+
+  /* BOTÓN VER PLANES EN CATÁLOGO MÓVIL */
+
+  @media (max-width:768px){
+
+    #productosGrid .card .buy,
+    .categoria-home .producto-item .buy{
+
+      background:
+        linear-gradient(
+          135deg,
+          var(
+            --color-plataforma,
+            var(--pechy-principal)
+          ),
+          color-mix(
+            in srgb,
+            var(
+              --color-plataforma,
+              var(--pechy-principal)
+            ) 70%,
+            white
+          )
+        ) !important;
+
+      color:
+        white !important;
+
+      border-color:
+        var(
+          --color-plataforma,
+          var(--pechy-principal)
+        ) !important;
+
+      box-shadow:
+        0 0 26px
+        color-mix(
+          in srgb,
+          var(
+            --color-plataforma,
+            var(--pechy-principal)
+          ) 42%,
+          transparent
+        ) !important;
+
+    }
+
+  }
+
+
+  /* BOTÓN VER PLANES EN CATÁLOGO PC */
+
+  @media (min-width:769px){
+
+    #productosGrid .card .buy{
+
+      background:
+        linear-gradient(
+          135deg,
+          var(
+            --catalogo-color,
+            var(--pechy-principal)
+          ),
+          color-mix(
+            in srgb,
+            var(
+              --catalogo-color,
+              var(--pechy-principal)
+            ) 70%,
+            white
+          )
+        ) !important;
+
+      color:
+        white !important;
+
+      border-color:
+        var(
+          --catalogo-color,
+          var(--pechy-principal)
+        ) !important;
+
+      box-shadow:
+        0 12px 28px
+        color-mix(
+          in srgb,
+          var(
+            --catalogo-color,
+            var(--pechy-principal)
+          ) 24%,
+          transparent
+        ) !important;
+
+    }
+
+  }
+
+
+  /* BOTÓN DEL MODAL CONSERVA EL COLOR DEL PRODUCTO */
+
+  .modal-producto-comprar{
+
+    background:
+      linear-gradient(
+        135deg,
+        var(
+          --modal-color,
+          var(--pechy-principal)
+        ),
+        color-mix(
+          in srgb,
+          var(
+            --modal-color,
+            var(--pechy-principal)
+          ) 72%,
+          white
+        )
+      ) !important;
+
+    color:
+      white !important;
+
+    box-shadow:
+      0 0 28px
+      color-mix(
+        in srgb,
+        var(
+          --modal-color,
+          var(--pechy-principal)
+        ) 45%,
+        transparent
+      ) !important;
+
+  }
+
+
+  /* LOS AGOTADOS SIGUEN GRISES */
+
+  .buy-agotado{
+
+    background:
+      linear-gradient(
+        135deg,
+        #4b5563,
+        #2d3748
+      ) !important;
+
+    color:
+      white !important;
+
+    border-color:
+      transparent !important;
+
+    box-shadow:
+      none !important;
+
+  }
+
+  /* ========================================
+     HERO PC — COLOR SEGÚN LA TARJETA ACTIVA
+  ======================================== */
+
+  @media (min-width:769px){
+
+    /* Texto grande: Netflix, Disney, Max o Prime */
+
+    .hero-pc-texto h1 span{
+
+      color:
+        var(
+          --hero-color,
+          var(--pechy-principal)
+        ) !important;
+
+      text-shadow:
+        0 0 28px
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 38%,
+          transparent
+        ) !important;
+
+      transition:
+        color .4s ease,
+        text-shadow .4s ease;
+
+    }
+
+
+    /* Botón Explorar catálogo */
+
+    .hero-pc-catalogo{
+
+      background:
+        linear-gradient(
+          135deg,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ),
+          color-mix(
+            in srgb,
+            var(
+              --hero-color,
+              var(--pechy-principal)
+            ) 68%,
+            white
+          )
+        ) !important;
+
+      border-color:
+        var(
+          --hero-color,
+          var(--pechy-principal)
+        ) !important;
+
+      color:
+        white !important;
+
+      box-shadow:
+        0 14px 30px
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 28%,
+          transparent
+        ) !important;
+
+      transition:
+        background .4s ease,
+        border-color .4s ease,
+        box-shadow .4s ease,
+        transform .2s ease;
+
+    }
+
+
+    /* Botón Comprar por WhatsApp dentro del hero */
+
+    .hero-pc-whatsapp{
+
+      background:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 14%,
+          rgba(255,255,255,.04)
+        ) !important;
+
+      border-color:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 58%,
+          transparent
+        ) !important;
+
+      color:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 70%,
+          white
+        ) !important;
+
+      box-shadow:
+        0 0 22px
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 20%,
+          transparent
+        ) !important;
+
+      transition:
+        background .4s ease,
+        border-color .4s ease,
+        color .4s ease,
+        box-shadow .4s ease,
+        transform .2s ease;
+
+    }
+
+
+    .hero-pc-whatsapp:hover{
+
+      background:
+        var(
+          --hero-color,
+          var(--pechy-principal)
+        ) !important;
+
+      color:
+        white !important;
+
+    }
+
+
+    /* Insignia Compra segura y protegida */
+
+    .hero-pc-badge{
+
+      background:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 16%,
+          transparent
+        ) !important;
+
+      border-color:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 70%,
+          white
+        ) !important;
+
+      color:
+        color-mix(
+          in srgb,
+          var(
+            --hero-color,
+            var(--pechy-principal)
+          ) 68%,
+          white
+        ) !important;
+
+      transition:
+        background .4s ease,
+        border-color .4s ease,
+        color .4s ease;
+
+    }
+
+  }
+  
+  
+</style>
+
 </head>
 <body>
 
 <div id="splashMobile">
   <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Pechy Players">
-  <h1>PECHY <span>PLAYERS</span></h1>
+  <h1>
+  {{ config.get("nombre_negocio", "PECHY PLAYERS") }}
+</h1>
   <div class="splash-loader"></div>
 </div>
 
@@ -71,16 +712,27 @@
 <nav class="nav">
   <div class="brand">
     <img src="{{ url_for('static', filename='img/logo.jpg') }}">
-    <span>PECHY PLAYERS</span>
+    <span>
+  {{ config.get("nombre_negocio", "PECHY PLAYERS") }}
+</span>
   </div>
 
   <div class="links">
     <a href="#">Inicio</a>
     <a href="#catalogo">Catálogo</a>
     <a href="#pagos">Pagos</a>
-    <a target="_blank" class="wa" href="https://wa.me/573147735950">WhatsApp</a>
+    <a
+    target="_blank"
+    class="wa"
+    href="https://wa.me/{{ config.get('whatsapp', '573147735950') }}">
+
+    WhatsApp
+
+</a>
   </div>
 </nav>
+
+{% if config.get("inicio_hero_activo", "1") == "1" %}
 
 <section class="hero-pc-v2">
 
@@ -92,32 +744,62 @@
     <div class="hero-pc-texto">
 
       <span class="hero-pc-badge">
-        🛡️ COMPRA SEGURA Y PROTEGIDA
-      </span>
+    {{ config.get(
+        "inicio_badge",
+        "🛡️ COMPRA SEGURA Y PROTEGIDA"
+    ) }}
+</span>
 
-      <h1>
-        EL MEJOR
-        <span>ENTRETENIMIENTO</span>
-        EN TUS MANOS
-      </h1>
+<h1>
+
+    {{ config.get(
+        "inicio_titulo_superior",
+        "EL MEJOR"
+    ) }}
+
+    <span>
+        {{ config.get(
+            "inicio_titulo_destacado",
+            "ENTRETENIMIENTO"
+        ) }}
+    </span>
+
+    {{ config.get(
+        "inicio_titulo_inferior",
+        "EN TUS MANOS"
+    ) }}
+
+</h1>
 
       <p>
-        Plataformas premium al mejor precio, entrega inmediata,
-        cuentas seguras y soporte rápido.
-      </p>
+  {{ config.get(
+      "mensaje_comercial",
+      "Plataformas premium al mejor precio, entrega inmediata y soporte rápido."
+  ) }}
+</p>
 
       <div class="hero-pc-botones">
 
         <a href="#catalogo" class="hero-pc-catalogo">
-          Explorar catálogo →
-        </a>
+
+    {{ config.get(
+        "inicio_boton_catalogo",
+        "Explorar catálogo →"
+    ) }}
+
+</a>
 
         <a
-          href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20las%20plataformas"
-          target="_blank"
-          class="hero-pc-whatsapp">
-          💬 Comprar por WhatsApp
-        </a>
+    href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20las%20plataformas"
+    target="_blank"
+    class="hero-pc-whatsapp">
+
+    {{ config.get(
+        "inicio_boton_whatsapp",
+        "💬 Comprar por WhatsApp"
+    ) }}
+
+</a>
 
       </div>
 
@@ -168,7 +850,12 @@
   <div class="hero-beneficio-item">
     <span>⚡</span>
     <div>
-      <strong>ENTREGA INMEDIATA</strong>
+      <strong>
+  {{ config.get(
+      "texto_entrega",
+      "Entrega inmediata"
+  )|upper }}
+</strong>
       <small>Al instante por WhatsApp</small>
     </div>
   </div>
@@ -200,6 +887,8 @@
 </div>
 
 </section>    
+
+{% endif %}
 
 {% if promociones %}
 <section class="promo-destacada-pc">
@@ -303,8 +992,208 @@
 </section>
 {% endif %}
 
+
+{% if peliculas %}
+
+<section class="cartelera-home">
+
+    <div class="cartelera-header">
+
+    <small>SELECCIÓN PREMIUM</small>
+
+<h2>¿Qué vemos hoy?</h2>
+
+    <div class="cartelera-categorias">
+
+    <div class="cartelera-categorias-scroll">
+
+        <button class="categoria-btn activa" data-categoria="acción">Acción</button>
+
+        <button class="categoria-btn" data-categoria="drama">Drama</button>
+
+        <button class="categoria-btn" data-categoria="comedia">Comedia</button>
+
+        <button class="categoria-btn" data-categoria="terror">Terror</button>
+
+        <button class="categoria-btn" data-categoria="ciencia ficción">Ciencia ficción</button>
+
+        <button class="categoria-btn" data-categoria="infantil">Infantil</button>
+
+       <button class="categoria-btn" data-categoria="romance">Romance</button>
+
+       <button class="categoria-btn" data-categoria="documentales">Documentales</button>
+
+       <button class="categoria-btn" data-categoria="series">Series</button>
+
+       <button class="categoria-btn" data-categoria="anime">Anime</button>
+
+    </div>
+
+</div>
+
+</div>
+
+    <div
+        class="cartelera-lista"
+        id="carteleraLista"
+        data-loop="true"
+    >
+
+        {% for pelicula in peliculas %}
+
+        <article
+    class="cartelera-card"
+    data-id="{{ pelicula.id }}"
+    data-categoria="{{ pelicula.categoria|lower }}"
+>
+
+            <div class="cartelera-poster">
+
+                <img
+                    src="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }}"
+                    alt="{{ pelicula.titulo }}"
+                    loading="lazy"
+                >
+
+                <div class="cartelera-poster-sombra"></div>
+
+                <div class="cartelera-badges">
+
+                    {% if pelicula.tendencia == 1 %}
+
+                    <span class="cartelera-badge tendencia">
+                        🔥 Tendencia
+                    </span>
+
+                    {% endif %}
+
+                    {% if pelicula.destacado == 1 %}
+
+                    <span class="cartelera-badge destacado">
+                        ⭐ Destacada
+                    </span>
+
+                    {% endif %}
+
+                </div>
+
+                <button
+    type="button"
+    class="cartelera-ver"
+
+    data-titulo="{{ pelicula.titulo }}"
+    data-descripcion="{{ pelicula.descripcion }}"
+    data-anio="{{ pelicula.anio }}"
+    data-genero="{{ pelicula.genero }}"
+    data-categoria="{{ pelicula.categoria }}"
+    data-poster="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }}"
+    
+    {% if pelicula.banner %}
+data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.banner) }}"
+{% else %}
+data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }}"
+{% endif %}
+
+    data-url="{{ pelicula.url }}"
+
+    data-plataformas="{{ pelicula.plataformas }}"
+
+    data-tendencia="{{ pelicula.tendencia }}"
+    data-destacado="{{ pelicula.destacado }}"
+
+>
+    ▶ Vista previa
+</button>
+
+            </div>
+
+            <div class="cartelera-info">
+
+                <span class="cartelera-tipo">
+                    {{ pelicula.tipo }}
+                </span>
+
+                <h3>{{ pelicula.titulo }}</h3>
+
+                <div class="cartelera-detalles">
+
+                    {% if pelicula.anio %}
+                    <span>{{ pelicula.anio }}</span>
+                    {% endif %}
+
+                    {% if pelicula.genero %}
+                    <span>{{ pelicula.genero }}</span>
+                    {% endif %}
+
+                </div>
+
+                {% if pelicula.plataformas %}
+
+                <div class="cartelera-plataformas">
+
+                    {% for plataforma in pelicula.plataformas.split(',') %}
+
+                    <span class="cartelera-plataforma">
+                        {{ plataforma }}
+                    </span>
+
+                    {% endfor %}
+
+                </div>
+
+                {% endif %}
+
+            </div>
+
+        </article>
+
+        {% endfor %}
+
+    </div>
+
+    <div class="cartelera-contador">
+
+        <strong id="carteleraActual">1</strong>
+
+        <span>/</span>
+
+        <span id="carteleraTotal">
+            {{ peliculas|length }}
+        </span>
+
+    </div>
+
+    <div
+        class="cartelera-puntos"
+        id="carteleraPuntos"
+    >
+
+        {% for pelicula in peliculas %}
+
+        <span class="cartelera-punto {% if loop.first %}activo{% endif %}">
+        </span>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
+{% endif %}
+
 <section class="benefits">
-  <div>⚡ <strong>Entrega inmediata</strong><span>Al instante por WhatsApp</span></div>
+  <div>
+  ⚡
+  <strong>
+    {{ config.get(
+        "texto_entrega",
+        "Entrega inmediata"
+    ) }}
+  </strong>
+  <span>
+    Al instante por WhatsApp
+  </span>
+</div>
   <div>🛡️ <strong>Cuentas seguras</strong><span>Privadas y estables</span></div>
   <div>🎧 <strong>Soporte 24/7</strong><span>Siempre estamos contigo</span></div>
   <div>🔥 <strong>Precios bajos</strong><span>Los mejores del mercado</span></div>
@@ -330,7 +1219,7 @@
   {% for producto in productos %}
   <article class="card producto-item" data-nombre="{{ producto.nombre | lower }}">
 
-{% if producto.destacado == 1 %}
+{% if producto.estado != "agotado" and producto.destacado == 1 %}
   <div class="badge-destacado">⭐ MÁS VENDIDO</div>
 {% endif %}
 
@@ -341,12 +1230,24 @@
   {% endif %}
 {% endfor %}
 
-{% if oferta.activa %}
+{% if producto.estado != "agotado" and oferta.activa %}
   <div class="badge-oferta">🔥 OFERTA</div>
 {% endif %}
 
+{% if producto.estado == "agotado" %}
+  <div class="agotado-ribbon">
+      <span>AGOTADO</span>
+  </div>
+{% endif %}
+
     <div class="cover">
-      <img class="cover-img" src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}">
+      <img
+  class="cover-img"
+  src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+  loading="lazy"
+  decoding="async"
+  alt="{{ producto.nombre }}"
+>
       <div class="cover-overlay">
         <h3>{{ producto.nombre }}</h3>
       </div>
@@ -357,36 +1258,74 @@
       <div class="plan">
         <span>{{ plan.plan }}</span>
         {% if plan.oferta_activa == 1 and plan.oferta_precio %}
-  <strong style="text-decoration: line-through; color:#777;">${{ plan.precio }}</strong>
-  <strong style="color:#ffd900;">${{ plan.oferta_precio }} 🔥</strong>
+  <strong style="text-decoration: line-through; color:#777;"><span
+  class="precio-configurable"
+  data-precio="{{ plan.precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
+</span></strong>
+  <strong style="color:#ffd900;"><span
+  class="precio-configurable"
+  data-precio="{{ plan.oferta_precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
+</span> 🔥</strong>
 {% else %}
   {% if plan.oferta_activa == 1 and plan.oferta_precio %}
   <div>
     <strong style="text-decoration: line-through; color:#777; display:block;">
-      ${{ plan.precio }}
+      <span
+  class="precio-configurable"
+  data-precio="{{ plan.precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
+</span>
     </strong>
     <strong style="color:#ffd900; display:block;">
-      ${{ plan.oferta_precio }} 🔥
+      <span
+  class="precio-configurable"
+  data-precio="{{ plan.oferta_precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
+</span> 🔥
     </strong>
   </div>
 {% else %}
-  <strong>${{ plan.precio }}</strong>
+  <strong><span
+  class="precio-configurable"
+  data-precio="{{ plan.precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
+</span></strong>
 {% endif %}
 {% endif %}
       </div>
       {% endfor %}
     </div>
 
-    <a class="buy" target="_blank"
-       href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20comprar%20{{ producto.nombre }}">
-      ✨ Ver planes
-    </a>
+    {% if producto.estado == "agotado" %}
+
+  <a
+    class="buy buy-agotado"
+    target="_blank"
+    href="https://wa.me/{{ config.whatsapp }}?text=Hola%20Pechy,%20avísame%20cuando%20vuelva%20a%20estar%20disponible%20{{ producto.nombre }}">
+    🔔 Avisarme cuando esté disponible
+  </a>
+
+{% else %}
+
+  <a
+    class="buy"
+    target="_blank"
+    href="https://wa.me/{{ config.whatsapp }}?text=Hola%20vengo%20desde%20la%20página%20de%20Pechy%20Players%20y%20quiero%20comprar%20{{ producto.nombre }}">
+    ✨ Ver planes
+  </a>
+
+{% endif %}
 
   </article>
   {% endfor %}
 </div>
-
-</section>
 
 <div class="catalogo-contador" id="catalogoContador">
   <strong id="catalogoActual">1</strong>
@@ -400,12 +1339,210 @@
   {% endfor %}
 </div>
 
+</section>
+
+{% for nombre_categoria, productos in categorias.items() %}
+
+<section class="categoria-home categoria-{{ nombre_categoria|lower|replace(' ','-') }}">
+
+    <div class="top-section categoria-encabezado">
+
+        <div class="categoria-info">
+
+            <small>CATEGORÍA</small>
+
+            <h2>{{ nombre_categoria|upper }}</h2>
+
+            <p>
+                Explora todos los productos disponibles
+                en esta categoría.
+            </p>
+
+        </div>
+
+        <button
+            class="categoria-ver-todo"
+            type="button"
+            data-categoria="{{ nombre_categoria }}">
+
+            Ver todo →
+
+        </button>
+
+    </div>
+
+
+    <div
+        class="grid categoria-grid categoria-slider"
+        id="slider-{{ loop.index }}">
+
+        {% for producto in productos %}
+
+        <article
+            class="card producto-item"
+            data-nombre="{{ producto.nombre|lower }}">
+
+            {% if producto.estado != "agotado" and producto.destacado == 1 %}
+<div class="badge-destacado">
+    ⭐ MÁS VENDIDO
+</div>
+{% endif %}
+
+            {% set oferta = namespace(activa=false) %}
+
+            {% for plan in producto.planes %}
+                {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+                    {% set oferta.activa = true %}
+                {% endif %}
+            {% endfor %}
+
+            {% if producto.estado != "agotado" and oferta.activa %}
+<div class="badge-oferta">
+    🔥 OFERTA
+</div>
+{% endif %}
+
+            {% if producto.estado == "agotado" %}
+<div class="agotado-ribbon">
+    <span>AGOTADO</span>
+</div>
+{% endif %}
+
+            <div class="cover">
+
+                <img
+                    class="cover-img"
+                    src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}"
+                    loading="lazy"
+                    decoding="async"
+                    alt="{{ producto.nombre }}">
+
+                <div class="cover-overlay">
+
+                    <h3>{{ producto.nombre }}</h3>
+
+                </div>
+
+            </div>
+
+            <div class="plans">
+
+                {% for plan in producto.planes %}
+
+                <div class="plan">
+
+                    <span>{{ plan.plan }}</span>
+
+                    {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+
+                        <div>
+
+                            <strong style="text-decoration:line-through;color:#777;display:block;">
+                                <span
+  class="precio-configurable"
+  data-precio="{{ plan.precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
+</span>
+                            </strong>
+
+                            <strong style="color:#ffd900;display:block;">
+                                <span
+  class="precio-configurable"
+  data-precio="{{ plan.oferta_precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
+</span> 🔥
+                            </strong>
+
+                        </div>
+
+                    {% else %}
+
+                        <strong><span
+  class="precio-configurable"
+  data-precio="{{ plan.precio }}"
+>
+  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
+</span></strong>
+
+                    {% endif %}
+
+                </div>
+
+                {% endfor %}
+
+            </div>
+
+            {% if producto.estado == "agotado" %}
+
+  <a
+    class="buy buy-agotado"
+    target="_blank"
+    href="https://wa.me/{{ config.whatsapp }}?text=Hola%20Pechy,%20avísame%20cuando%20vuelva%20a%20estar%20disponible%20{{ producto.nombre }}">
+    🔔 Avisarme cuando esté disponible
+  </a>
+
+{% else %}
+
+  <a
+    class="buy"
+    target="_blank"
+    href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20comprar%20{{ producto.nombre }}">
+    ✨ Ver planes
+  </a>
+
+{% endif %}
+
+        </article>
+
+        {% endfor %}
+
+    </div>
+
+    <div class="catalogo-contador">
+
+        <strong id="contador-{{ loop.index }}">
+            1
+        </strong>
+
+        <span>/</span>
+
+        <span>
+            {{ productos|length }}
+        </span>
+
+    </div>
+
+    <div
+        class="catalogo-puntos"
+        id="puntos-{{ loop.index }}">
+
+        {% for producto in productos %}
+
+            <span class="catalogo-punto {% if loop.first %}activo{% endif %}"></span>
+
+        {% endfor %}
+
+    </div>
+
+</section>
+
+{% endfor %}
+
 <section class="info">
   <div>
     <h3>¿Por qué comprar con nosotros?</h3>
     <div class="info-grid">
       <p>🚀 Entrega rápida</p>
-      <p>✅ Garantía</p>
+      <p>
+  ✅ Garantía de
+  {{ config.get(
+      "dias_garantia",
+      "30"
+  ) }}
+  días
+</p>
       <p>🎧 Soporte</p>
       <p>👥 Clientes satisfechos</p>
     </div>
@@ -423,12 +1560,34 @@
 </section>
 
 <footer>
-  <img src="{{ url_for('static', filename='img/logo.jpg') }}">
+
+  <img
+    src="{{ url_for('static', filename='img/logo.jpg') }}"
+    alt="{{ config.get('nombre_negocio', 'PECHY PLAYERS') }}">
+
   <div>
-    <h3>PECHY PLAYERS</h3>
-    <p>Tu tienda premium de entretenimiento digital.</p>
+
+    <h3>
+      {{ config.get("nombre_negocio", "PECHY PLAYERS") }}
+    </h3>
+
+    <p>
+      {{ config.get(
+        "texto_footer",
+        "PECHY PLAYERS - Todos los derechos reservados."
+      ) }}
+    </p>
+
   </div>
-  <a target="_blank" href="https://wa.me/573147735950">314 773 5950</a>
+
+  <a
+    target="_blank"
+    href="https://wa.me/{{ config.get('whatsapp', '573147735950') }}">
+
+    +{{ config.get("whatsapp", "573147735950") }}
+
+  </a>
+
 </footer>
 
 <div id="productoModal" class="producto-modal">
@@ -446,7 +1605,12 @@
 
     <div class="modal-topbar">
   <div>
-    <small>DISPONIBLE AHORA</small>
+    <small>
+  {{ config.get(
+      "texto_disponibilidad",
+      "Disponible"
+  )|upper }}
+</small>
     <strong id="modalProductoTopNombre"></strong>
   </div>
 
@@ -481,7 +1645,13 @@
 </div>
 
       <div class="modal-beneficios">
-  <div>⚡ Entrega inmediata</div>
+  <div>
+  ⚡
+  {{ config.get(
+      "texto_entrega",
+      "Entrega inmediata"
+  ) }}
+</div>
   <div>🛡️ Cuenta segura y estable</div>
   <div>🎧 Soporte rápido</div>
 </div>
@@ -494,7 +1664,14 @@
     <div>✓ Acceso inmediato</div>
     <div>✓ Instrucciones paso a paso</div>
     <div>✓ Soporte por WhatsApp</div>
-    <div>✓ Garantía durante tu servicio</div>
+    <div>
+  ✓ Garantía de
+  {{ config.get(
+      "dias_garantia",
+      "30"
+  ) }}
+  días
+</div>
   </div>
 </section>
 
@@ -509,7 +1686,8 @@
   </div>
 
   <p>
-    Atención directa por WhatsApp, soporte y garantía durante tu servicio.
+    Atención directa por WhatsApp, soporte y garantía de
+{{ config.get("dias_garantia", "30") }} días.
   </p>
 </section>
 
@@ -567,7 +1745,121 @@
 
 </div>
 
-<a class="float-wa" target="_blank" href="https://wa.me/573147735950">💬</a>
+<div
+  id="categoriasModal"
+  class="categorias-modal"
+>
+
+  <div
+    id="categoriasModalFondo"
+    class="categorias-modal-fondo">
+  </div>
+
+  <div class="categorias-modal-contenido">
+
+    <div class="categorias-modal-header">
+
+      <div>
+        <small>CATÁLOGO COMPLETO</small>
+        <h2 id="categoriasModalTitulo">
+          Productos
+        </h2>
+      </div>
+
+      <button
+        id="cerrarCategoriasModal"
+        type="button">
+        ✕
+      </button>
+
+    </div>
+
+    <div
+      id="categoriasModalGrid"
+      class="categorias-modal-grid">
+    </div>
+
+  </div>
+
+</div>
+
+<!-- ===========================
+     MODAL CARTELERA
+============================ -->
+
+<div
+    id="carteleraModal"
+    class="cartelera-modal">
+
+    <div
+        id="carteleraModalFondo"
+        class="cartelera-modal-fondo">
+    </div>
+
+    <div
+        class="cartelera-modal-contenido">
+
+        <button
+            id="cerrarCarteleraModal"
+            class="cerrar-cartelera-modal"
+            type="button">
+
+            ✕
+
+        </button>
+
+        <img
+            id="carteleraModalBanner"
+            class="cartelera-modal-banner"
+            src=""
+            alt="">
+
+        <div class="cartelera-modal-info">
+
+            <small>
+                PECHY PLAYERS
+            </small>
+
+            <h2 id="carteleraModalTitulo">
+            </h2>
+
+            <div
+                id="carteleraModalDetalles">
+            </div>
+
+            <p
+                id="carteleraModalDescripcion">
+            </p>
+
+            <div
+                id="carteleraModalPlataformas">
+            </div>
+
+            <div id="carteleraModalBadges"></div>
+
+            <a
+    id="carteleraModalVerAhora"
+    class="cartelera-modal-ver-ahora"
+    href="#"
+    target="_blank"
+>
+    🎬 Ver ahora
+</a>
+
+        </div>
+
+    </div>
+
+</div>
+
+<a
+    class="float-wa"
+    target="_blank"
+    href="https://wa.me/{{ config.get('whatsapp', '573147735950') }}">
+
+    💬
+
+</a>
 
 <div id="pechyToast" class="pechy-toast">
 
@@ -588,13 +1880,113 @@
 
 </div>
 
-<script src="{{ url_for('static', filename='js/script.js') }}"></script>
-<script src="{{ url_for('static', filename='js/recordatorios.js') }}"></script>
-<script src="{{ url_for('static', filename='js/toast.js') }}"></script>
-<script src="{{ url_for('static', filename='js/splash.js') }}"></script>
-<script src="{{ url_for('static', filename='js/mobile.js') }}"></script>
-<script src="{{ url_for('static', filename='js/mobile-carousel.js') }}"></script>
-<script src="{{ url_for('static', filename='js/modal.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pc-v2.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/script.js') }}?v=3"></script>
+<script defer src="{{ url_for('static', filename='js/recordatorios.js') }}?v=2"></script>
+<script defer src="{{ url_for('static', filename='js/toast.js') }}?v=2"></script>
+
+<script defer src="{{ url_for('static', filename='js/splash.js') }}?v=2"></script>
+<script defer src="{{ url_for('static', filename='js/mobile.js') }}?v=9"></script>
+
+<script defer src="{{ url_for('static', filename='js/mobile-carousel.js') }}?v=2"></script>
+<script defer src="{{ url_for('static', filename='js/categorias.js') }}?v=3"></script>
+<script defer src="{{ url_for('static', filename='js/modal.js') }}?v=2"></script>
+<script defer src="{{ url_for('static', filename='js/pc-v2.js') }}?v=2"></script>
+<script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
+
+<script>
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const simboloMoneda =
+  {{ config.get("moneda_simbolo", "$") | tojson }};
+
+const separadorMiles =
+  {{ config.get("separador_miles", ".") | tojson }};
+
+
+    function formatearPrecioComercial(valor){
+
+      const textoOriginal =
+        String(valor ?? "").trim();
+
+
+      /*
+        Se eliminan separadores anteriores,
+        símbolos y espacios.
+
+        Ejemplos:
+        20.000 → 20000
+        20,000 → 20000
+        $20000  → 20000
+      */
+
+      const soloNumeros =
+        textoOriginal.replace(/\D/g, "");
+
+
+      if (!soloNumeros) {
+        return `${simboloMoneda}${textoOriginal}`;
+      }
+
+
+      const numero =
+        Number(soloNumeros);
+
+
+      if (!Number.isFinite(numero)) {
+        return `${simboloMoneda}${textoOriginal}`;
+      }
+
+
+      const partes = [];
+
+      let numerosRestantes =
+        String(Math.trunc(numero));
+
+
+      while (numerosRestantes.length > 3) {
+
+        partes.unshift(
+          numerosRestantes.slice(-3)
+        );
+
+        numerosRestantes =
+          numerosRestantes.slice(0, -3);
+
+      }
+
+
+      partes.unshift(numerosRestantes);
+
+
+      const precioFormateado =
+        partes.join(separadorMiles);
+
+
+      return `${simboloMoneda}${precioFormateado}`;
+
+    }
+
+
+    document
+      .querySelectorAll(".precio-configurable")
+      .forEach(elemento => {
+
+        elemento.textContent =
+          formatearPrecioComercial(
+            elemento.dataset.precio
+          );
+
+      });
+
+  }
+  
+);
+
+</script>
+
 </body>
 </html>

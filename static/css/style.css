@@ -1148,3 +1148,303 @@ transform:scale(1.05);
     box-shadow:0 0 14px rgba(255,45,45,.55);
   }
 }
+/*=====================================
+        PRODUCTO AGOTADO
+======================================*/
+
+.card:has(.agotado-ribbon) .cover-img{
+    filter:
+        brightness(.18)
+        grayscale(.85)
+        contrast(.85);
+    transform:scale(1.03);
+}
+.card:has(.agotado-ribbon) .cover::after{
+    content:"";
+    position:absolute;
+    inset:0;
+    background:rgba(0,0,0,.38);
+    z-index:3;
+    pointer-events:none;
+}
+
+.card:has(.agotado-ribbon) .cover-overlay{
+    z-index:4;
+}
+
+.card:has(.agotado-ribbon) .cover-overlay h3{
+    color:rgba(255,255,255,.78);
+    text-shadow:none;
+}
+
+.buy-agotado{
+    background:linear-gradient(135deg,#4b5563,#2d3748)!important;
+    color:white!important;
+    box-shadow:none!important;
+}
+
+.buy-agotado:hover{
+    background:linear-gradient(135deg,#6b7280,#374151)!important;
+    transform:translateY(-2px);
+}
+.card:has(.agotado-ribbon){
+    border:1px solid rgba(140,140,140,.35);
+    box-shadow:none;
+    opacity:.88;
+    transition:.35s;
+}
+
+.card:has(.agotado-ribbon):hover{
+    transform:translateY(-4px);
+    border-color:rgba(180,180,180,.45);
+    box-shadow:0 0 18px rgba(255,255,255,.08);
+}
+
+.card:has(.agotado-ribbon) .plans{
+    opacity:.75;
+}
+
+.card:has(.agotado-ribbon) .plan strong{
+    color:#bdbdbd;
+}
+
+.card:has(.agotado-ribbon) .plan span{
+    color:#b0b0b0;
+}
+/*=====================================
+      RIBBON AGOTADO PREMIUM
+======================================*/
+
+.agotado-ribbon{
+    position:absolute;
+    top:28px;
+    left:-55px;
+    width:220px;
+    padding:10px 0;
+
+    background:linear-gradient(
+        135deg,
+        #7a0000,
+        #ff1e1e,
+        #7a0000
+    );
+
+    transform:rotate(-35deg);
+
+    z-index:20;
+
+    text-align:center;
+
+    box-shadow:
+        0 12px 30px rgba(255,0,0,.45);
+
+    border-top:1px solid rgba(255,255,255,.18);
+    border-bottom:1px solid rgba(255,255,255,.18);
+}
+
+.agotado-ribbon span{
+
+    color:white;
+
+    font-size:16px;
+
+    font-weight:900;
+
+    letter-spacing:3px;
+
+    text-transform:uppercase;
+
+    text-shadow:
+        0 2px 8px rgba(0,0,0,.7);
+}
+
+
+
+
+/* ==========================================
+   APARIENCIA GLOBAL CONFIGURABLE
+   CONECTADA DESDE EL PANEL ADMIN
+========================================== */
+
+/* COLOR PRINCIPAL DE MARCA */
+
+.hero h1 span,
+.top-section small,
+.promociones-titulo small,
+.info h3{
+    color:var(--pechy-principal);
+}
+
+.main-btn,
+.buy{
+    background:
+        linear-gradient(
+            135deg,
+            var(--pechy-principal),
+            color-mix(
+                in srgb,
+                var(--pechy-principal) 72%,
+                white
+            )
+        );
+
+    box-shadow:
+        0 0 28px
+        color-mix(
+            in srgb,
+            var(--pechy-principal) 42%,
+            transparent
+        );
+}
+
+#buscador:focus{
+    border-color:var(--pechy-principal);
+
+    box-shadow:
+        0 0 18px
+        color-mix(
+            in srgb,
+            var(--pechy-principal) 25%,
+            transparent
+        );
+}
+
+.card:hover{
+    border-color:var(--pechy-principal);
+
+    box-shadow:
+        0 0 35px
+        color-mix(
+            in srgb,
+            var(--pechy-principal) 30%,
+            transparent
+        );
+}
+
+.cover{
+    background:
+        linear-gradient(
+            180deg,
+            transparent,
+            rgba(0,0,0,.90)
+        ),
+        radial-gradient(
+            circle at top,
+            color-mix(
+                in srgb,
+                var(--pechy-principal) 38%,
+                transparent
+            ),
+            transparent 55%
+        ),
+        #101010;
+}
+
+.plan strong{
+    color:var(--pechy-principal);
+}
+
+.promociones-home{
+    background:
+        radial-gradient(
+            circle at top left,
+            color-mix(
+                in srgb,
+                var(--pechy-principal) 13%,
+                transparent
+            ),
+            transparent 35%
+        ),
+        color-mix(
+            in srgb,
+            var(--pechy-secundario) 24%,
+            #03060b
+        );
+}
+
+.promo-flecha:hover,
+.promo-punto.activo,
+.catalogo-punto.activo,
+.promocion-punto.activo{
+    background:var(--pechy-principal);
+}
+
+
+/* COLOR SECUNDARIO DE SUPERFICIES */
+
+.card{
+    background:
+        linear-gradient(
+            180deg,
+            color-mix(
+                in srgb,
+                var(--pechy-secundario) 82%,
+                #101827
+            ),
+            color-mix(
+                in srgb,
+                var(--pechy-secundario) 50%,
+                #03060b
+            )
+        );
+}
+
+#buscador,
+.info > div,
+.promo-slider,
+.promo-slide,
+.promo-card-info{
+    background-color:var(--pechy-secundario);
+}
+
+
+/* COLOR DE ACENTO PREMIUM */
+
+.badge-oferta{
+    background:
+        linear-gradient(
+            135deg,
+            var(--pechy-acento),
+            color-mix(
+                in srgb,
+                var(--pechy-acento) 72%,
+                #ffb300
+            )
+        );
+
+    box-shadow:
+        0 0 20px
+        color-mix(
+            in srgb,
+            var(--pechy-acento) 48%,
+            transparent
+        );
+}
+
+.accordion-title::after{
+    color:var(--pechy-acento);
+}
+
+
+/* AGOTADO CONSERVA SU COLOR DE ALERTA */
+
+.buy-agotado{
+    background:
+        linear-gradient(
+            135deg,
+            #4b5563,
+            #2d3748
+        ) !important;
+
+    box-shadow:none !important;
+}
+
+.agotado-ribbon{
+    background:
+        linear-gradient(
+            135deg,
+            #7a0000,
+            #ff1e1e,
+            #7a0000
+        );
+}
