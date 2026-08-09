@@ -782,6 +782,7 @@ Nube de cuentas
     data-nombre="{{ perfil.nombre_perfil }}"
     data-plataforma="{{ cuenta.plataforma }}"
     data-pin="{{ perfil.pin }}"
+    data-cliente-id="{{ perfil.cliente_id or '' }}"
     data-cliente="{{ perfil.nombre_cliente }}"
     data-telefono="{{ perfil.telefono }}"
     data-entrega="{{ perfil.fecha_entrega }}"
@@ -1792,6 +1793,80 @@ Nube de cuentas
         Perfil actualizado correctamente.
     </span>
 </div>
+
+<section
+    id="grupoLiberacionPerfil"
+    class="nube-liberacion-box"
+    hidden
+>
+    <button
+        type="button"
+        class="nube-modal-liberacion"
+        id="abrirLiberacionPerfil"
+    >
+        <i data-lucide="arrow-right-left"></i>
+        Cambiar / liberar servicio
+    </button>
+
+    <div
+        id="panelLiberacionPerfil"
+        class="nube-liberacion-panel"
+        hidden
+    >
+        <div id="contenidoLiberacionPerfil">
+            <div class="nube-liberacion-titulo">
+                <span>SERVICIO ACTUAL</span>
+                <strong>Liberar sin trasladar días</strong>
+            </div>
+
+            <dl class="nube-liberacion-resumen">
+                <div><dt>Cliente</dt><dd id="liberacionCliente">—</dd></div>
+                <div><dt>Servicio actual</dt><dd id="liberacionServicio">—</dd></div>
+                <div><dt>Vencimiento</dt><dd id="liberacionVencimiento">—</dd></div>
+                <div><dt>Días restantes</dt><dd id="liberacionDias">0</dd></div>
+            </dl>
+
+            <label class="nube-liberacion-motivo">
+                <span>Motivo (opcional)</span>
+                <textarea
+                    id="motivoLiberacionPerfil"
+                    rows="2"
+                    placeholder="Ej: el cliente canceló el servicio..."
+                ></textarea>
+            </label>
+
+            <div class="nube-liberacion-advertencia">
+                <i data-lucide="shield-alert"></i>
+                <p>
+                    Este perfil volverá a disponible.<br>
+                    La venta anterior quedará guardada en el historial.<br>
+                    No se trasladarán días a otro servicio.
+                </p>
+            </div>
+
+            <div class="nube-liberacion-acciones">
+                <button type="button" id="cancelarLiberacionPerfil">
+                    Cancelar
+                </button>
+                <button type="button" id="confirmarLiberacionPerfil">
+                    Confirmar liberación
+                </button>
+            </div>
+        </div>
+
+        <div
+            id="exitoLiberacionPerfil"
+            class="nube-liberacion-exito"
+            hidden
+        >
+            <i data-lucide="badge-check"></i>
+            <div>
+                <strong>Perfil liberado</strong>
+                <span>La venta quedó protegida en el historial y no se trasladaron días.</span>
+            </div>
+        </div>
+    </div>
+</section>
 
 <section
     id="panelMensajeCliente"

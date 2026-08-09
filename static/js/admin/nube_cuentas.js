@@ -1293,6 +1293,34 @@ const confirmarReemplazoPerfil =
         "confirmarReemplazoPerfil"
     );
 
+const grupoLiberacionPerfil = document.getElementById("grupoLiberacionPerfil");
+const abrirLiberacionPerfil = document.getElementById("abrirLiberacionPerfil");
+const panelLiberacionPerfil = document.getElementById("panelLiberacionPerfil");
+const contenidoLiberacionPerfil = document.getElementById("contenidoLiberacionPerfil");
+const exitoLiberacionPerfil = document.getElementById("exitoLiberacionPerfil");
+const motivoLiberacionPerfil = document.getElementById("motivoLiberacionPerfil");
+const cancelarLiberacionPerfil = document.getElementById("cancelarLiberacionPerfil");
+const confirmarLiberacionPerfil = document.getElementById("confirmarLiberacionPerfil");
+const liberacionCliente = document.getElementById("liberacionCliente");
+const liberacionServicio = document.getElementById("liberacionServicio");
+const liberacionVencimiento = document.getElementById("liberacionVencimiento");
+const liberacionDias = document.getElementById("liberacionDias");
+const grupoRenovacionPerfil = document.querySelector(".nube-renovacion-rapida");
+
+let operacionLiberacionUuid = "";
+
+function crearOperacionUuid(){
+    if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+    return `liberar-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function esFechaOperativaValida(valor){
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(valor || "")) return false;
+    const fecha = new Date(`${valor}T00:00:00Z`);
+    return !Number.isNaN(fecha.getTime()) &&
+        fecha.toISOString().slice(0, 10) === valor;
+}
+
 
 let perfilReemplazoSeleccionado = null;
 
@@ -1544,6 +1572,23 @@ const renovarPerfil =
             perfilGestionNotas.value =
                 datos.notas || "";
 
+            const perfilRealmenteAsignado =
+                Boolean(String(datos.cliente || "").trim()) &&
+                esFechaOperativaValida(datos.entrega) &&
+                Number(datos.dias || 0) > 0 &&
+                esFechaOperativaValida(datos.vencimiento);
+
+            if (grupoLiberacionPerfil){
+                grupoLiberacionPerfil.hidden = !perfilRealmenteAsignado;
+            }
+            if (panelLiberacionPerfil) panelLiberacionPerfil.hidden = true;
+            if (contenidoLiberacionPerfil) contenidoLiberacionPerfil.hidden = false;
+            if (exitoLiberacionPerfil) exitoLiberacionPerfil.hidden = true;
+            if (motivoLiberacionPerfil) motivoLiberacionPerfil.value = "";
+            if (abrirLiberacionPerfil) abrirLiberacionPerfil.hidden = false;
+            if (grupoRenovacionPerfil) grupoRenovacionPerfil.hidden = false;
+            operacionLiberacionUuid = "";
+
 
             tituloGestionPerfil.textContent =
                 datos.nombre ||
@@ -1756,6 +1801,96 @@ if (motivoCaidaPerfil){
                 });
             }
         );
+
+
+        abrirLiberacionPerfil?.addEventListener("click", async () => {
+            const perfilId = perfilGestionId?.value || "";
+            if (!perfilId) return;
+
+            abrirLiberacionPerfil.disabled = true;
+            try {
+                const respuesta = await fetch(
+                    `/admin/nube-cuentas/perfil/${perfilId}/liberacion`
+                );
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok){
+                    throw new Error(
+                        resultado.mensaje || "No se pudo preparar la liberación."
+                    );
+                }
+
+                liberacionCliente.textContent = resultado.cliente || "—";
+                liberacionServicio.textContent =
+                    `${resultado.plataforma || "—"} · ${resultado.perfil || "—"}`;
+                liberacionVencimiento.textContent = resultado.vencimiento || "—";
+                liberacionDias.textContent = String(resultado.dias_restantes ?? 0);
+                operacionLiberacionUuid = crearOperacionUuid();
+                panelLiberacionPerfil.hidden = false;
+                contenidoLiberacionPerfil.hidden = false;
+                exitoLiberacionPerfil.hidden = true;
+            } catch (error) {
+                mostrarMensajePerfil(error.message, "error");
+            } finally {
+                abrirLiberacionPerfil.disabled = false;
+            }
+        });
+
+
+        cancelarLiberacionPerfil?.addEventListener("click", () => {
+            panelLiberacionPerfil.hidden = true;
+            motivoLiberacionPerfil.value = "";
+            operacionLiberacionUuid = "";
+        });
+
+
+        confirmarLiberacionPerfil?.addEventListener("click", async () => {
+            const perfilId = perfilGestionId?.value || "";
+            if (!perfilId || !operacionLiberacionUuid) return;
+
+            confirmarLiberacionPerfil.disabled = true;
+            try {
+                const respuesta = await fetch(
+                    "/admin/nube-cuentas/perfil/liberar-trasladar",
+                    {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({
+                            perfil_origen_id: perfilId,
+                            accion: "liberar",
+                            motivo: motivoLiberacionPerfil?.value || "",
+                            operacion_uuid: operacionLiberacionUuid
+                        })
+                    }
+                );
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok){
+                    throw new Error(
+                        resultado.mensaje || "No se pudo liberar el perfil."
+                    );
+                }
+
+                contenidoLiberacionPerfil.hidden = true;
+                exitoLiberacionPerfil.hidden = false;
+                abrirLiberacionPerfil.hidden = true;
+                if (panelMensajeCliente) panelMensajeCliente.hidden = true;
+                if (abrirCaidaPerfil) abrirCaidaPerfil.hidden = true;
+                if (grupoReemplazoPerfil) grupoReemplazoPerfil.hidden = true;
+                if (grupoRenovacionPerfil) grupoRenovacionPerfil.hidden = true;
+                perfilGestionCliente.value = "";
+                perfilGestionTelefono.value = "";
+                perfilGestionEntrega.value = "";
+                perfilGestionDias.value = "";
+                perfilGestionVencimiento.value = "Sin vencimiento";
+                subtituloGestionPerfil.textContent = "Perfil · disponible";
+                mostrarMensajePerfil(resultado.mensaje);
+                if (window.lucide) window.lucide.createIcons();
+
+                window.setTimeout(() => window.location.reload(), 2200);
+            } catch (error) {
+                mostrarMensajePerfil(error.message, "error");
+                confirmarLiberacionPerfil.disabled = false;
+            }
+        });
 
 
         // ==========================================

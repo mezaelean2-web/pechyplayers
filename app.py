@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_perfil_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -913,7 +913,7 @@ def guardar_perfil_nube():
     )
 
 
-    if actualizado and es_ajax:
+    if actualizado and actualizado.get("ok") and es_ajax:
 
         return jsonify({
             "ok": True,
@@ -927,6 +927,10 @@ def guardar_perfil_nube():
             ]
         })
 
+    if actualizado and not actualizado.get("ok") and es_ajax:
+
+        return jsonify(actualizado), 409
+
     if not actualizado and es_ajax:
 
         return jsonify({
@@ -934,7 +938,7 @@ def guardar_perfil_nube():
             "mensaje": "No se encontró el perfil."
         }), 404
 
-    if actualizado:
+    if actualizado and actualizado.get("ok"):
 
         flash(
             "Perfil actualizado correctamente ✅"
@@ -950,6 +954,72 @@ def guardar_perfil_nube():
     return redirect(
         "/admin/nube-cuentas"
     )
+
+
+@app.route(
+    "/admin/nube-cuentas/perfil/<int:perfil_id>/liberacion",
+    methods=["GET"]
+)
+def obtener_contexto_liberacion_perfil_nube_route(perfil_id):
+
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    contexto = obtener_contexto_liberacion_perfil_nube(perfil_id)
+
+    if not contexto:
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se encontró el perfil."
+        }), 404
+
+    if not contexto["asignado"]:
+        return jsonify({
+            "ok": False,
+            "mensaje": "El perfil no tiene una asignación real para liberar."
+        }), 409
+
+    return jsonify({"ok": True, **contexto})
+
+
+@app.route(
+    "/admin/nube-cuentas/perfil/liberar-trasladar",
+    methods=["POST"]
+)
+def liberar_trasladar_perfil_nube_route():
+
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    datos = request.get_json(silent=True) or {}
+
+    if datos.get("accion") != "liberar":
+        return jsonify({
+            "ok": False,
+            "mensaje": (
+                "La acción solicitada todavía no está implementada. "
+                "En esta fase solo se permite ‘liberar’."
+            )
+        }), 400
+
+    try:
+        perfil_origen_id = int(datos.get("perfil_origen_id", 0))
+    except (TypeError, ValueError):
+        perfil_origen_id = 0
+
+    if perfil_origen_id <= 0:
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se pudo identificar el perfil de origen."
+        }), 400
+
+    resultado = liberar_perfil_nube(
+        perfil_origen_id=perfil_origen_id,
+        motivo=datos.get("motivo", ""),
+        operacion_uuid=datos.get("operacion_uuid", "")
+    )
+
+    return jsonify(resultado), (200 if resultado["ok"] else 409)
 
 
 

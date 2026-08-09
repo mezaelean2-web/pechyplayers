@@ -1377,6 +1377,81 @@ def normalizar_telefono_nube(telefono):
     return digitos
 
 
+def es_asignacion_operativa_nube(
+    nombre_cliente,
+    fecha_entrega,
+    dias_cuenta,
+    fecha_vencimiento
+):
+
+    if not (nombre_cliente or "").strip():
+        return False
+
+    try:
+        dias = int(dias_cuenta or 0)
+        datetime.strptime(fecha_entrega or "", "%Y-%m-%d")
+        datetime.strptime(fecha_vencimiento or "", "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return False
+
+    return dias > 0
+
+
+def _resolver_cliente_existente_por_telefono_nube(
+    cursor,
+    nombre_cliente,
+    telefono
+):
+
+    nombre_cliente = (nombre_cliente or "").strip()
+    telefono = (telefono or "").strip()
+    telefono_normalizado = normalizar_telefono_nube(telefono)
+
+    if not telefono_normalizado:
+        return None
+
+    cursor.execute(
+        "SELECT id, telefono, telefono_normalizado FROM nube_clientes"
+    )
+    coincidencias = [
+        fila for fila in cursor.fetchall()
+        if (
+            (fila["telefono_normalizado"] or "") == telefono_normalizado
+            or (
+                not fila["telefono_normalizado"] and
+                normalizar_telefono_nube(fila["telefono"]) ==
+                telefono_normalizado
+            )
+        )
+    ]
+
+    if len(coincidencias) != 1:
+        return None
+
+    cliente_id = coincidencias[0]["id"]
+
+    cursor.execute(
+        """
+        UPDATE nube_clientes
+        SET
+            telefono_normalizado = ?,
+            nombre = CASE WHEN ? != '' THEN ? ELSE nombre END,
+            telefono = CASE WHEN ? != '' THEN ? ELSE telefono END,
+            fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """,
+        (
+            telefono_normalizado,
+            nombre_cliente,
+            nombre_cliente,
+            telefono,
+            telefono,
+            cliente_id
+        )
+    )
+    return cliente_id
+
+
 def _obtener_o_crear_cliente_nube(
     cursor,
     nombre_cliente,
@@ -1552,6 +1627,258 @@ def _crear_snapshot_servicio_nube(cursor, perfil_id):
         ensure_ascii=False,
         sort_keys=True
     )
+
+
+def obtener_contexto_liberacion_perfil_nube(perfil_id):
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute(
+            """
+            SELECT
+                p.id AS perfil_id,
+                p.cliente_id,
+                p.nombre_cliente AS cliente,
+                p.telefono,
+                p.fecha_entrega,
+                p.dias_cuenta,
+                p.nombre_perfil AS perfil,
+                p.fecha_vencimiento AS vencimiento,
+                p.estado,
+                c.id AS cuenta_id,
+                c.plataforma,
+                c.correo AS cuenta_madre
+            FROM nube_perfiles AS p
+            INNER JOIN nube_cuentas AS c
+                ON c.id = p.cuenta_id
+            WHERE p.id = ?
+            """,
+            (perfil_id,)
+        )
+        fila = cursor.fetchone()
+
+        if not fila:
+            return None
+
+        contexto = dict(fila)
+        contexto["dias_restantes"] = max(
+            calcular_dias_restantes(contexto["vencimiento"]),
+            0
+        )
+        contexto["asignado"] = es_asignacion_operativa_nube(
+            contexto["cliente"],
+            contexto["fecha_entrega"],
+            contexto["dias_cuenta"],
+            contexto["vencimiento"]
+        )
+        return contexto
+    finally:
+        conn.close()
+
+
+def liberar_perfil_nube(
+    perfil_origen_id,
+    motivo="",
+    operacion_uuid=""
+):
+
+    motivo = (motivo or "").strip()
+    operacion_uuid = (operacion_uuid or "").strip()
+
+    if not operacion_uuid:
+        return {
+            "ok": False,
+            "codigo": "operacion_uuid_requerido",
+            "mensaje": "La operación necesita un identificador único."
+        }
+
+    conn = conectar()
+    cursor = conn.cursor()
+
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+
+        cursor.execute(
+            """
+            SELECT
+                p.id,
+                p.cuenta_id,
+                p.cliente_id,
+                p.nombre_cliente,
+                p.telefono,
+                p.fecha_entrega,
+                p.dias_cuenta,
+                p.fecha_vencimiento,
+                p.estado
+            FROM nube_perfiles AS p
+            WHERE p.id = ?
+            """,
+            (perfil_origen_id,)
+        )
+        origen = cursor.fetchone()
+
+        if not origen:
+            raise ValueError("No se encontró el perfil de origen.")
+
+        if not es_asignacion_operativa_nube(
+            origen["nombre_cliente"],
+            origen["fecha_entrega"],
+            origen["dias_cuenta"],
+            origen["fecha_vencimiento"]
+        ):
+            raise ValueError(
+                "El perfil ya está disponible o no tiene una asignación real."
+            )
+
+        cliente_id_esperado = origen["cliente_id"]
+        if cliente_id_esperado is None and origen["telefono"]:
+            cliente_id_esperado = (
+                _resolver_cliente_existente_por_telefono_nube(
+                    cursor,
+                    origen["nombre_cliente"],
+                    origen["telefono"]
+                )
+            )
+            if cliente_id_esperado is not None:
+                cursor.execute(
+                    """
+                    UPDATE nube_perfiles
+                    SET cliente_id = ?
+                    WHERE id = ? AND cliente_id IS NULL
+                    """,
+                    (cliente_id_esperado, perfil_origen_id)
+                )
+        estado_esperado = origen["estado"] or ""
+        dias_restantes = max(
+            calcular_dias_restantes(origen["fecha_vencimiento"]),
+            0
+        )
+        snapshot = _crear_snapshot_servicio_nube(
+            cursor,
+            perfil_origen_id
+        )
+
+        if not snapshot:
+            raise ValueError("No se pudo crear el snapshot del servicio.")
+
+        cursor.execute(
+            """
+            INSERT INTO nube_transferencias_servicios (
+                operacion_uuid,
+                tipo_operacion,
+                perfil_origen_id,
+                cuenta_origen_id,
+                cliente_id,
+                dias_disponibles,
+                dias_trasladados,
+                destino_tipo,
+                perfil_destino_id,
+                cuenta_destino_id,
+                motivo,
+                venta_origen_snapshot
+            )
+            VALUES (?, 'liberar', ?, ?, ?, ?, 0, '', NULL, NULL, ?, ?)
+            """,
+            (
+                operacion_uuid,
+                perfil_origen_id,
+                origen["cuenta_id"],
+                cliente_id_esperado,
+                dias_restantes,
+                motivo,
+                snapshot
+            )
+        )
+
+        cursor.execute(
+            """
+            UPDATE nube_perfiles
+            SET
+                cliente_id = NULL,
+                nombre_cliente = '',
+                telefono = '',
+                fecha_entrega = '',
+                dias_cuenta = 0,
+                fecha_vencimiento = '',
+                estado = 'disponible',
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+              AND (
+                    cliente_id = ?
+                    OR (cliente_id IS NULL AND ? IS NULL)
+              )
+              AND COALESCE(estado, '') = ?
+            """,
+            (
+                perfil_origen_id,
+                cliente_id_esperado,
+                cliente_id_esperado,
+                estado_esperado
+            )
+        )
+
+        if cursor.rowcount != 1:
+            raise RuntimeError(
+                "El perfil cambió durante la operación; no fue liberado."
+            )
+
+        cursor.execute(
+            """
+            INSERT INTO nube_movimientos (
+                cuenta_id,
+                tipo,
+                descripcion,
+                estado_anterior,
+                estado_nuevo,
+                cliente_nombre
+            )
+            VALUES (?, 'liberacion_perfil', ?, ?, 'disponible', ?)
+            """,
+            (
+                origen["cuenta_id"],
+                "Perfil liberado sin trasladar días"
+                + (f". Motivo: {motivo}" if motivo else ""),
+                estado_esperado,
+                origen["nombre_cliente"] or ""
+            )
+        )
+
+        conn.commit()
+        return {
+            "ok": True,
+            "mensaje": "Perfil liberado correctamente.",
+            "perfil_id": perfil_origen_id,
+            "dias_restantes": dias_restantes,
+            "estado": "disponible"
+        }
+
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        if "operacion_uuid" in str(error).lower():
+            return {
+                "ok": False,
+                "codigo": "operacion_duplicada",
+                "mensaje": "Esta liberación ya fue procesada."
+            }
+        return {
+            "ok": False,
+            "codigo": "error_integridad",
+            "mensaje": "No se pudo guardar la liberación."
+        }
+    except (ValueError, RuntimeError) as error:
+        conn.rollback()
+        return {
+            "ok": False,
+            "codigo": "origen_no_valido",
+            "mensaje": str(error)
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def calcular_estado_nube(
@@ -3180,7 +3507,11 @@ def actualizar_perfil_nube(
         SELECT
             c.estado AS estado_cuenta,
             p.estado AS estado_perfil,
-            p.cliente_id AS cliente_id_actual
+            p.cliente_id AS cliente_id_actual,
+            p.nombre_cliente AS nombre_cliente_actual,
+            p.fecha_entrega AS fecha_entrega_actual,
+            p.dias_cuenta AS dias_cuenta_actual,
+            p.fecha_vencimiento AS fecha_vencimiento_actual
 
         FROM nube_perfiles AS p
 
@@ -3211,6 +3542,21 @@ def actualizar_perfil_nube(
         else ""
     ) or ""
 
+    cliente_id_actual = (
+        fila_cuenta["cliente_id_actual"]
+        if fila_cuenta
+        else None
+    )
+
+    asignacion_operativa_actual = bool(
+        fila_cuenta and es_asignacion_operativa_nube(
+            fila_cuenta["nombre_cliente_actual"],
+            fila_cuenta["fecha_entrega_actual"],
+            fila_cuenta["dias_cuenta_actual"],
+            fila_cuenta["fecha_vencimiento_actual"]
+        )
+    )
+
 
     if estado_perfil in {
         "reemplazada",
@@ -3231,6 +3577,18 @@ def actualizar_perfil_nube(
         fecha_entrega and
         dias_cuenta > 0
     )
+
+    if asignacion_operativa_actual and not perfil_asignado:
+        conn.rollback()
+        conn.close()
+        return {
+            "ok": False,
+            "codigo": "liberacion_requerida",
+            "mensaje": (
+                "Un perfil vendido no puede desasignarse desde Guardar perfil. "
+                "Usa ‘Cambiar / liberar servicio’."
+            )
+        }
 
     cliente_id = None
 

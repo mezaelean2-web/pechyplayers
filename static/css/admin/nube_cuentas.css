@@ -3425,6 +3425,195 @@ body.nube-modal-abierto{
     color:#ff9d9d;
 }
 
+/* ==========================================
+   CAMBIAR / LIBERAR SERVICIO
+   ========================================== */
+
+#grupoLiberacionPerfil[hidden],
+#panelLiberacionPerfil[hidden],
+#exitoLiberacionPerfil[hidden]{
+    display:none !important;
+}
+
+.nube-liberacion-box{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+}
+
+.nube-modal-liberacion{
+    min-height:40px;
+    padding:10px 14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    border:1px solid rgba(167,139,250,.28);
+    border-radius:10px;
+    background:linear-gradient(145deg, rgba(124,58,237,.16), rgba(76,29,149,.05));
+    color:#c4b5fd;
+    font-size:10px;
+    font-weight:750;
+    cursor:pointer;
+}
+
+.nube-modal-liberacion:hover{
+    border-color:rgba(196,181,253,.5);
+    background:rgba(124,58,237,.18);
+}
+
+.nube-modal-liberacion svg{
+    width:15px;
+    height:15px;
+}
+
+.nube-liberacion-panel{
+    padding:15px;
+    border:1px solid rgba(167,139,250,.2);
+    border-radius:12px;
+    background:linear-gradient(150deg, rgba(124,58,237,.08), rgba(15,16,20,.85));
+}
+
+.nube-liberacion-titulo span{
+    display:block;
+    margin-bottom:3px;
+    color:#8b83a5;
+    font-size:8px;
+    font-weight:800;
+    letter-spacing:.12em;
+}
+
+.nube-liberacion-titulo strong{
+    color:#f5f3ff;
+    font-size:13px;
+}
+
+.nube-liberacion-resumen{
+    margin:13px 0;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:8px;
+}
+
+.nube-liberacion-resumen div{
+    padding:9px 10px;
+    border:1px solid rgba(255,255,255,.06);
+    border-radius:9px;
+    background:rgba(255,255,255,.025);
+}
+
+.nube-liberacion-resumen dt{
+    color:#858b96;
+    font-size:8px;
+    font-weight:700;
+    text-transform:uppercase;
+}
+
+.nube-liberacion-resumen dd{
+    margin:4px 0 0;
+    color:#eef0f4;
+    font-size:11px;
+    font-weight:650;
+}
+
+.nube-liberacion-motivo span{
+    display:block;
+    color:#b8bdc7;
+    font-size:9px;
+    font-weight:700;
+}
+
+.nube-liberacion-motivo textarea{
+    width:100%;
+    margin-top:6px;
+    padding:10px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:9px;
+    background:#15161a;
+    color:#fff;
+    resize:vertical;
+    outline:none;
+}
+
+.nube-liberacion-advertencia{
+    margin-top:11px;
+    padding:11px;
+    display:flex;
+    gap:9px;
+    border:1px solid rgba(245,158,11,.2);
+    border-radius:9px;
+    background:rgba(245,158,11,.06);
+    color:#f8cf85;
+}
+
+.nube-liberacion-advertencia svg{
+    width:16px;
+    height:16px;
+    flex:0 0 16px;
+}
+
+.nube-liberacion-advertencia p{
+    margin:0;
+    font-size:9px;
+    line-height:1.55;
+}
+
+.nube-liberacion-acciones{
+    margin-top:12px;
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+}
+
+.nube-liberacion-acciones button{
+    min-height:35px;
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:9px;
+    font-weight:750;
+    cursor:pointer;
+}
+
+#cancelarLiberacionPerfil{
+    border:1px solid rgba(255,255,255,.09);
+    background:#191a1f;
+    color:#b7bcc5;
+}
+
+#confirmarLiberacionPerfil{
+    border:1px solid rgba(167,139,250,.3);
+    background:linear-gradient(145deg, #7c3aed, #5b21b6);
+    color:#fff;
+}
+
+.nube-liberacion-exito{
+    padding:7px 2px;
+    display:flex;
+    align-items:center;
+    gap:11px;
+    color:#a7f3d0;
+}
+
+.nube-liberacion-exito > svg{
+    width:30px;
+    height:30px;
+}
+
+.nube-liberacion-exito strong,
+.nube-liberacion-exito span{
+    display:block;
+}
+
+.nube-liberacion-exito strong{
+    margin-bottom:3px;
+    color:#ecfdf5;
+    font-size:13px;
+}
+
+.nube-liberacion-exito span{
+    color:#9ca3af;
+    font-size:9px;
+}
+
 
 .nube-reemplazo-nivel-cuenta_nueva{
     background:rgba(148,163,184,.10);
