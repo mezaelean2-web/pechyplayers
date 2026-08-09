@@ -1335,6 +1335,7 @@ const abrirWhatsappCliente =
 
 let mensajeClienteActual = "";
 let telefonoClienteActual = "";
+let operacionCompletada = false;
 
 function datoEntrega(valor){
     const texto = String(valor ?? "").trim();
@@ -1464,6 +1465,7 @@ function mostrarPanelMensajeCliente(tipo, datos){
     vistaPreviaMensajeCliente.textContent = mensajeClienteActual;
     abrirWhatsappCliente.disabled = !telefonoClienteActual;
     panelMensajeCliente.hidden = false;
+    operacionCompletada = true;
 }
 
 copiarMensajeCliente?.addEventListener("click", async () => {
@@ -1542,6 +1544,8 @@ const renovarPerfil =
         ){
 
             if (!modalPerfil) return;
+
+            operacionCompletada = false;
 
 
             const datos =
@@ -1695,6 +1699,8 @@ if (motivoCaidaPerfil){
 
             if (!modalPerfil) return;
 
+            operacionCompletada = false;
+
 
             modalPerfil.classList.remove(
                 "abierto"
@@ -1755,6 +1761,12 @@ if (motivoCaidaPerfil){
             "submit",
             event => {
                 event.preventDefault();
+
+                if (operacionCompletada){
+                    cerrarModalPerfil();
+                    window.location.reload();
+                    return;
+                }
 
                 const botonGuardar =
                     formGestionPerfil.querySelector("button[type='submit']");
