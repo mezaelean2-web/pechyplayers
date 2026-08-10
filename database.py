@@ -5724,3 +5724,273 @@ def obtener_perfiles_disponibles_reemplazo(
     )
     conn.close()
     return candidatos
+
+
+# ==========================================
+# NUBE — HISTORIAL COMPLETO DEL PERFIL
+# ==========================================
+
+def _leer_snapshot_historial_perfil_nube(valor):
+    if not valor:
+        return {}
+    try:
+        snapshot = json.loads(valor)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return {}
+    return snapshot if isinstance(snapshot, dict) else {}
+
+
+def _datos_publicos_snapshot_perfil_nube(snapshot):
+    if not snapshot:
+        return {}
+    return {
+        "perfil_id": snapshot.get("perfil_id"),
+        "cuenta_id": snapshot.get("cuenta_id"),
+        "plataforma": snapshot.get("plataforma") or "",
+        "nombre_perfil": snapshot.get("nombre_perfil") or "",
+        "cliente": snapshot.get("nombre_cliente") or "",
+        "telefono": snapshot.get("telefono") or "",
+        "fecha_entrega": snapshot.get("fecha_entrega") or "",
+        "dias": int(snapshot.get("dias_cuenta") or 0),
+        "dias_restantes": int(snapshot.get("dias_restantes") or 0),
+        "fecha_vencimiento": snapshot.get("fecha_vencimiento") or "",
+        "estado": snapshot.get("estado") or ""
+    }
+
+
+def _crear_evento_historial_perfil_nube(
+    clave, tipo, fecha, titulo, descripcion, datos,
+    origen, icono, nivel="normal"
+):
+    return {
+        "id": clave,
+        "tipo": tipo,
+        "fecha": fecha or "",
+        "titulo": titulo,
+        "descripcion": descripcion or "",
+        "datos": datos or {},
+        "origen": origen,
+        "icono": icono,
+        "nivel": nivel
+    }
+
+
+def obtener_historial_completo_perfil_nube(perfil_id):
+    try:
+        perfil_id = int(perfil_id)
+    except (TypeError, ValueError):
+        return None
+    if perfil_id <= 0:
+        return None
+
+    conn = conectar()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT p.id AS perfil_id, p.cuenta_id, p.nombre_perfil,
+                   p.nombre_cliente, p.telefono, p.fecha_entrega,
+                   p.dias_cuenta, p.fecha_vencimiento, p.estado,
+                   p.fecha_creacion, p.fecha_actualizacion, c.plataforma
+            FROM nube_perfiles AS p
+            INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+            WHERE p.id = ?
+            """,
+            (perfil_id,)
+        )
+        fila_perfil = cursor.fetchone()
+        if not fila_perfil:
+            return None
+
+        perfil = {
+            "perfil_id": fila_perfil["perfil_id"],
+            "nombre_perfil": fila_perfil["nombre_perfil"] or "",
+            "plataforma": fila_perfil["plataforma"] or "",
+            "cuenta_id": fila_perfil["cuenta_id"],
+            "cuenta_madre": f"Cuenta #{fila_perfil['cuenta_id']}",
+            "estado": fila_perfil["estado"] or "disponible"
+        }
+        eventos = []
+        claves = set()
+        asignaciones = set()
+
+        def agregar(evento):
+            if evento and evento["id"] not in claves:
+                claves.add(evento["id"])
+                eventos.append(evento)
+
+        def agregar_asignacion(snapshot, origen, clave_base):
+            if int(snapshot.get("perfil_id") or 0) != perfil_id:
+                return
+            datos = _datos_publicos_snapshot_perfil_nube(snapshot)
+            if not (datos["cliente"] and datos["fecha_entrega"] and datos["dias"] > 0):
+                return
+            clave_asignacion = (
+                perfil_id,
+                snapshot.get("cliente_id"),
+                datos["cliente"].strip().casefold(),
+                datos["fecha_entrega"],
+                datos["fecha_vencimiento"]
+            )
+            if clave_asignacion in asignaciones:
+                return
+            asignaciones.add(clave_asignacion)
+            agregar(_crear_evento_historial_perfil_nube(
+                f"asignacion:{clave_base}", "venta", datos["fecha_entrega"],
+                "Venta realizada",
+                f"Perfil asignado a {datos['cliente']} por {datos['dias']} días.",
+                datos, origen, "user-check"
+            ))
+
+        cursor.execute(
+            """
+            SELECT * FROM nube_transferencias_servicios
+            WHERE perfil_origen_id = ? OR perfil_destino_id = ?
+            ORDER BY fecha DESC, id DESC
+            """,
+            (perfil_id, perfil_id)
+        )
+        for transferencia in cursor.fetchall():
+            snapshot_origen = _leer_snapshot_historial_perfil_nube(
+                transferencia["venta_origen_snapshot"]
+            )
+            snapshot_antes = _leer_snapshot_historial_perfil_nube(
+                transferencia["destino_antes_snapshot"]
+            )
+            snapshot_despues = _leer_snapshot_historial_perfil_nube(
+                transferencia["destino_despues_snapshot"]
+            )
+            agregar_asignacion(
+                snapshot_origen,
+                "nube_transferencias_servicios.venta_origen_snapshot",
+                f"transferencia:{transferencia['id']}:origen"
+            )
+            rol = (
+                "origen" if transferencia["perfil_origen_id"] == perfil_id
+                else "destino"
+            )
+            datos = {
+                "operacion_uuid": transferencia["operacion_uuid"],
+                "rol_perfil": rol,
+                "dias_disponibles": transferencia["dias_disponibles"] or 0,
+                "dias_trasladados": transferencia["dias_trasladados"] or 0,
+                "motivo": transferencia["motivo"] or "",
+                "origen": _datos_publicos_snapshot_perfil_nube(snapshot_origen),
+                "destino_antes": _datos_publicos_snapshot_perfil_nube(snapshot_antes),
+                "destino_despues": _datos_publicos_snapshot_perfil_nube(snapshot_despues)
+            }
+            operacion = transferencia["tipo_operacion"]
+            if operacion == "liberar":
+                tipo, titulo = "liberacion", "Perfil liberado"
+                descripcion = "El perfil fue liberado sin trasladar días."
+                icono, nivel = "unlock", "advertencia"
+            elif operacion == "sumar_activo":
+                tipo, titulo = "traslado_servicio_activo", "Días trasladados a servicio activo"
+                descripcion = f"Se trasladaron {datos['dias_trasladados']} días a un servicio activo."
+                icono, nivel = "calendar-plus", "positivo"
+            else:
+                tipo, titulo = "traslado_nuevo_servicio", "Traslado a nuevo servicio"
+                descripcion = f"Se trasladaron {datos['dias_trasladados']} días a un nuevo perfil."
+                icono, nivel = "arrow-right-left", "positivo"
+            agregar(_crear_evento_historial_perfil_nube(
+                f"transferencia:{transferencia['id']}:{rol}", tipo,
+                transferencia["fecha"], titulo, descripcion, datos,
+                "nube_transferencias_servicios", icono, nivel
+            ))
+
+        cursor.execute(
+            """
+            SELECT r.*, pa.nombre_perfil AS perfil_anterior,
+                   pn.nombre_perfil AS perfil_nuevo,
+                   ca.plataforma AS plataforma_anterior,
+                   cn.plataforma AS plataforma_nueva
+            FROM nube_reemplazos_perfiles AS r
+            INNER JOIN nube_perfiles AS pa ON pa.id = r.perfil_anterior_id
+            INNER JOIN nube_perfiles AS pn ON pn.id = r.perfil_nuevo_id
+            INNER JOIN nube_cuentas AS ca ON ca.id = r.cuenta_anterior_id
+            INNER JOIN nube_cuentas AS cn ON cn.id = r.cuenta_nueva_id
+            WHERE r.perfil_anterior_id = ? OR r.perfil_nuevo_id = ?
+            ORDER BY r.fecha DESC, r.id DESC
+            """,
+            (perfil_id, perfil_id)
+        )
+        for reemplazo in cursor.fetchall():
+            rol = "origen" if reemplazo["perfil_anterior_id"] == perfil_id else "destino"
+            datos = {
+                "rol_perfil": rol,
+                "perfil_origen_id": reemplazo["perfil_anterior_id"],
+                "perfil_origen": reemplazo["perfil_anterior"] or "",
+                "plataforma_origen": reemplazo["plataforma_anterior"] or "",
+                "perfil_destino_id": reemplazo["perfil_nuevo_id"],
+                "perfil_destino": reemplazo["perfil_nuevo"] or "",
+                "plataforma_destino": reemplazo["plataforma_nueva"] or "",
+                "cliente": reemplazo["nombre_cliente"] or "",
+                "telefono": reemplazo["telefono"] or "",
+                "motivo": reemplazo["motivo"] or "",
+                "dias_restantes": reemplazo["dias_restantes"] or 0,
+                "vencimiento_preservado": reemplazo["fecha_vencimiento_anterior"] or ""
+            }
+            agregar(_crear_evento_historial_perfil_nube(
+                f"reemplazo:{reemplazo['id']}:{rol}", "reemplazo",
+                reemplazo["fecha"], "Perfil reemplazado",
+                f"{datos['perfil_origen']} fue reemplazado por {datos['perfil_destino']}.",
+                datos, "nube_reemplazos_perfiles", "repeat-2", "advertencia"
+            ))
+
+        cursor.execute(
+            """
+            SELECT * FROM nube_movimientos
+            WHERE cuenta_id = ?
+              AND tipo IN ('creacion', 'cuenta_caida', 'perfil_caido')
+            ORDER BY fecha DESC, id DESC
+            """,
+            (fila_perfil["cuenta_id"],)
+        )
+        for movimiento in cursor.fetchall():
+            if (
+                movimiento["tipo"] == "perfil_caido" and
+                (fila_perfil["nombre_perfil"] or "").casefold()
+                not in (movimiento["descripcion"] or "").casefold()
+            ):
+                continue
+            if movimiento["tipo"] == "creacion":
+                tipo, titulo, icono, nivel = (
+                    "creacion_cuenta", "Cuenta madre creada", "cloud", "normal"
+                )
+            else:
+                tipo, titulo, icono, nivel = (
+                    "caida", "Servicio marcado como caído", "triangle-alert", "critico"
+                )
+            agregar(_crear_evento_historial_perfil_nube(
+                f"movimiento:{movimiento['id']}", tipo, movimiento["fecha"],
+                titulo, movimiento["descripcion"] or "",
+                {
+                    "cliente": movimiento["cliente_nombre"] or "",
+                    "estado_anterior": movimiento["estado_anterior"] or "",
+                    "estado_nuevo": movimiento["estado_nuevo"] or ""
+                },
+                "nube_movimientos", icono, nivel
+            ))
+
+        agregar_asignacion(
+            {
+                "perfil_id": perfil_id,
+                "cuenta_id": fila_perfil["cuenta_id"],
+                "plataforma": fila_perfil["plataforma"],
+                "nombre_perfil": fila_perfil["nombre_perfil"],
+                "nombre_cliente": fila_perfil["nombre_cliente"],
+                "telefono": fila_perfil["telefono"],
+                "fecha_entrega": fila_perfil["fecha_entrega"],
+                "dias_cuenta": fila_perfil["dias_cuenta"],
+                "fecha_vencimiento": fila_perfil["fecha_vencimiento"],
+                "estado": fila_perfil["estado"]
+            },
+            "nube_perfiles", "actual"
+        )
+        eventos.sort(
+            key=lambda evento: (evento["fecha"] or "", evento["id"]),
+            reverse=True
+        )
+        return {"perfil": perfil, "eventos": eventos}
+    finally:
+        conn.close()

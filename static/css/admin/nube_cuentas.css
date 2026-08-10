@@ -1644,6 +1644,11 @@ body.nube-modal-abierto{
     scrollbar-gutter:stable;
 }
 
+#modalGestionarPerfil #formGestionPerfil[hidden],
+#modalGestionarPerfil #vistaHistorialPerfil[hidden]{
+    display:none !important;
+}
+
 
 #modalGestionarPerfil .nube-form > *{
     flex-shrink:0;
@@ -1673,6 +1678,439 @@ body.nube-modal-abierto{
 
 
 /* ==========================================
+   HISTORIAL COMPLETO DEL PERFIL
+   ========================================== */
+
+.nube-perfil-tabs{
+    flex-shrink:0;
+    display:flex;
+    gap:7px;
+    padding:10px 26px;
+    border-bottom:1px solid rgba(255,255,255,.065);
+    background:rgba(10,11,14,.42);
+}
+
+.nube-perfil-tab{
+    min-height:35px;
+    padding:0 13px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    gap:7px;
+    border:1px solid transparent;
+    border-radius:9px;
+    background:transparent;
+    color:#747b87;
+    font-size:9px;
+    font-weight:850;
+    letter-spacing:.09em;
+    text-transform:uppercase;
+    cursor:pointer;
+    transition:background .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.nube-perfil-tab svg{
+    width:14px;
+    height:14px;
+}
+
+.nube-perfil-tab:hover{
+    color:#d4d7dd;
+    background:rgba(255,255,255,.04);
+}
+
+.nube-perfil-tab.activo{
+    border-color:rgba(229,9,20,.24);
+    background:linear-gradient(145deg, rgba(229,9,20,.14), rgba(229,9,20,.045));
+    color:#ff7a80;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.025);
+}
+
+.nube-historial-vista{
+    min-height:0;
+    flex:1 1 auto;
+    overflow-x:hidden;
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+}
+
+.nube-historial-vista::-webkit-scrollbar{
+    width:7px;
+}
+
+.nube-historial-vista::-webkit-scrollbar-track{
+    background:transparent;
+}
+
+.nube-historial-vista::-webkit-scrollbar-thumb{
+    border-radius:20px;
+    background:#30323a;
+}
+
+.nube-historial-contenido{
+    padding:24px 26px 30px;
+}
+
+.nube-historial-resumen{
+    padding:18px;
+    border:1px solid rgba(255,255,255,.075);
+    border-radius:14px;
+    background:
+        radial-gradient(circle at 95% 0%, rgba(229,9,20,.10), transparent 38%),
+        linear-gradient(145deg, rgba(255,255,255,.035), rgba(255,255,255,.012));
+    box-shadow:0 16px 35px rgba(0,0,0,.16);
+}
+
+.nube-historial-resumen > span{
+    display:block;
+    color:#ff5b62;
+    font-size:8px;
+    font-weight:900;
+    letter-spacing:.15em;
+}
+
+.nube-historial-resumen h3{
+    margin:6px 0 16px;
+    color:#f4f5f7;
+    font-size:18px;
+    line-height:1.25;
+}
+
+.nube-historial-resumen > div{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(0, 1fr));
+    gap:8px;
+}
+
+.nube-historial-resumen > div > span{
+    min-width:0;
+    padding:9px 10px;
+    border:1px solid rgba(255,255,255,.055);
+    border-radius:9px;
+    background:rgba(7,8,11,.36);
+}
+
+.nube-historial-resumen small,
+.nube-historial-resumen strong{
+    display:block;
+}
+
+.nube-historial-resumen small{
+    margin-bottom:4px;
+    color:#6f7682;
+    font-size:7px;
+    font-weight:800;
+    letter-spacing:.07em;
+    text-transform:uppercase;
+}
+
+.nube-historial-resumen strong{
+    overflow:hidden;
+    color:#dce0e6;
+    font-size:10px;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.nube-historial-linea{
+    position:relative;
+    margin-top:22px;
+}
+
+.nube-historial-linea::before{
+    content:"";
+    position:absolute;
+    top:22px;
+    bottom:22px;
+    left:18px;
+    width:1px;
+    background:linear-gradient(to bottom, rgba(255,255,255,.15), rgba(255,255,255,.025));
+}
+
+.nube-historial-evento{
+    --historial-color:#8b93a1;
+    position:relative;
+    display:grid;
+    grid-template-columns:37px minmax(0, 1fr);
+    gap:13px;
+}
+
+.nube-historial-evento + .nube-historial-evento{
+    margin-top:13px;
+}
+
+.nube-historial-evento--venta{ --historial-color:#34d399; }
+.nube-historial-evento--renovacion{ --historial-color:#60a5fa; }
+.nube-historial-evento--caida{ --historial-color:#fb7185; }
+.nube-historial-evento--reemplazo{ --historial-color:#fbbf24; }
+.nube-historial-evento--liberacion{ --historial-color:#fb923c; }
+.nube-historial-evento--traslado{ --historial-color:#a78bfa; }
+.nube-historial-evento--traslado-activo{ --historial-color:#38bdf8; }
+
+.nube-historial-marcador{
+    position:relative;
+    z-index:1;
+    width:37px;
+    height:37px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border:1px solid color-mix(in srgb, var(--historial-color) 38%, transparent);
+    border-radius:11px;
+    background:color-mix(in srgb, var(--historial-color) 12%, #121318);
+    color:var(--historial-color);
+    box-shadow:0 0 0 5px #121318, 0 8px 22px rgba(0,0,0,.2);
+}
+
+.nube-historial-marcador svg{
+    width:16px;
+    height:16px;
+}
+
+.nube-historial-tarjeta{
+    min-width:0;
+    padding:14px 15px;
+    border:1px solid rgba(255,255,255,.065);
+    border-radius:12px;
+    background:linear-gradient(145deg, rgba(255,255,255,.028), rgba(255,255,255,.012));
+    transition:border-color .16s ease, transform .16s ease;
+}
+
+.nube-historial-tarjeta:hover{
+    border-color:color-mix(in srgb, var(--historial-color) 25%, transparent);
+    transform:translateY(-1px);
+}
+
+.nube-historial-evento-header{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:12px;
+}
+
+.nube-historial-evento-header strong{
+    color:#f0f2f5;
+    font-size:12px;
+}
+
+.nube-historial-evento-header time{
+    flex-shrink:0;
+    color:#686f7a;
+    font-size:8px;
+    font-weight:700;
+}
+
+.nube-historial-tarjeta > p{
+    margin:7px 0 0;
+    color:#8b919c;
+    font-size:9px;
+    line-height:1.55;
+}
+
+.nube-historial-traslado{
+    margin-top:12px;
+    padding:11px;
+    border:1px solid color-mix(in srgb, var(--historial-color) 22%, transparent);
+    border-radius:10px;
+    background:color-mix(in srgb, var(--historial-color) 6%, rgba(4,5,8,.36));
+}
+
+.nube-historial-traslado-contexto{
+    display:block;
+    margin-bottom:9px;
+    color:#e3e5ea;
+    font-size:9px;
+    line-height:1.4;
+}
+
+.nube-historial-traslado-ruta{
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:7px;
+}
+
+.nube-historial-traslado-extremo{
+    min-width:0;
+    padding:9px;
+    border:1px solid rgba(255,255,255,.05);
+    border-radius:8px;
+    background:rgba(4,5,8,.3);
+}
+
+.nube-historial-traslado-extremo.es-actual{
+    border-color:color-mix(in srgb, var(--historial-color) 42%, transparent);
+    background:color-mix(in srgb, var(--historial-color) 11%, rgba(4,5,8,.48));
+}
+
+.nube-historial-traslado-extremo > div{
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+}
+
+.nube-historial-traslado-extremo > strong{
+    display:block;
+    margin-top:7px;
+    overflow-wrap:anywhere;
+    color:#cbd0d8;
+    font-size:9px;
+    line-height:1.4;
+}
+
+.nube-historial-traslado-extremo.es-actual > strong{
+    color:#f1f2f5;
+}
+
+.nube-historial-traslado-badge{
+    padding:3px 6px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:999px;
+    color:#8c929c;
+    font-size:6px;
+    font-weight:900;
+    letter-spacing:.09em;
+}
+
+.nube-historial-traslado-badge.es-perfil{
+    border-color:color-mix(in srgb, var(--historial-color) 42%, transparent);
+    background:color-mix(in srgb, var(--historial-color) 16%, transparent);
+    color:var(--historial-color);
+}
+
+.nube-historial-tarjeta dl{
+    margin:12px 0 0;
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0, 1fr));
+    gap:6px;
+}
+
+.nube-historial-tarjeta dl > div{
+    min-width:0;
+    padding:8px 9px;
+    border:1px solid rgba(255,255,255,.045);
+    border-radius:8px;
+    background:rgba(4,5,8,.26);
+}
+
+.nube-historial-tarjeta dt{
+    color:#666d78;
+    font-size:7px;
+    font-weight:800;
+    letter-spacing:.05em;
+    text-transform:uppercase;
+}
+
+.nube-historial-tarjeta dd{
+    margin:4px 0 0;
+    overflow-wrap:anywhere;
+    color:#cbd0d8;
+    font-size:9px;
+    font-weight:650;
+    line-height:1.4;
+}
+
+.nube-historial-estado{
+    min-height:240px;
+    padding:34px 20px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+}
+
+.nube-historial-estado > svg{
+    width:34px;
+    height:34px;
+    margin-bottom:13px;
+    color:#626a77;
+}
+
+.nube-historial-estado strong{
+    color:#d9dde4;
+    font-size:12px;
+}
+
+.nube-historial-estado span{
+    max-width:360px;
+    margin-top:6px;
+    color:#777e89;
+    font-size:9px;
+    line-height:1.55;
+}
+
+.nube-historial-estado.error > svg{
+    color:#fb7185;
+}
+
+.nube-historial-estado button{
+    min-height:34px;
+    margin-top:14px;
+    padding:0 13px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:8px;
+    background:#1c1e23;
+    color:#d6dae1;
+    font-size:9px;
+    font-weight:800;
+    cursor:pointer;
+}
+
+.nube-historial-skeleton{
+    padding-top:6px;
+}
+
+.nube-historial-skeleton > div{
+    display:grid;
+    grid-template-columns:37px minmax(0, 1fr);
+    gap:13px;
+}
+
+.nube-historial-skeleton > div + div{
+    margin-top:13px;
+}
+
+.nube-historial-skeleton span,
+.nube-historial-skeleton i{
+    display:block;
+    border-radius:10px;
+    background:linear-gradient(90deg, #1b1d22 25%, #25272d 45%, #1b1d22 65%);
+    background-size:220% 100%;
+    animation:nubeHistorialCarga 1.25s ease-in-out infinite;
+}
+
+.nube-historial-skeleton span{
+    width:37px;
+    height:37px;
+}
+
+.nube-historial-skeleton > div > div{
+    height:94px;
+    padding:17px;
+    border:1px solid rgba(255,255,255,.04);
+    border-radius:12px;
+    background:rgba(255,255,255,.015);
+}
+
+.nube-historial-skeleton i:first-child{
+    width:44%;
+    height:10px;
+}
+
+.nube-historial-skeleton i:last-child{
+    width:75%;
+    height:8px;
+    margin-top:14px;
+}
+
+@keyframes nubeHistorialCarga{
+    from{ background-position:100% 0; }
+    to{ background-position:-100% 0; }
+}
+
+
+/* ==========================================
    RESPONSIVE MODAL
    ========================================== */
 
@@ -1691,6 +2129,32 @@ body.nube-modal-abierto{
     #modalGestionarPerfil .nube-modal-panel{
         max-height:calc(100vh - 24px);
         max-height:calc(100dvh - 24px);
+    }
+
+    .nube-perfil-tabs{
+        padding:9px 20px;
+    }
+
+    .nube-perfil-tab{
+        flex:1;
+    }
+
+    .nube-historial-contenido{
+        padding:20px;
+    }
+
+    .nube-historial-resumen > div,
+    .nube-historial-tarjeta dl{
+        grid-template-columns:1fr;
+    }
+
+    .nube-historial-traslado-ruta{
+        grid-template-columns:1fr;
+    }
+
+    .nube-historial-evento-header{
+        flex-direction:column;
+        gap:5px;
     }
 
     .nube-form-grid{

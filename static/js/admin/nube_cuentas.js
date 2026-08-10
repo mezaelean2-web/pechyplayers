@@ -1155,6 +1155,18 @@ const precio =
         const formGestionPerfil =
             document.getElementById("formGestionPerfil");
 
+        const tabGestionPerfil =
+            document.getElementById("tabGestionPerfil");
+
+        const tabHistorialPerfil =
+            document.getElementById("tabHistorialPerfil");
+
+        const vistaHistorialPerfil =
+            document.getElementById("vistaHistorialPerfil");
+
+        const contenidoHistorialPerfil =
+            document.getElementById("contenidoHistorialPerfil");
+
         const guardarGestionPerfil =
             formGestionPerfil?.querySelector("button[type='submit']");
 
@@ -1824,6 +1836,392 @@ diasTrasladarPerfil?.addEventListener("input", () => {
 });
 
 
+const configuracionEventosHistorial = {
+    venta: {
+        clase: "venta",
+        icono: "user-check"
+    },
+    renovacion: {
+        clase: "renovacion",
+        icono: "refresh-cw"
+    },
+    caida: {
+        clase: "caida",
+        icono: "triangle-alert"
+    },
+    reemplazo: {
+        clase: "reemplazo",
+        icono: "repeat-2"
+    },
+    liberacion: {
+        clase: "liberacion",
+        icono: "unlock"
+    },
+    traslado_nuevo_servicio: {
+        clase: "traslado",
+        icono: "arrow-right-left"
+    },
+    traslado_servicio_activo: {
+        clase: "traslado-activo",
+        icono: "calendar-plus"
+    },
+    creacion_cuenta: {
+        clase: "neutral",
+        icono: "cloud"
+    }
+};
+
+let historialPerfilCargadoId = "";
+let historialPerfilAbortController = null;
+
+function textoHistorial(valor, alternativo = "—"){
+    if (valor === 0) return "0";
+    const texto = String(valor ?? "").trim();
+    return texto || alternativo;
+}
+
+function formatearFechaHistorial(valor){
+    const texto = String(valor ?? "").trim();
+    if (!texto) return "Fecha no disponible";
+
+    const normalizado = texto.includes("T")
+        ? texto
+        : texto.includes(" ")
+            ? texto.replace(" ", "T")
+            : `${texto}T12:00:00`;
+    const fecha = new Date(normalizado);
+    if (Number.isNaN(fecha.getTime())) return texto;
+
+    return new Intl.DateTimeFormat("es-CO", {
+        dateStyle: "medium",
+        timeStyle: texto.length > 10 ? "short" : undefined
+    }).format(fecha);
+}
+
+function etiquetaServicioHistorial(datos){
+    if (!datos || typeof datos !== "object") return "—";
+    return [datos.plataforma, datos.nombre_perfil]
+        .map(valor => String(valor ?? "").trim())
+        .filter(Boolean)
+        .join(" · ") || "—";
+}
+
+function detallesEventoHistorial(evento){
+    const datos = evento?.datos || {};
+    const origen = datos.origen || {};
+    const antes = datos.destino_antes || {};
+    const despues = datos.destino_despues || {};
+
+    switch (evento?.tipo){
+        case "venta":
+            return [
+                ["Cliente", datos.cliente],
+                ["Días", datos.dias],
+                ["Vence", datos.fecha_vencimiento]
+            ];
+        case "renovacion":
+            return [
+                ["Días agregados", datos.dias_agregados ?? datos.dias],
+                ["Vencimiento anterior", datos.vencimiento_anterior],
+                ["Nuevo vencimiento", datos.nuevo_vencimiento]
+            ];
+        case "caida":
+            return [
+                ["Cliente", datos.cliente],
+                ["Estado anterior", datos.estado_anterior],
+                ["Estado nuevo", datos.estado_nuevo]
+            ];
+        case "reemplazo":
+            return [
+                ["Origen", `${textoHistorial(datos.plataforma_origen, "")} · ${textoHistorial(datos.perfil_origen, "")}`],
+                ["Destino", `${textoHistorial(datos.plataforma_destino, "")} · ${textoHistorial(datos.perfil_destino, "")}`],
+                ["Cliente", datos.cliente],
+                ["Vencimiento preservado", datos.vencimiento_preservado],
+                ["Motivo", datos.motivo]
+            ];
+        case "liberacion":
+            return [
+                ["Cliente anterior", origen.cliente],
+                ["Días restantes", datos.dias_disponibles ?? origen.dias_restantes],
+                ["Motivo", datos.motivo]
+            ];
+        case "traslado_nuevo_servicio":
+            return [
+                ["Origen", etiquetaServicioHistorial(origen)],
+                ["Destino", etiquetaServicioHistorial(despues)],
+                ["Días trasladados", datos.dias_trasladados],
+                ["Nuevo vencimiento", despues.fecha_vencimiento],
+                ["Motivo", datos.motivo]
+            ];
+        case "traslado_servicio_activo":
+            return [
+                ["Origen", etiquetaServicioHistorial(origen)],
+                ["Destino", etiquetaServicioHistorial(despues)],
+                ["Días agregados", datos.dias_trasladados],
+                ["Vencimiento anterior", antes.fecha_vencimiento],
+                ["Nuevo vencimiento", despues.fecha_vencimiento],
+                ["Motivo", datos.motivo]
+            ];
+        default:
+            return [];
+    }
+}
+
+function esTrasladoHistorial(evento){
+    return evento?.tipo === "traslado_nuevo_servicio" ||
+        evento?.tipo === "traslado_servicio_activo";
+}
+
+function crearRutaTrasladoHistorial(evento){
+    const datos = evento?.datos || {};
+    const perfilEsOrigen = datos.rol_perfil === "origen";
+    const perfilEsDestino = datos.rol_perfil === "destino";
+    if (!perfilEsOrigen && !perfilEsDestino) return null;
+
+    const bloque = document.createElement("section");
+    bloque.className = "nube-historial-traslado";
+
+    const contexto = document.createElement("strong");
+    contexto.className = "nube-historial-traslado-contexto";
+    contexto.textContent = perfilEsOrigen
+        ? "Servicio trasladado desde este perfil"
+        : "Este perfil recibió un traslado";
+
+    const ruta = document.createElement("div");
+    ruta.className = "nube-historial-traslado-ruta";
+    [
+        ["ORIGEN", perfilEsOrigen, etiquetaServicioHistorial(datos.origen)],
+        ["DESTINO", perfilEsDestino, etiquetaServicioHistorial(datos.destino_despues)]
+    ].forEach(([rol, esActual, servicio]) => {
+        const extremo = document.createElement("div");
+        extremo.className = `nube-historial-traslado-extremo${esActual ? " es-actual" : ""}`;
+
+        const etiquetas = document.createElement("div");
+        const etiquetaRol = document.createElement("span");
+        etiquetaRol.className = "nube-historial-traslado-badge";
+        etiquetaRol.textContent = rol;
+        etiquetas.appendChild(etiquetaRol);
+        if (esActual){
+            const etiquetaActual = document.createElement("span");
+            etiquetaActual.className = "nube-historial-traslado-badge es-perfil";
+            etiquetaActual.textContent = "ESTE PERFIL";
+            etiquetas.appendChild(etiquetaActual);
+        }
+
+        const valor = document.createElement("strong");
+        valor.textContent = esActual ? "Este perfil" : servicio;
+        extremo.append(etiquetas, valor);
+        ruta.appendChild(extremo);
+    });
+
+    bloque.append(contexto, ruta);
+    return bloque;
+}
+
+function crearEstadoHistorial(icono, titulo, descripcion, clase = ""){
+    const estado = document.createElement("div");
+    estado.className = `nube-historial-estado ${clase}`.trim();
+
+    const elementoIcono = document.createElement("i");
+    elementoIcono.setAttribute("data-lucide", icono);
+    const fuerte = document.createElement("strong");
+    fuerte.textContent = titulo;
+    const texto = document.createElement("span");
+    texto.textContent = descripcion;
+
+    estado.append(elementoIcono, fuerte, texto);
+    return estado;
+}
+
+function mostrarCargaHistorial(){
+    if (!contenidoHistorialPerfil) return;
+    const carga = document.createElement("div");
+    carga.className = "nube-historial-skeleton";
+    carga.setAttribute("aria-label", "Cargando historial");
+
+    for (let indice = 0; indice < 3; indice += 1){
+        const fila = document.createElement("div");
+        const punto = document.createElement("span");
+        const lineas = document.createElement("div");
+        lineas.append(document.createElement("i"), document.createElement("i"));
+        fila.append(punto, lineas);
+        carga.appendChild(fila);
+    }
+    contenidoHistorialPerfil.replaceChildren(carga);
+}
+
+function renderizarHistorialPerfil(resultado){
+    if (!contenidoHistorialPerfil) return;
+    const fragmento = document.createDocumentFragment();
+    const perfil = resultado?.perfil || {};
+    const eventos = Array.isArray(resultado?.eventos) ? resultado.eventos : [];
+
+    const resumen = document.createElement("header");
+    resumen.className = "nube-historial-resumen";
+    const etiqueta = document.createElement("span");
+    etiqueta.textContent = "HISTORIAL DEL PERFIL";
+    const titulo = document.createElement("h3");
+    titulo.textContent = [perfil.plataforma, perfil.nombre_perfil]
+        .map(valor => String(valor ?? "").trim())
+        .filter(Boolean)
+        .join(" · ") || "Perfil";
+    const meta = document.createElement("div");
+
+    [
+        ["Estado actual", perfil.estado],
+        ["Cuenta madre", perfil.cuenta_madre],
+        ["Eventos", eventos.length]
+    ].forEach(([nombre, valor]) => {
+        const elemento = document.createElement("span");
+        const nombreElemento = document.createElement("small");
+        nombreElemento.textContent = nombre;
+        const valorElemento = document.createElement("strong");
+        valorElemento.textContent = textoHistorial(valor);
+        elemento.append(nombreElemento, valorElemento);
+        meta.appendChild(elemento);
+    });
+    resumen.append(etiqueta, titulo, meta);
+    fragmento.appendChild(resumen);
+
+    if (!eventos.length){
+        fragmento.appendChild(crearEstadoHistorial(
+            "history",
+            "Sin movimientos registrados",
+            "No hay movimientos históricos registrados para este perfil."
+        ));
+        contenidoHistorialPerfil.replaceChildren(fragmento);
+        if (window.lucide) window.lucide.createIcons();
+        return;
+    }
+
+    const linea = document.createElement("div");
+    linea.className = "nube-historial-linea";
+
+    eventos.forEach(evento => {
+        const configuracion = configuracionEventosHistorial[evento?.tipo] || {
+            clase: "neutral",
+            icono: "activity"
+        };
+        const articulo = document.createElement("article");
+        articulo.className = `nube-historial-evento nube-historial-evento--${configuracion.clase}`;
+
+        const marcador = document.createElement("div");
+        marcador.className = "nube-historial-marcador";
+        const icono = document.createElement("i");
+        icono.setAttribute("data-lucide", configuracion.icono);
+        marcador.appendChild(icono);
+
+        const tarjeta = document.createElement("div");
+        tarjeta.className = "nube-historial-tarjeta";
+        const cabecera = document.createElement("div");
+        cabecera.className = "nube-historial-evento-header";
+        const tituloEvento = document.createElement("strong");
+        tituloEvento.textContent = textoHistorial(evento?.titulo, "Movimiento del perfil");
+        const fecha = document.createElement("time");
+        fecha.dateTime = String(evento?.fecha ?? "");
+        fecha.textContent = formatearFechaHistorial(evento?.fecha);
+        cabecera.append(tituloEvento, fecha);
+
+        const descripcion = document.createElement("p");
+        descripcion.textContent = textoHistorial(evento?.descripcion, "Sin descripción adicional.");
+        tarjeta.append(cabecera, descripcion);
+
+        const rutaTraslado = crearRutaTrasladoHistorial(evento);
+        if (rutaTraslado) tarjeta.appendChild(rutaTraslado);
+
+        const detalles = detallesEventoHistorial(evento)
+            .filter(([nombre]) => !rutaTraslado || !["Origen", "Destino"].includes(nombre))
+            .filter(([, valor]) => String(valor ?? "").trim());
+        if (detalles.length){
+            const lista = document.createElement("dl");
+            detalles.forEach(([nombre, valor]) => {
+                const fila = document.createElement("div");
+                const termino = document.createElement("dt");
+                termino.textContent = nombre;
+                const dato = document.createElement("dd");
+                dato.textContent = textoHistorial(valor);
+                fila.append(termino, dato);
+                lista.appendChild(fila);
+            });
+            tarjeta.appendChild(lista);
+        }
+        articulo.append(marcador, tarjeta);
+        linea.appendChild(articulo);
+    });
+
+    fragmento.appendChild(linea);
+    contenidoHistorialPerfil.replaceChildren(fragmento);
+    if (window.lucide) window.lucide.createIcons();
+}
+
+async function cargarHistorialPerfil(forzar = false){
+    const perfilId = String(perfilGestionId?.value || "").trim();
+    if (!perfilId || !contenidoHistorialPerfil) return;
+    if (!forzar && historialPerfilCargadoId === perfilId) return;
+
+    historialPerfilAbortController?.abort();
+    historialPerfilAbortController = new AbortController();
+    mostrarCargaHistorial();
+
+    try {
+        const respuesta = await fetch(
+            `/admin/nube-cuentas/perfil/${encodeURIComponent(perfilId)}/historial`,
+            {signal: historialPerfilAbortController.signal}
+        );
+        const resultado = await respuesta.json();
+        if (!respuesta.ok || !resultado.ok){
+            throw new Error(resultado.mensaje || "No se pudo cargar el historial.");
+        }
+        historialPerfilCargadoId = perfilId;
+        renderizarHistorialPerfil(resultado);
+    } catch (error) {
+        if (error.name === "AbortError") return;
+        const estado = crearEstadoHistorial(
+            "circle-alert",
+            "No pudimos cargar el historial",
+            error.message || "Intenta nuevamente en unos segundos.",
+            "error"
+        );
+        const reintentar = document.createElement("button");
+        reintentar.type = "button";
+        reintentar.textContent = "Reintentar";
+        reintentar.addEventListener("click", () => cargarHistorialPerfil(true));
+        estado.appendChild(reintentar);
+        contenidoHistorialPerfil.replaceChildren(estado);
+        if (window.lucide) window.lucide.createIcons();
+    }
+}
+
+function cambiarVistaPerfil(vista){
+    const mostrarHistorial = vista === "historial";
+    if (formGestionPerfil){
+        formGestionPerfil.hidden = mostrarHistorial;
+        formGestionPerfil.setAttribute("aria-hidden", String(mostrarHistorial));
+    }
+    if (vistaHistorialPerfil){
+        vistaHistorialPerfil.hidden = !mostrarHistorial;
+        vistaHistorialPerfil.setAttribute("aria-hidden", String(!mostrarHistorial));
+    }
+    tabGestionPerfil?.classList.toggle("activo", !mostrarHistorial);
+    tabHistorialPerfil?.classList.toggle("activo", mostrarHistorial);
+    tabGestionPerfil?.setAttribute("aria-selected", String(!mostrarHistorial));
+    tabHistorialPerfil?.setAttribute("aria-selected", String(mostrarHistorial));
+
+    if (mostrarHistorial) cargarHistorialPerfil();
+}
+
+function resetearHistorialPerfil(){
+    historialPerfilAbortController?.abort();
+    historialPerfilAbortController = null;
+    historialPerfilCargadoId = "";
+    contenidoHistorialPerfil?.replaceChildren();
+    cambiarVistaPerfil("gestion");
+}
+
+tabGestionPerfil?.addEventListener("click", () => cambiarVistaPerfil("gestion"));
+tabHistorialPerfil?.addEventListener("click", () => cambiarVistaPerfil("historial"));
+
+
         function abrirGestionPerfil(
             boton
         ){
@@ -1831,6 +2229,7 @@ diasTrasladarPerfil?.addEventListener("input", () => {
             if (!modalPerfil) return;
 
             establecerOperacionCompletada(false);
+            resetearHistorialPerfil();
 
 
             const datos =
@@ -1992,6 +2391,7 @@ if (motivoCaidaPerfil){
             if (!modalPerfil) return;
 
             establecerOperacionCompletada(false);
+            resetearHistorialPerfil();
             operacionLiberacionUuid = "";
             resetearTrasladoPerfil();
 

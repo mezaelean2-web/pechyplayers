@@ -1650,11 +1650,44 @@ Nube de cuentas
         </div>
 
 
+        <div
+            class="nube-perfil-tabs"
+            role="tablist"
+            aria-label="Vistas del perfil"
+        >
+            <button
+                type="button"
+                class="nube-perfil-tab activo"
+                id="tabGestionPerfil"
+                role="tab"
+                aria-selected="true"
+                aria-controls="formGestionPerfil"
+            >
+                <i data-lucide="settings-2"></i>
+                Gestión
+            </button>
+
+            <button
+                type="button"
+                class="nube-perfil-tab"
+                id="tabHistorialPerfil"
+                role="tab"
+                aria-selected="false"
+                aria-controls="vistaHistorialPerfil"
+            >
+                <i data-lucide="history"></i>
+                Historial
+            </button>
+        </div>
+
+
         <form
             action="/admin/nube-cuentas/perfil/guardar"
             method="POST"
             class="nube-form"
             id="formGestionPerfil"
+            role="tabpanel"
+            aria-labelledby="tabGestionPerfil"
         >
 
             <input
@@ -2120,6 +2153,21 @@ Nube de cuentas
 </div>
 
         </form>
+
+
+        <section
+            class="nube-historial-vista"
+            id="vistaHistorialPerfil"
+            role="tabpanel"
+            aria-labelledby="tabHistorialPerfil"
+            tabindex="0"
+            hidden
+        >
+            <div
+                class="nube-historial-contenido"
+                id="contenidoHistorialPerfil"
+            ></div>
+        </section>
 
     </div>
 

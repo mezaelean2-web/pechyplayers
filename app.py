@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, obtener_historial_completo_perfil_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -980,6 +980,24 @@ def obtener_contexto_liberacion_perfil_nube_route(perfil_id):
         }), 409
 
     return jsonify({"ok": True, **contexto})
+
+
+@app.route(
+    "/admin/nube-cuentas/perfil/<int:perfil_id>/historial",
+    methods=["GET"]
+)
+def obtener_historial_completo_perfil_nube_route(perfil_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    historial = obtener_historial_completo_perfil_nube(perfil_id)
+    if not historial:
+        return jsonify({
+            "ok": False,
+            "mensaje": "No se encontró el perfil."
+        }), 404
+
+    return jsonify({"ok": True, **historial})
 
 
 @app.route(
