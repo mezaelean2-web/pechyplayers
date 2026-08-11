@@ -3,6 +3,190 @@ document.addEventListener(
     () => {
 
         // ==========================================
+        // CENTRO DE ALERTAS OPERATIVAS
+        // ==========================================
+
+        const centroAlertas = document.getElementById("nubeAlertasCentro");
+        const listaAlertas = document.getElementById("nubeAlertasLista");
+        const filtroTipoAlertas = document.getElementById("nubeAlertasFiltroTipo");
+        const filtrosPrincipalesAlertas = document.getElementById("nubeAlertasFiltrosPrincipales");
+        const botonActualizarAlertas = document.getElementById("nubeAlertasActualizar");
+        const estadoAlertas = { alertas: [], filtro: "todas", tipo: "todos", cargando: false };
+
+        const gruposTipoAlerta = {
+            perfiles: ["perfil_vencido", "perfil_vence_hoy", "perfil_por_vencer"],
+            cuentas: ["cuenta_vencida", "cuenta_vence_hoy", "cuenta_por_vencer"],
+            pagos_pin: ["pago_pin_pendiente", "pago_pin_vence_hoy", "pago_pin_proximo"],
+            caidas: ["cuenta_caida"]
+        };
+
+        function crearElementoAlerta(etiqueta, clase, texto){
+            const elemento = document.createElement(etiqueta);
+            if (clase) elemento.className = clase;
+            if (texto !== undefined) elemento.textContent = texto;
+            return elemento;
+        }
+
+        function coincideFiltroAlerta(alerta){
+            const coincidePrincipal = estadoAlertas.filtro === "todas" ||
+                (estadoAlertas.filtro === "criticas" && alerta.prioridad === "critica") ||
+                (estadoAlertas.filtro === "hoy" && alerta.dias_restantes === 0) ||
+                (estadoAlertas.filtro === "proximas" && alerta.dias_restantes >= 1 && alerta.dias_restantes <= 3);
+            const tipos = gruposTipoAlerta[estadoAlertas.tipo];
+            return coincidePrincipal && (!tipos || tipos.includes(alerta.tipo));
+        }
+
+        function textoFechaAlerta(alerta){
+            if (!alerta.fecha_objetivo) return "Sin fecha objetivo";
+            if (alerta.dias_restantes === 0) return `${alerta.fecha_objetivo} · Hoy`;
+            if (alerta.dias_restantes === 1) return `${alerta.fecha_objetivo} · Falta 1 día`;
+            if (alerta.dias_restantes > 1) return `${alerta.fecha_objetivo} · Faltan ${alerta.dias_restantes} días`;
+            if (alerta.dias_restantes === -1) return `${alerta.fecha_objetivo} · Hace 1 día`;
+            if (alerta.dias_restantes < -1) return `${alerta.fecha_objetivo} · Hace ${Math.abs(alerta.dias_restantes)} días`;
+            return alerta.fecha_objetivo;
+        }
+
+        function ejecutarAccionAlerta(alerta){
+            let selector;
+            if (alerta.accion === "gestionar_perfil" && alerta.perfil_id){
+                selector = `.nube-gestionar-perfil[data-id="${CSS.escape(String(alerta.perfil_id))}"]`;
+            } else if (alerta.cuenta_id){
+                selector = `.nube-ver-cuenta[data-id="${CSS.escape(String(alerta.cuenta_id))}"]`;
+            }
+            const control = selector ? document.querySelector(selector) : null;
+            if (control){
+                control.click();
+                return;
+            }
+            const fila = alerta.cuenta_id
+                ? document.querySelector(`.nube-cuenta-madre .nube-ver-cuenta[data-id="${CSS.escape(String(alerta.cuenta_id))}"]`)?.closest("tr")
+                : null;
+            fila?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        function renderizarAlertas(){
+            if (!listaAlertas) return;
+            listaAlertas.replaceChildren();
+            const visibles = estadoAlertas.alertas.filter(coincideFiltroAlerta);
+
+            if (!visibles.length){
+                const vacio = crearElementoAlerta("div", "nube-alertas-vacio");
+                vacio.append(
+                    crearElementoAlerta("strong", "", estadoAlertas.alertas.length ? "Sin coincidencias" : "Todo al día"),
+                    crearElementoAlerta("span", "", estadoAlertas.alertas.length
+                        ? "No hay alertas para los filtros seleccionados."
+                        : "No hay alertas operativas pendientes.")
+                );
+                listaAlertas.append(vacio);
+                return;
+            }
+
+            visibles.forEach(alerta => {
+                const tarjeta = crearElementoAlerta("article", `nube-alerta-item nube-alerta-${alerta.prioridad}`);
+                const cabecera = crearElementoAlerta("div", "nube-alerta-item-cabecera");
+                cabecera.append(
+                    crearElementoAlerta("span", "nube-alerta-prioridad", alerta.prioridad.toUpperCase()),
+                    crearElementoAlerta("span", "nube-alerta-tipo", alerta.tipo.replaceAll("_", " "))
+                );
+                const contenido = crearElementoAlerta("div", "nube-alerta-contenido");
+                contenido.append(
+                    crearElementoAlerta("h3", "", alerta.titulo),
+                    crearElementoAlerta("p", "", alerta.descripcion)
+                );
+                const meta = crearElementoAlerta("div", "nube-alerta-meta");
+                [
+                    alerta.plataforma,
+                    alerta.cliente ? `Cliente: ${alerta.cliente}` : "",
+                    alerta.perfil_id ? `Perfil #${alerta.perfil_id}` : `Cuenta #${alerta.cuenta_id}`,
+                    textoFechaAlerta(alerta)
+                ].filter(Boolean).forEach(texto => meta.append(crearElementoAlerta("span", "", texto)));
+                contenido.append(meta);
+                const accion = crearElementoAlerta("button", "nube-alerta-accion",
+                    alerta.accion === "gestionar_perfil" ? "Gestionar perfil" :
+                    alerta.accion === "actualizar_pago_pin" ? "Ver control PIN" : "Ver cuenta");
+                accion.type = "button";
+                accion.addEventListener("click", () => ejecutarAccionAlerta(alerta));
+                tarjeta.append(cabecera, contenido, accion);
+                listaAlertas.append(tarjeta);
+            });
+        }
+
+        function cambiarFiltroAlertas(filtro){
+            estadoAlertas.filtro = filtro;
+            document.querySelectorAll("[data-alerta-filtro]").forEach(boton => {
+                const activo = boton.dataset.alertaFiltro === filtro;
+                boton.classList.toggle("activo", activo);
+                boton.setAttribute("aria-pressed", String(activo));
+            });
+            renderizarAlertas();
+        }
+
+        function crearFiltrosPrincipales(){
+            if (!filtrosPrincipalesAlertas) return;
+            [
+                ["todas", "Todas"], ["criticas", "Críticas"],
+                ["hoy", "Hoy"], ["proximas", "Próximas"]
+            ].forEach(([valor, etiqueta]) => {
+                const boton = crearElementoAlerta("button", "nube-alertas-chip", etiqueta);
+                boton.type = "button";
+                boton.dataset.alertaFiltro = valor;
+                boton.setAttribute("aria-pressed", String(valor === "todas"));
+                boton.classList.toggle("activo", valor === "todas");
+                boton.addEventListener("click", () => cambiarFiltroAlertas(valor));
+                filtrosPrincipalesAlertas.append(boton);
+            });
+        }
+
+        async function refreshAlertasNube(){
+            if (!centroAlertas || estadoAlertas.cargando) return;
+            estadoAlertas.cargando = true;
+            centroAlertas.setAttribute("aria-busy", "true");
+            botonActualizarAlertas?.setAttribute("disabled", "");
+            try {
+                const respuesta = await fetch("/admin/nube-cuentas/alertas", {
+                    headers: { "Accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudieron cargar las alertas.");
+                estadoAlertas.alertas = Array.isArray(resultado.alertas) ? resultado.alertas : [];
+                const resumen = resultado.resumen || {};
+                document.getElementById("nubeAlertasTotal").textContent = resumen.total ?? 0;
+                document.getElementById("nubeAlertasCriticas").textContent = resumen.criticas ?? 0;
+                document.getElementById("nubeAlertasHoy").textContent = resumen.hoy ?? 0;
+                document.getElementById("nubeAlertasProximas").textContent = resumen.proximas ?? 0;
+                renderizarAlertas();
+            } catch (error) {
+                listaAlertas?.replaceChildren();
+                const estadoError = crearElementoAlerta("div", "nube-alertas-error");
+                estadoError.append(
+                    crearElementoAlerta("strong", "", "No pudimos cargar las alertas"),
+                    crearElementoAlerta("span", "", error.message)
+                );
+                const reintentar = crearElementoAlerta("button", "nube-alerta-accion", "Reintentar");
+                reintentar.type = "button";
+                reintentar.addEventListener("click", refreshAlertasNube);
+                estadoError.append(reintentar);
+                listaAlertas?.append(estadoError);
+            } finally {
+                estadoAlertas.cargando = false;
+                centroAlertas.setAttribute("aria-busy", "false");
+                botonActualizarAlertas?.removeAttribute("disabled");
+            }
+        }
+
+        crearFiltrosPrincipales();
+        document.querySelectorAll(".nube-alerta-stat").forEach(boton =>
+            boton.addEventListener("click", () => cambiarFiltroAlertas(boton.dataset.alertaFiltro))
+        );
+        filtroTipoAlertas?.addEventListener("change", () => {
+            estadoAlertas.tipo = filtroTipoAlertas.value;
+            renderizarAlertas();
+        });
+        botonActualizarAlertas?.addEventListener("click", refreshAlertasNube);
+        window.refreshAlertasNube = refreshAlertasNube;
+        refreshAlertasNube();
+
+        // ==========================================
         // MODAL — NUEVA CUENTA
         // ==========================================
 
@@ -201,6 +385,9 @@ document.addEventListener(
                 "toggleDrawerPassword"
             );
 
+        const botonPapeleraDrawer = drawer?.querySelector(".nube-drawer-papelera");
+        let cuentaActualDrawerId = null;
+
 
         let passwordActual = "";
 
@@ -215,6 +402,8 @@ document.addEventListener(
 
             const datos =
                 boton.dataset;
+
+            cuentaActualDrawerId = datos.id || null;
 
 
             const plataforma =
@@ -352,6 +541,8 @@ document.addEventListener(
             const estado =
                 datos.estado ||
                 "disponible";
+
+            if (botonPapeleraDrawer) botonPapeleraDrawer.hidden = estado !== "caida";
 
 
             if (drawerEstado){
@@ -1340,6 +1531,13 @@ const filaVencimientoActual = document.getElementById("filaVencimientoActual");
 const trasladoResumenVencimientoActual = document.getElementById("trasladoResumenVencimientoActual");
 const advertenciaLiberacionPerfil = document.getElementById("advertenciaLiberacionPerfil");
 const grupoRenovacionPerfil = document.querySelector(".nube-renovacion-rapida");
+const grupoNoRenovoPerfil = document.getElementById("grupoNoRenovoPerfil");
+const abrirNoRenovoPerfil = document.getElementById("abrirNoRenovoPerfil");
+const panelNoRenovoPerfil = document.getElementById("panelNoRenovoPerfil");
+const contenidoNoRenovoPerfil = document.getElementById("contenidoNoRenovoPerfil");
+const exitoNoRenovoPerfil = document.getElementById("exitoNoRenovoPerfil");
+const cancelarNoRenovoPerfil = document.getElementById("cancelarNoRenovoPerfil");
+const confirmarNoRenovoPerfil = document.getElementById("confirmarNoRenovoPerfil");
 
 let operacionLiberacionUuid = "";
 let accionLiberacionPerfil = "liberar";
@@ -1823,6 +2021,29 @@ elegirLiberarPerfil?.addEventListener(
     "click",
     () => seleccionarAccionLiberacion("liberar")
 );
+
+document.addEventListener("DOMContentLoaded", async () => {
+    const atajo = document.getElementById("nubeAlertasAtajo");
+    if (atajo) {
+        try {
+            const respuesta = await fetch("/admin/nube-cuentas/alertas", { headers: { Accept: "application/json" } });
+            const datos = await respuesta.json();
+            if (!respuesta.ok || !datos.ok) throw new Error();
+            const resumen = datos.resumen || {};
+            document.getElementById("nubeAlertasAtajoTitulo").textContent = resumen.total ? `${resumen.total} alerta${resumen.total === 1 ? "" : "s"} requieren atención` : "Todo está al día";
+            document.getElementById("nubeAlertasAtajoResumen").textContent = `${resumen.criticas || 0} críticas · ${resumen.hoy || 0} hoy · ${resumen.proximas || 0} próximas`;
+        } catch (_) {
+            document.getElementById("nubeAlertasAtajoTitulo").textContent = "Centro de alertas";
+            document.getElementById("nubeAlertasAtajoResumen").textContent = "No se pudo actualizar el conteo · Abrir centro";
+        }
+    }
+    const params = new URLSearchParams(window.location.search);
+    const perfil = params.get("perfil");
+    const cuenta = params.get("cuenta");
+    const escape = window.CSS?.escape || (valor => String(valor).replace(/[^a-zA-Z0-9_-]/g, ""));
+    const selector = perfil ? `.nube-gestionar-perfil[data-id="${escape(perfil)}"]` : cuenta ? `.nube-ver-cuenta[data-id="${escape(cuenta)}"]` : "";
+    if (selector) window.setTimeout(() => document.querySelector(selector)?.click(), 120);
+});
 elegirTrasladarPerfil?.addEventListener(
     "click",
     () => seleccionarAccionLiberacion("trasladar_nuevo")
@@ -2168,6 +2389,27 @@ async function cargarHistorialPerfil(forzar = false){
             `/admin/nube-cuentas/perfil/${encodeURIComponent(perfilId)}/historial`,
             {signal: historialPerfilAbortController.signal}
         );
+
+        botonPapeleraDrawer?.addEventListener("click", async () => {
+            if (!cuentaActualDrawerId) return;
+            botonPapeleraDrawer.disabled = true;
+            try {
+                const detalleRespuesta = await fetch(`/admin/nube-cuentas/alertas/detalle?cuenta_id=${encodeURIComponent(cuentaActualDrawerId)}`, { headers: { Accept: "application/json" } });
+                const detalle = await detalleRespuesta.json();
+                if (!detalleRespuesta.ok) throw new Error(detalle.mensaje || "No se pudo validar la cuenta.");
+                if (!detalle.cuenta.lista_para_papelera) {
+                    const pendientes = Number(detalle.cuenta.servicios_vigentes_pendientes || 0);
+                    alert(pendientes === 1 ? "Falta 1 servicio vigente por resolver." : `Faltan ${pendientes} servicios vigentes por resolver.`);
+                    return;
+                }
+                if (!confirm("Mover cuenta a Papelera\n\nLa cuenta saldrá del inventario operativo y del Centro de Alertas. Los datos operativos restantes serán limpiados, pero todo el historial se conservará.")) return;
+                const respuesta = await fetch(`/admin/nube-cuentas/${cuentaActualDrawerId}/papelera`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ motivo: "Archivada desde Nube" }) });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok) throw new Error(resultado.mensaje || "No se pudo mover la cuenta a Papelera.");
+                cerrarPanelCuenta(); window.location.reload();
+            } catch (error) { alert(error.message); }
+            finally { botonPapeleraDrawer.disabled = false; }
+        });
         const resultado = await respuesta.json();
         if (!respuesta.ok || !resultado.ok){
             throw new Error(resultado.mensaje || "No se pudo cargar el historial.");
@@ -2269,6 +2511,16 @@ tabHistorialPerfil?.addEventListener("click", () => cambiarVistaPerfil("historia
             if (grupoLiberacionPerfil){
                 grupoLiberacionPerfil.hidden = !perfilRealmenteAsignado;
             }
+            const estadoNoRenovo = String(datos.estado || "").trim().toLowerCase();
+            const estadoPermiteNoRenovo = ![
+                "disponible", "reemplazada", "papelera", "garantia", "caida"
+            ].includes(estadoNoRenovo);
+            if (grupoNoRenovoPerfil){
+                grupoNoRenovoPerfil.hidden = !(perfilRealmenteAsignado && estadoPermiteNoRenovo);
+            }
+            if (panelNoRenovoPerfil) panelNoRenovoPerfil.hidden = true;
+            if (contenidoNoRenovoPerfil) contenidoNoRenovoPerfil.hidden = false;
+            if (exitoNoRenovoPerfil) exitoNoRenovoPerfil.hidden = true;
             if (panelLiberacionPerfil) panelLiberacionPerfil.hidden = true;
             if (contenidoLiberacionPerfil) contenidoLiberacionPerfil.hidden = false;
             if (exitoLiberacionPerfil) exitoLiberacionPerfil.hidden = true;
@@ -2408,6 +2660,8 @@ if (motivoCaidaPerfil){
             document.body.classList.remove(
                 "nube-modal-abierto"
             );
+
+            refreshAlertasNube();
 
         }
 
@@ -2681,6 +2935,54 @@ if (motivoCaidaPerfil){
             } catch (error) {
                 mostrarMensajePerfil(error.message, "error");
                 confirmarLiberacionPerfil.disabled = false;
+            }
+        });
+
+        abrirNoRenovoPerfil?.addEventListener("click", () => {
+            panelNoRenovoPerfil.hidden = false;
+            contenidoNoRenovoPerfil.hidden = false;
+            exitoNoRenovoPerfil.hidden = true;
+        });
+
+        cancelarNoRenovoPerfil?.addEventListener("click", () => {
+            panelNoRenovoPerfil.hidden = true;
+        });
+
+        confirmarNoRenovoPerfil?.addEventListener("click", async () => {
+            const perfilId = perfilGestionId?.value || "";
+            if (!perfilId || operacionCompletada) return;
+            confirmarNoRenovoPerfil.disabled = true;
+            try {
+                const respuesta = await fetch("/admin/nube-cuentas/perfil/no-renovo", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({
+                        perfil_id: perfilId,
+                        operacion_uuid: crearOperacionUuid().replace("liberar-", "no-renovo-")
+                    })
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok){
+                    throw new Error(resultado.mensaje || "No se pudo registrar la no renovación.");
+                }
+                contenidoNoRenovoPerfil.hidden = true;
+                exitoNoRenovoPerfil.hidden = false;
+                if (grupoLiberacionPerfil) grupoLiberacionPerfil.hidden = true;
+                if (grupoRenovacionPerfil) grupoRenovacionPerfil.hidden = true;
+                if (abrirCaidaPerfil) abrirCaidaPerfil.hidden = true;
+                if (grupoReemplazoPerfil) grupoReemplazoPerfil.hidden = true;
+                perfilGestionCliente.value = "";
+                perfilGestionTelefono.value = "";
+                perfilGestionEntrega.value = "";
+                perfilGestionDias.value = "";
+                perfilGestionVencimiento.value = "Sin vencimiento";
+                subtituloGestionPerfil.textContent = "Perfil · disponible";
+                mostrarMensajePerfil(resultado.mensaje);
+                establecerOperacionCompletada(true);
+                window.lucide?.createIcons();
+            } catch (error) {
+                mostrarMensajePerfil(error.message, "error");
+                confirmarNoRenovoPerfil.disabled = false;
             }
         });
 
@@ -2988,6 +3290,8 @@ confirmarCaidaPerfil?.addEventListener(
                 mostrarMensajePerfil(
     resultado.mensaje
 );
+
+establecerOperacionCompletada(true);
 
 
 // ==========================================

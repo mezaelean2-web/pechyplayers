@@ -1628,6 +1628,196 @@ body.nube-modal-abierto{
     background:#30323a;
 }
 
+/* ==========================================
+   CENTRO DE ALERTAS OPERATIVAS
+   ========================================== */
+
+.nube-alertas-centro{
+    margin: 22px 0 26px;
+    padding: 20px;
+    border: 1px solid rgba(148, 163, 184, .16);
+    border-radius: 22px;
+    background: linear-gradient(145deg, rgba(15, 23, 42, .94), rgba(8, 15, 29, .98));
+    box-shadow: 0 18px 45px rgba(0, 0, 0, .2);
+}
+
+.nube-alertas-cabecera,
+.nube-alertas-filtros,
+.nube-alerta-item{
+    display: flex;
+    align-items: center;
+}
+
+.nube-alertas-cabecera{
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.nube-alertas-eyebrow{
+    color: #60a5fa;
+    font-size: .7rem;
+    font-weight: 800;
+    letter-spacing: .14em;
+}
+
+.nube-alertas-cabecera h2{
+    margin: 4px 0 2px;
+    color: #f8fafc;
+    font-size: 1.25rem;
+}
+
+.nube-alertas-cabecera p{
+    margin: 0;
+    color: #94a3b8;
+    font-size: .84rem;
+}
+
+.nube-alertas-actualizar,
+.nube-alerta-accion,
+.nube-alertas-chip,
+.nube-alerta-stat{
+    font: inherit;
+    cursor: pointer;
+}
+
+.nube-alertas-actualizar{
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(148, 163, 184, .22);
+    border-radius: 11px;
+    color: #cbd5e1;
+    background: rgba(30, 41, 59, .65);
+}
+
+.nube-alertas-actualizar svg{ width: 16px; height: 16px; }
+.nube-alertas-actualizar:disabled{ opacity: .55; cursor: wait; }
+
+.nube-alertas-resumen{
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin: 17px 0 14px;
+}
+
+.nube-alerta-stat{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-width: 0;
+    padding: 11px 14px;
+    border: 1px solid rgba(148, 163, 184, .14);
+    border-radius: 13px;
+    color: #aebbd0;
+    background: rgba(30, 41, 59, .46);
+    text-align: left;
+}
+
+.nube-alerta-stat strong{ color: #f8fafc; font-size: 1.25rem; }
+.nube-alerta-stat.activo{ border-color: rgba(59, 130, 246, .65); background: rgba(37, 99, 235, .14); }
+
+.nube-alertas-filtros{
+    justify-content: space-between;
+    gap: 14px;
+    padding-top: 13px;
+    border-top: 1px solid rgba(148, 163, 184, .12);
+}
+
+.nube-alertas-segmentos{ display: flex; flex-wrap: wrap; gap: 7px; }
+
+.nube-alertas-chip{
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: #94a3b8;
+    background: transparent;
+}
+
+.nube-alertas-chip.activo{ color: #dbeafe; border-color: rgba(96, 165, 250, .35); background: rgba(59, 130, 246, .13); }
+
+.nube-alertas-tipo{ display: flex; align-items: center; gap: 8px; color: #94a3b8; font-size: .8rem; }
+.nube-alertas-tipo select{ padding: 7px 30px 7px 10px; border: 1px solid rgba(148, 163, 184, .2); border-radius: 9px; color: #dbe4f0; background: #111c30; }
+
+.nube-alertas-lista{ display: grid; gap: 9px; margin-top: 14px; }
+
+.nube-alerta-item{
+    position: relative;
+    gap: 14px;
+    padding: 14px 15px;
+    overflow: hidden;
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 14px;
+    background: rgba(15, 23, 42, .7);
+}
+
+.nube-alerta-item::before{ content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: #64748b; }
+.nube-alerta-critica::before{ background: #ef4444; }
+.nube-alerta-alta::before{ background: #f59e0b; }
+.nube-alerta-media::before{ background: #3b82f6; }
+
+.nube-alerta-item-cabecera{ width: 92px; flex: 0 0 92px; display: grid; gap: 5px; }
+.nube-alerta-prioridad{ color: #f8fafc; font-size: .67rem; font-weight: 850; letter-spacing: .09em; }
+.nube-alerta-tipo{ color: #64748b; font-size: .66rem; text-transform: capitalize; }
+.nube-alerta-contenido{ min-width: 0; flex: 1; }
+.nube-alerta-contenido h3{ margin: 0 0 3px; color: #e5edf8; font-size: .94rem; }
+.nube-alerta-contenido p{ margin: 0; color: #94a3b8; font-size: .79rem; line-height: 1.45; }
+.nube-alerta-meta{ display: flex; flex-wrap: wrap; gap: 5px 14px; margin-top: 7px; color: #718198; font-size: .72rem; }
+
+.nube-alerta-accion{
+    flex: 0 0 auto;
+    padding: 8px 11px;
+    border: 1px solid rgba(96, 165, 250, .3);
+    border-radius: 9px;
+    color: #bfdbfe;
+    background: rgba(37, 99, 235, .11);
+}
+
+.nube-alerta-accion:hover{ background: rgba(37, 99, 235, .22); }
+.nube-alertas-actualizar:hover{ color: #fff; background: rgba(51, 65, 85, .8); }
+.nube-alerta-stat:hover{ border-color: rgba(148, 163, 184, .32); }
+.nube-alertas-chip:hover{ color: #dbeafe; }
+.nube-alertas-centro button:focus-visible,
+.nube-alertas-centro select:focus-visible{ outline: 3px solid rgba(96, 165, 250, .45); outline-offset: 2px; }
+
+.nube-alertas-vacio,
+.nube-alertas-error{
+    display: grid;
+    justify-items: center;
+    gap: 5px;
+    padding: 28px 16px;
+    border: 1px dashed rgba(148, 163, 184, .18);
+    border-radius: 14px;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.nube-alertas-vacio strong{ color: #86efac; }
+.nube-alertas-error strong{ color: #fca5a5; }
+.nube-alertas-error .nube-alerta-accion{ margin-top: 7px; }
+.nube-alertas-skeleton{ display: grid; gap: 9px; }
+.nube-alertas-skeleton span{ display: block; height: 60px; border-radius: 13px; background: linear-gradient(90deg, rgba(30,41,59,.6), rgba(51,65,85,.8), rgba(30,41,59,.6)); background-size: 200% 100%; animation: nube-alertas-carga 1.25s infinite; }
+@keyframes nube-alertas-carga{ to{ background-position: -200% 0; } }
+.nube-alertas-atajo{display:flex;align-items:center;gap:14px;margin:16px 0;padding:13px 16px;border:1px solid rgba(212,175,55,.2);border-radius:15px;color:#e2e8f0;background:linear-gradient(110deg,rgba(21,30,47,.92),rgba(12,18,30,.85));text-decoration:none;transition:.18s}.nube-alertas-atajo:hover{transform:translateY(-1px);border-color:rgba(212,175,55,.38)}.nube-alertas-atajo-icono{display:grid;place-items:center;width:38px;height:38px;flex:0 0 auto;border-radius:11px;color:#d4af37;background:rgba(212,175,55,.1)}.nube-alertas-atajo-icono svg{width:18px}.nube-alertas-atajo-texto{display:flex;min-width:0;flex:1;flex-direction:column;gap:3px}.nube-alertas-atajo-texto small{color:#94a3b8}.nube-alertas-atajo-ver{display:flex;align-items:center;gap:7px;color:#d4af37;font-size:.82rem;font-weight:700}.nube-alertas-atajo-ver svg{width:16px}@media(max-width:560px){.nube-alertas-atajo{align-items:flex-start}.nube-alertas-atajo-ver{font-size:0}.nube-alertas-atajo-texto small{font-size:.72rem}}
+
+@media (max-width: 760px){
+    .nube-alertas-centro{ padding: 16px; border-radius: 18px; }
+    .nube-alertas-resumen{ grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .nube-alertas-filtros{ align-items: flex-start; flex-direction: column; }
+    .nube-alerta-item{ align-items: flex-start; flex-wrap: wrap; }
+    .nube-alerta-item-cabecera{ width: auto; flex: 1 1 100%; grid-template-columns: auto 1fr; }
+    .nube-alerta-contenido{ flex-basis: 100%; }
+    .nube-alerta-accion{ width: 100%; }
+}
+
+@media (max-width: 460px){
+    .nube-alertas-cabecera{ align-items: flex-start; }
+    .nube-alertas-actualizar{ padding: 9px; font-size: 0; }
+    .nube-alertas-resumen{ gap: 7px; }
+    .nube-alerta-stat{ padding: 10px; font-size: .76rem; }
+}
+
 
 /* El formulario de gestion puede crecer con los flujos de liberacion. */
 #modalGestionarPerfil .nube-modal-panel{

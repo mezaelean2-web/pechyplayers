@@ -56,6 +56,18 @@
     <span>Nube de cuentas</span>
 </a>
 
+<a href="/admin/nube-alertas"
+   class="sidebar-link {% if request.path == '/admin/nube-alertas' %}active{% endif %}">
+    <i data-lucide="bell-ring" class="sidebar-icon"></i>
+    <span>Centro de alertas</span>
+</a>
+
+<a href="/admin/nube-papelera"
+   class="sidebar-link {% if request.path.startswith('/admin/nube-papelera') %}active{% endif %}">
+    <i data-lucide="archive" class="sidebar-icon"></i>
+    <span>Papelera</span>
+</a>
+
     <div class="sidebar-group-title">SISTEMA</div>
 
     <a href="/admin/historial"

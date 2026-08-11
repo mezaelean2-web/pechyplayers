@@ -1,8 +1,9 @@
 import json
+import os
 import re
 import sqlite3
 
-DB = "pechy.db"
+DB = os.environ.get("PECHY_DB", "pechy.db")
 
 def conectar():
     conn = sqlite3.connect(DB)
@@ -1032,6 +1033,17 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
 
         except sqlite3.OperationalError:
 
+            pass
+
+    for columna_archivo_nube in [
+        "fecha_archivada TEXT DEFAULT ''",
+        "motivo_archivo TEXT DEFAULT ''"
+    ]:
+        try:
+            cursor.execute(
+                f"ALTER TABLE nube_cuentas ADD COLUMN {columna_archivo_nube}"
+            )
+        except sqlite3.OperationalError:
             pass
 
 
@@ -2423,6 +2435,96 @@ def liberar_o_trasladar_perfil_nube(
         conn.close()
 
 
+def registrar_no_renovacion_perfil_nube(perfil_id, operacion_uuid=""):
+    """Cierra una venta no renovada y conserva su snapshot en el historial."""
+    try:
+        perfil_id = int(perfil_id)
+    except (TypeError, ValueError):
+        return {"ok": False, "codigo": "perfil_invalido",
+                "mensaje": "No se pudo identificar el perfil."}
+    operacion_uuid = (operacion_uuid or "").strip()
+    if perfil_id <= 0 or not operacion_uuid:
+        return {"ok": False, "codigo": "datos_invalidos",
+                "mensaje": "La operación no es válida."}
+
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            SELECT id, cuenta_id, cliente_id, nombre_cliente, telefono,
+                   fecha_entrega, dias_cuenta, fecha_vencimiento, estado
+            FROM nube_perfiles WHERE id=?
+        """, (perfil_id,))
+        perfil = cursor.fetchone()
+        if not perfil:
+            raise ValueError("No se encontró el perfil.")
+        estado = (perfil["estado"] or "").strip().lower()
+        asignado = es_asignacion_operativa_nube(
+            perfil["nombre_cliente"], perfil["fecha_entrega"],
+            perfil["dias_cuenta"], perfil["fecha_vencimiento"]
+        )
+        if estado == "disponible" and not asignado:
+            conn.rollback()
+            return {"ok": True, "duplicado": True, "perfil_id": perfil_id,
+                    "estado": "disponible",
+                    "mensaje": "La no renovación ya fue procesada."}
+        if estado in {"reemplazada", "papelera", "garantia", "caida"}:
+            raise ValueError("El estado actual del perfil no permite marcar no renovación.")
+        if not asignado:
+            raise ValueError("El perfil no tiene una asignación operativa real.")
+
+        snapshot = _crear_snapshot_servicio_nube(cursor, perfil_id)
+        if not snapshot:
+            raise RuntimeError("No se pudo crear el snapshot previo del servicio.")
+        dias_restantes = max(calcular_dias_restantes(perfil["fecha_vencimiento"]), 0)
+        cursor.execute("""
+            INSERT INTO nube_transferencias_servicios (
+                operacion_uuid, tipo_operacion, perfil_origen_id,
+                cuenta_origen_id, cliente_id, dias_disponibles,
+                dias_trasladados, destino_tipo, perfil_destino_id,
+                cuenta_destino_id, motivo, venta_origen_snapshot
+            ) VALUES (?, 'no_renovo', ?, ?, ?, ?, 0, '', NULL, NULL,
+                      'Cliente no renovó el servicio', ?)
+        """, (operacion_uuid, perfil_id, perfil["cuenta_id"],
+              perfil["cliente_id"], dias_restantes, snapshot))
+        cursor.execute("""
+            UPDATE nube_perfiles SET cliente_id=NULL, nombre_cliente='',
+                telefono='', fecha_entrega='', dias_cuenta=0,
+                fecha_vencimiento='', estado='disponible',
+                fecha_actualizacion=CURRENT_TIMESTAMP
+            WHERE id=? AND COALESCE(estado, '')=?
+        """, (perfil_id, perfil["estado"] or ""))
+        if cursor.rowcount != 1:
+            raise RuntimeError("El perfil cambió durante la operación.")
+        cursor.execute("""
+            INSERT INTO nube_movimientos (
+                cuenta_id, tipo, descripcion, estado_anterior,
+                estado_nuevo, cliente_nombre
+            ) VALUES (?, 'servicio_no_renovado', ?, ?, 'disponible', ?)
+        """, (perfil["cuenta_id"],
+              "Servicio no renovado; el perfil volvió a estar disponible",
+              perfil["estado"] or "", perfil["nombre_cliente"] or ""))
+        conn.commit()
+        return {"ok": True, "duplicado": False, "perfil_id": perfil_id,
+                "estado": "disponible",
+                "mensaje": "Servicio marcado como no renovado."}
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        if "operacion_uuid" in str(error).lower() or "unique" in str(error).lower():
+            return {"ok": True, "duplicado": True, "perfil_id": perfil_id,
+                    "mensaje": "La no renovación ya fue procesada."}
+        raise
+    except (ValueError, RuntimeError) as error:
+        conn.rollback()
+        return {"ok": False, "codigo": "perfil_no_elegible", "mensaje": str(error)}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def _sumar_dias_servicio_activo_nube(
     perfil_origen_id,
     perfil_destino_id,
@@ -3206,6 +3308,8 @@ def obtener_cuentas_nube(
 
         FROM nube_cuentas
 
+        WHERE COALESCE(estado, '') != 'papelera'
+
         ORDER BY id DESC
 
         LIMIT ?
@@ -3338,7 +3442,24 @@ def obtener_estadisticas_nube():
         FROM nube_cuentas AS c
         LEFT JOIN nube_perfiles AS p
             ON p.cuenta_id = c.id
+        WHERE COALESCE(c.estado, '') != 'papelera'
         GROUP BY c.id
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS nube_archivos_asignaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cuenta_id INTEGER NOT NULL,
+            perfil_id INTEGER,
+            tipo_origen TEXT NOT NULL DEFAULT 'perfil',
+            snapshot TEXT NOT NULL,
+            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(cuenta_id) REFERENCES nube_cuentas(id) ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_nube_archivos_asignaciones_cuenta
+        ON nube_archivos_asignaciones(cuenta_id)
     """)
 
 
@@ -3446,6 +3567,552 @@ def obtener_estadisticas_nube():
 
     return resumen
 
+
+def obtener_alertas_operativas_nube():
+    """Construye las alertas operativas de Nube sin mutar datos."""
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT
+            c.id, c.plataforma, c.nombre_cliente, c.fecha_entrega,
+            c.dias_cuenta, c.fecha_vencimiento, c.estado, c.modalidad,
+            c.tipo_pago, c.fecha_proximo_pago,
+            COUNT(p.id) AS perfiles_totales,
+            COALESCE(SUM(CASE
+                WHEN p.estado NOT IN ('reemplazada', 'papelera') THEN 1
+                ELSE 0
+            END), 0) AS perfiles_vigentes,
+            COALESCE(SUM(CASE WHEN p.estado = 'disponible' THEN 1 ELSE 0 END), 0)
+                AS perfiles_disponibles
+        FROM nube_cuentas AS c
+        LEFT JOIN nube_perfiles AS p ON p.cuenta_id = c.id
+        WHERE COALESCE(c.estado, '') != 'papelera'
+        GROUP BY c.id
+        ORDER BY c.id
+    """)
+    cuentas = [dict(fila) for fila in cursor.fetchall()]
+
+    cursor.execute("""
+        SELECT
+            p.id, p.cuenta_id, p.nombre_perfil, p.cliente_id,
+            p.nombre_cliente, p.fecha_entrega, p.dias_cuenta,
+            p.fecha_vencimiento, p.estado, c.plataforma,
+            c.estado AS estado_cuenta
+        FROM nube_perfiles AS p
+        INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+        WHERE COALESCE(c.estado, '') != 'papelera'
+        ORDER BY p.cuenta_id, p.id
+    """)
+    perfiles = [dict(fila) for fila in cursor.fetchall()]
+    conn.close()
+
+    alertas = []
+    cuentas_caidas = set()
+
+    def agregar(tipo, prioridad, titulo, descripcion, fecha_objetivo,
+                dias_restantes, cuenta, perfil_id=None, cliente="",
+                accion="gestionar_cuenta", **adicionales):
+        alerta = {
+            "tipo": tipo,
+            "prioridad": prioridad,
+            "titulo": titulo,
+            "descripcion": descripcion,
+            "fecha_objetivo": fecha_objetivo or "",
+            "dias_restantes": dias_restantes,
+            "perfil_id": perfil_id,
+            "cuenta_id": cuenta["id"],
+            "plataforma": cuenta.get("plataforma") or "",
+            "cliente": cliente or "",
+            "accion": accion
+        }
+        alerta.update(adicionales)
+        alertas.append(alerta)
+
+    for cuenta in cuentas:
+        perfiles_totales = int(cuenta.get("perfiles_totales") or 0)
+        perfiles_disponibles = int(cuenta.get("perfiles_disponibles") or 0)
+        estado_efectivo = calcular_estado_efectivo_cuenta_nube(
+            cuenta.get("fecha_vencimiento") or "",
+            cuenta.get("estado") or "disponible",
+            cuenta.get("modalidad") or "cuenta_completa",
+            perfiles_disponibles,
+            perfiles_totales - perfiles_disponibles
+        )
+        if estado_efectivo != "caida":
+            continue
+        cuentas_caidas.add(cuenta["id"])
+        afectados = int(cuenta.get("perfiles_vigentes") or 0)
+        descripcion = "La cuenta madre está marcada como caída."
+        if afectados:
+            descripcion += f" Afecta {afectados} perfil(es) vigente(s)."
+        agregar(
+            "cuenta_caida", "critica", "Cuenta madre caída", descripcion,
+            "", None, cuenta, cliente=cuenta.get("nombre_cliente") or "",
+            perfiles_afectados=afectados
+        )
+
+    for cuenta in cuentas:
+        if cuenta["id"] in cuentas_caidas:
+            continue
+        estado = cuenta.get("estado") or "disponible"
+        if estado in {"papelera", "reemplazada", "garantia"}:
+            continue
+
+        if (
+            (cuenta.get("modalidad") or "cuenta_completa") == "cuenta_completa" and
+            es_asignacion_operativa_nube(
+                cuenta.get("nombre_cliente"), cuenta.get("fecha_entrega"),
+                cuenta.get("dias_cuenta"), cuenta.get("fecha_vencimiento")
+            )
+        ):
+            dias = calcular_dias_restantes(cuenta.get("fecha_vencimiento"))
+            if dias < 0:
+                agregar(
+                    "cuenta_vencida", "critica", "Cuenta vencida",
+                    "El servicio de la cuenta completa ya venció.",
+                    cuenta.get("fecha_vencimiento"), dias, cuenta,
+                    cliente=cuenta.get("nombre_cliente") or ""
+                )
+            elif dias == 0:
+                agregar(
+                    "cuenta_vence_hoy", "alta", "Cuenta vence hoy",
+                    "El servicio de la cuenta completa vence hoy.",
+                    cuenta.get("fecha_vencimiento"), dias, cuenta,
+                    cliente=cuenta.get("nombre_cliente") or ""
+                )
+            elif dias <= 3:
+                agregar(
+                    "cuenta_por_vencer", "media", "Cuenta por vencer",
+                    f"El servicio de la cuenta completa vence en {dias} día(s).",
+                    cuenta.get("fecha_vencimiento"), dias, cuenta,
+                    cliente=cuenta.get("nombre_cliente") or ""
+                )
+
+        estado_pago = calcular_estado_pago_nube(
+            cuenta.get("tipo_pago"), cuenta.get("fecha_proximo_pago")
+        )
+        if estado_pago in {"", "autopagable", "sin_fecha"}:
+            continue
+        dias_pago = calcular_dias_restantes(cuenta.get("fecha_proximo_pago"))
+        if dias_pago < 0:
+            agregar(
+                "pago_pin_pendiente", "critica", "Pago PIN pendiente",
+                "La fecha estimada de pago del PIN ya pasó.",
+                cuenta.get("fecha_proximo_pago"), dias_pago, cuenta,
+                cliente=cuenta.get("nombre_cliente") or "",
+                accion="actualizar_pago_pin"
+            )
+        elif dias_pago == 0:
+            agregar(
+                "pago_pin_vence_hoy", "alta", "Pago PIN vence hoy",
+                "La fecha estimada de pago del PIN es hoy.",
+                cuenta.get("fecha_proximo_pago"), dias_pago, cuenta,
+                cliente=cuenta.get("nombre_cliente") or "",
+                accion="actualizar_pago_pin"
+            )
+        elif dias_pago <= 3:
+            agregar(
+                "pago_pin_proximo", "media", "Pago PIN próximo",
+                f"La fecha estimada de pago del PIN es en {dias_pago} día(s).",
+                cuenta.get("fecha_proximo_pago"), dias_pago, cuenta,
+                cliente=cuenta.get("nombre_cliente") or "",
+                accion="actualizar_pago_pin"
+            )
+
+    for perfil in perfiles:
+        if perfil["cuenta_id"] in cuentas_caidas:
+            continue
+        if (perfil.get("estado") or "disponible") in {
+            "disponible", "papelera", "reemplazada", "garantia", "caida"
+        }:
+            continue
+        if not es_asignacion_operativa_nube(
+            perfil.get("nombre_cliente"), perfil.get("fecha_entrega"),
+            perfil.get("dias_cuenta"), perfil.get("fecha_vencimiento")
+        ):
+            continue
+        cuenta = {"id": perfil["cuenta_id"], "plataforma": perfil["plataforma"]}
+        dias = calcular_dias_restantes(perfil.get("fecha_vencimiento"))
+        nombre = perfil.get("nombre_perfil") or "Perfil"
+        if dias < 0:
+            agregar(
+                "perfil_vencido", "critica", "Perfil vencido",
+                f"{nombre} ya venció.", perfil.get("fecha_vencimiento"), dias,
+                cuenta, perfil["id"], perfil.get("nombre_cliente"),
+                "gestionar_perfil"
+            )
+        elif dias == 0:
+            agregar(
+                "perfil_vence_hoy", "alta", "Perfil vence hoy",
+                f"{nombre} vence hoy.", perfil.get("fecha_vencimiento"), dias,
+                cuenta, perfil["id"], perfil.get("nombre_cliente"),
+                "gestionar_perfil"
+            )
+        elif dias <= 3:
+            agregar(
+                "perfil_por_vencer", "media", "Perfil por vencer",
+                f"{nombre} vence en {dias} día(s).",
+                perfil.get("fecha_vencimiento"), dias, cuenta, perfil["id"],
+                perfil.get("nombre_cliente"), "gestionar_perfil"
+            )
+
+    orden_prioridad = {"critica": 0, "alta": 1, "media": 2}
+    alertas.sort(key=lambda alerta: (
+        orden_prioridad.get(alerta["prioridad"], 99),
+        alerta["fecha_objetivo"] or "9999-12-31",
+        alerta["cuenta_id"],
+        alerta["perfil_id"] or 0,
+        alerta["tipo"]
+    ))
+    return {
+        "resumen": {
+            "total": len(alertas),
+            "criticas": sum(a["prioridad"] == "critica" for a in alertas),
+            "hoy": sum(a["dias_restantes"] == 0 for a in alertas),
+            "proximas": sum(
+                isinstance(a["dias_restantes"], int) and
+                1 <= a["dias_restantes"] <= 3
+                for a in alertas
+            )
+        },
+        "alertas": alertas
+    }
+
+
+def obtener_detalle_alerta_nube(cuenta_id, perfil_id=None):
+    """Devuelve contexto operativo seguro, sin credenciales, para el modal."""
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, plataforma, correo, nombre_cliente, modalidad, estado, tipo_pago,
+               valor_pin, plan_pago, precio_plan_referencia,
+               fecha_aplicacion_pin, dias_estimados_pin, fecha_proximo_pago
+        FROM nube_cuentas WHERE id = ?
+    """, (cuenta_id,))
+    fila = cursor.fetchone()
+    if not fila:
+        conn.close()
+        return None
+    cuenta = dict(fila)
+    cursor.execute("""
+        SELECT id, nombre_perfil, estado, cliente_id, nombre_cliente,
+               fecha_entrega, dias_cuenta, fecha_vencimiento
+        FROM nube_perfiles WHERE cuenta_id = ? ORDER BY orden, id
+    """, (cuenta_id,))
+    perfiles_cuenta = [dict(item) for item in cursor.fetchall()]
+    pendientes = [item for item in perfiles_cuenta if _servicio_vigente_pendiente_nube(item)]
+    vencidos = [item for item in perfiles_cuenta if _servicio_vencido_nube(item)]
+    resueltos = [item for item in perfiles_cuenta if
+                 (item.get("estado") or "").lower() in {"reemplazada", "papelera"}]
+    cuenta["perfiles_totales"] = len(perfiles_cuenta)
+    cuenta["perfiles_pendientes"] = len(pendientes)
+    cuenta["perfiles_resueltos"] = len(resueltos)
+    cuenta["perfiles_vencidos"] = len(vencidos)
+    cuenta["servicios_vigentes_pendientes"] = len(pendientes)
+    cuenta["lista_para_papelera"] = not pendientes and cuenta.get("estado") == "caida"
+    perfil = None
+    if perfil_id:
+        cursor.execute("""
+            SELECT id, cuenta_id, nombre_perfil, nombre_cliente,
+                   fecha_vencimiento, estado
+            FROM nube_perfiles WHERE id = ? AND cuenta_id = ?
+        """, (perfil_id, cuenta_id))
+        fila_perfil = cursor.fetchone()
+        perfil = dict(fila_perfil) if fila_perfil else None
+    cursor.execute("""
+        SELECT id, valor_pin, plan, precio_plan_referencia,
+               fecha_aplicacion, dias_estimados, fecha_estimada_fin, notas
+        FROM nube_pagos_pin WHERE cuenta_id = ?
+        ORDER BY fecha_aplicacion DESC, id DESC LIMIT 12
+    """, (cuenta_id,))
+    historial = [dict(fila_pago) for fila_pago in cursor.fetchall()]
+    conn.close()
+    return {"cuenta": cuenta, "perfil": perfil, "perfiles": perfiles_cuenta,
+            "perfiles_pendientes": pendientes, "historial_pin": historial}
+
+
+def registrar_pago_pin_nube(cuenta_id, valor_pin, plan,
+                            precio_plan_referencia, fecha_aplicacion,
+                            notas=""):
+    """Registra un ciclo PIN preservando historial y actualiza su proyección."""
+    try:
+        cuenta_id = int(cuenta_id)
+        valor_pin = int(valor_pin)
+        precio_plan_referencia = int(precio_plan_referencia)
+        datetime.strptime(fecha_aplicacion, "%Y-%m-%d")
+    except (TypeError, ValueError):
+        raise ValueError("Los datos del pago PIN no son válidos.")
+    plan = (plan or "").strip()
+    notas = (notas or "").strip()
+    if valor_pin <= 0 or precio_plan_referencia <= 0 or not plan:
+        raise ValueError("Plan, valor PIN y precio mensual son obligatorios.")
+    dias = calcular_dias_pin_nube(valor_pin, precio_plan_referencia)
+    proximo_pago = calcular_fecha_pago_pin_nube(fecha_aplicacion, dias)
+    if not proximo_pago:
+        raise ValueError("No fue posible calcular la próxima fecha de pago.")
+
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute(
+            "SELECT id, tipo_pago, estado, modalidad FROM nube_cuentas WHERE id = ?",
+            (cuenta_id,)
+        )
+        cuenta = cursor.fetchone()
+        if not cuenta:
+            raise ValueError("La cuenta no existe.")
+        if (cuenta["tipo_pago"] or "").lower() != "pin":
+            raise ValueError("La cuenta no utiliza modalidad de pago PIN.")
+        cursor.execute("""
+            SELECT id, fecha_estimada_fin FROM nube_pagos_pin
+            WHERE cuenta_id = ? AND valor_pin = ? AND plan = ?
+              AND precio_plan_referencia = ? AND fecha_aplicacion = ?
+            ORDER BY id DESC LIMIT 1
+        """, (cuenta_id, valor_pin, plan, precio_plan_referencia, fecha_aplicacion))
+        duplicado = cursor.fetchone()
+        if duplicado:
+            pago_id = duplicado["id"]
+            proximo_pago = duplicado["fecha_estimada_fin"]
+        else:
+            cursor.execute("""
+                INSERT INTO nube_pagos_pin (
+                    cuenta_id, valor_pin, plan, precio_plan_referencia,
+                    fecha_aplicacion, dias_estimados, fecha_estimada_fin, notas
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (cuenta_id, valor_pin, plan, precio_plan_referencia,
+                  fecha_aplicacion, dias, proximo_pago, notas))
+            pago_id = cursor.lastrowid
+        cursor.execute("""
+            UPDATE nube_cuentas SET valor_pin = ?, plan_pago = ?,
+                precio_plan_referencia = ?, fecha_aplicacion_pin = ?,
+                dias_estimados_pin = ?, fecha_proximo_pago = ?
+            WHERE id = ?
+        """, (valor_pin, plan, precio_plan_referencia, fecha_aplicacion,
+              dias, proximo_pago, cuenta_id))
+        cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='nube_movimientos'")
+        if not duplicado and cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO nube_movimientos
+                (cuenta_id, tipo, descripcion, estado_anterior, estado_nuevo)
+                SELECT ?, 'pago_pin_registrado', ?, estado, estado
+                FROM nube_cuentas WHERE id = ?
+            """, (cuenta_id, f"Pago PIN registrado para {plan}", cuenta_id))
+        estado_anterior = cuenta["estado"]
+        reactivada = estado_anterior == "caida"
+        restaurada_papelera = estado_anterior == "papelera"
+        perfiles_liberados = 0
+        if reactivada or restaurada_papelera:
+            perfiles_liberados = _limpiar_y_habilitar_cuenta_nube(cursor, cuenta_id)
+            cursor.execute("""
+                UPDATE nube_cuentas SET estado='disponible', cliente_id=NULL,
+                    nombre_cliente='', telefono='', fecha_entrega='', dias_cuenta=0,
+                    fecha_vencimiento='', fecha_archivada='', motivo_archivo='',
+                    fecha_actualizacion=CURRENT_TIMESTAMP
+                WHERE id=? AND estado=?
+            """, (cuenta_id, estado_anterior))
+            if cursor.rowcount != 1:
+                raise RuntimeError("La cuenta cambiÃ³ durante la reactivaciÃ³n.")
+            cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='nube_movimientos'")
+            if cursor.fetchone():
+                cursor.execute("""
+                    INSERT INTO nube_movimientos
+                    (cuenta_id,tipo,descripcion,estado_anterior,estado_nuevo)
+                    VALUES (?,?,?,?, 'disponible')
+                """, (cuenta_id,
+                      ('cuenta_restaurada_por_pago_pin' if restaurada_papelera else 'cuenta_reactivada_por_pago_pin'),
+                      f"Cuenta {'restaurada' if restaurada_papelera else 'reactivada'} por pago PIN; {perfiles_liberados} slots disponibles",
+                      estado_anterior))
+        conn.commit()
+        return {
+            "duplicado": bool(duplicado), "pago_id": pago_id,
+            "fecha_aplicacion": fecha_aplicacion, "proximo_pago": proximo_pago,
+            "valor_pin": valor_pin, "plan": plan, "dias_estimados": dias,
+            "cuenta_reactivada": reactivada,
+            "cuenta_restaurada": restaurada_papelera,
+            "perfiles_liberados": perfiles_liberados
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _servicio_vigente_pendiente_nube(servicio):
+    estado = (servicio.get("estado") or "").strip().lower()
+    if estado in {"reemplazada", "papelera"}:
+        return False
+    if not es_asignacion_operativa_nube(
+        servicio.get("nombre_cliente"), servicio.get("fecha_entrega"),
+        servicio.get("dias_cuenta"), servicio.get("fecha_vencimiento")
+    ):
+        return False
+    return calcular_dias_restantes(servicio.get("fecha_vencimiento")) >= 0
+
+
+def _servicio_vencido_nube(servicio):
+    return es_asignacion_operativa_nube(
+        servicio.get("nombre_cliente"), servicio.get("fecha_entrega"),
+        servicio.get("dias_cuenta"), servicio.get("fecha_vencimiento")
+    ) and calcular_dias_restantes(servicio.get("fecha_vencimiento")) < 0
+
+
+def _asegurar_archivo_asignaciones_nube(cursor):
+    cursor.execute("""CREATE TABLE IF NOT EXISTS nube_archivos_asignaciones (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, cuenta_id INTEGER NOT NULL,
+        perfil_id INTEGER, tipo_origen TEXT NOT NULL DEFAULT 'perfil',
+        snapshot TEXT NOT NULL, fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+
+
+def _limpiar_y_habilitar_cuenta_nube(cursor, cuenta_id, estado_perfiles="disponible"):
+    cursor.execute("""UPDATE nube_perfiles SET cliente_id=NULL,nombre_cliente='',
+        telefono='',fecha_entrega='',dias_cuenta=0,fecha_vencimiento='',estado=?,
+        fecha_actualizacion=CURRENT_TIMESTAMP WHERE cuenta_id=?""",
+        (estado_perfiles, cuenta_id))
+    return cursor.rowcount
+
+
+def _resumen_papelera_cuenta(cursor, cuenta_id):
+    cursor.execute("""
+        SELECT id, nombre_perfil, estado, cliente_id, nombre_cliente,
+               fecha_entrega, dias_cuenta, fecha_vencimiento
+        FROM nube_perfiles WHERE cuenta_id = ? ORDER BY orden, id
+    """, (cuenta_id,))
+    perfiles = [dict(fila) for fila in cursor.fetchall()]
+    pendientes = [p for p in perfiles if _servicio_vigente_pendiente_nube(p)]
+    return perfiles, pendientes
+
+
+def mover_cuenta_papelera_nube(cuenta_id, motivo=""):
+    """Archiva una madre caída sólo cuando no quedan servicios por resolver."""
+    try:
+        cuenta_id = int(cuenta_id)
+    except (TypeError, ValueError):
+        return {"ok": False, "codigo": "cuenta_invalida", "mensaje": "Cuenta inválida."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor(); cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""SELECT id, estado, modalidad, nombre_cliente,
+            fecha_entrega, dias_cuenta, fecha_vencimiento
+            FROM nube_cuentas WHERE id = ?""", (cuenta_id,))
+        cuenta = cursor.fetchone()
+        if not cuenta:
+            raise ValueError("La cuenta no existe.")
+        if cuenta["estado"] == "papelera":
+            conn.rollback(); return {"ok": True, "duplicado": True, "estado": "papelera"}
+        if cuenta["estado"] != "caida":
+            raise ValueError("Sólo una cuenta caída puede moverse a Papelera.")
+        perfiles, pendientes = _resumen_papelera_cuenta(cursor, cuenta_id)
+        cuenta_dict = dict(cuenta)
+        if (cuenta["modalidad"] or "cuenta_completa") == "cuenta_completa" and _servicio_vigente_pendiente_nube(cuenta_dict):
+            pendientes.append({"id": None, "nombre_perfil": "Cuenta completa"})
+        if pendientes:
+            cantidad = len(pendientes)
+            raise ValueError(f"Falta {cantidad} servicio vigente por resolver." if cantidad == 1 else f"Faltan {cantidad} servicios vigentes por resolver.")
+        _asegurar_archivo_asignaciones_nube(cursor)
+        for perfil in perfiles:
+            if es_asignacion_operativa_nube(perfil.get("nombre_cliente"), perfil.get("fecha_entrega"), perfil.get("dias_cuenta"), perfil.get("fecha_vencimiento")):
+                snapshot = _crear_snapshot_servicio_nube(cursor, perfil["id"])
+                cursor.execute("""INSERT INTO nube_archivos_asignaciones
+                    (cuenta_id,perfil_id,tipo_origen,snapshot) VALUES (?,?,'perfil',?)""",
+                    (cuenta_id, perfil["id"], snapshot))
+        if (cuenta["modalidad"] or "cuenta_completa") == "cuenta_completa" and es_asignacion_operativa_nube(
+            cuenta["nombre_cliente"], cuenta["fecha_entrega"], cuenta["dias_cuenta"], cuenta["fecha_vencimiento"]):
+            cursor.execute("""INSERT INTO nube_archivos_asignaciones
+                (cuenta_id,perfil_id,tipo_origen,snapshot) VALUES (?,NULL,'cuenta_completa',?)""",
+                (cuenta_id, json.dumps(cuenta_dict, ensure_ascii=False, sort_keys=True)))
+        _limpiar_y_habilitar_cuenta_nube(cursor, cuenta_id, "papelera")
+        cursor.execute("""UPDATE nube_cuentas SET estado='papelera',
+            fecha_archivada=datetime('now','localtime'), motivo_archivo=?,
+            cliente_id=NULL,nombre_cliente='',telefono='',fecha_entrega='',
+            dias_cuenta=0,fecha_vencimiento='',
+            fecha_actualizacion=CURRENT_TIMESTAMP WHERE id=? AND estado='caida'""",
+            ((motivo or "").strip(), cuenta_id))
+        if cursor.rowcount != 1:
+            raise RuntimeError("La cuenta cambió durante la operación.")
+        cursor.execute("""INSERT INTO nube_movimientos
+            (cuenta_id,tipo,descripcion,estado_anterior,estado_nuevo)
+            VALUES (?,'cuenta_movida_papelera',?,'caida','papelera')""",
+            (cuenta_id, "Cuenta archivada" + (f". Motivo: {motivo.strip()}" if motivo.strip() else "")))
+        conn.commit()
+        return {"ok": True, "duplicado": False, "estado": "papelera",
+                "perfiles": len(perfiles)}
+    except (ValueError, RuntimeError) as error:
+        conn.rollback(); return {"ok": False, "codigo": "no_elegible", "mensaje": str(error)}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        conn.close()
+
+
+def obtener_cuentas_papelera_nube():
+    conn = conectar(); cursor = conn.cursor()
+    cursor.execute("""SELECT c.id,c.plataforma,c.correo,c.estado,c.modalidad,c.tipo_pago,
+        c.valor_pin,c.plan_pago,c.fecha_aplicacion_pin,c.fecha_proximo_pago,
+        c.fecha_archivada,c.motivo_archivo,COUNT(p.id) perfiles_totales,
+        (SELECT tipo FROM nube_movimientos m WHERE m.cuenta_id=c.id ORDER BY m.id DESC LIMIT 1) ultimo_movimiento
+        FROM nube_cuentas c LEFT JOIN nube_perfiles p ON p.cuenta_id=c.id
+        WHERE c.estado='papelera' GROUP BY c.id ORDER BY c.fecha_archivada DESC,c.id DESC""")
+    cuentas = [dict(fila) for fila in cursor.fetchall()]; conn.close(); return cuentas
+
+
+def obtener_detalle_papelera_nube(cuenta_id):
+    conn = conectar(); cursor = conn.cursor()
+    cursor.execute("""SELECT id,plataforma,correo,estado,modalidad,tipo_pago,valor_pin,
+        plan_pago,precio_plan_referencia,fecha_aplicacion_pin,fecha_proximo_pago,
+        fecha_archivada,motivo_archivo FROM nube_cuentas WHERE id=? AND estado='papelera'""", (cuenta_id,))
+    fila = cursor.fetchone()
+    if not fila: conn.close(); return None
+    cuenta = dict(fila); perfiles, _ = _resumen_papelera_cuenta(cursor, cuenta_id)
+    cursor.execute("""SELECT id,tipo,descripcion,estado_anterior,estado_nuevo,cliente_nombre,fecha
+        FROM nube_movimientos WHERE cuenta_id=? ORDER BY id DESC LIMIT 50""", (cuenta_id,))
+    movimientos = [dict(x) for x in cursor.fetchall()]
+    cursor.execute("""SELECT id,valor_pin,plan,precio_plan_referencia,fecha_aplicacion,
+        dias_estimados,fecha_estimada_fin,notas FROM nube_pagos_pin WHERE cuenta_id=?
+        ORDER BY id DESC LIMIT 20""", (cuenta_id,))
+    pagos = [dict(x) for x in cursor.fetchall()]
+    _asegurar_archivo_asignaciones_nube(cursor)
+    cursor.execute("""SELECT id,perfil_id,tipo_origen,snapshot,fecha
+        FROM nube_archivos_asignaciones WHERE cuenta_id=? ORDER BY id DESC""", (cuenta_id,))
+    snapshots = [dict(x) for x in cursor.fetchall()]
+    for item in snapshots:
+        item["datos"] = json.loads(item.pop("snapshot"))
+    conn.close()
+    return {"cuenta": cuenta, "perfiles": perfiles, "movimientos": movimientos,
+            "historial_pin": pagos, "snapshots": snapshots}
+
+
+def restaurar_cuenta_papelera_nube(cuenta_id):
+    """Reactiva la madre y libera sus slots sin reactivar asignaciones antiguas."""
+    try: cuenta_id = int(cuenta_id)
+    except (TypeError, ValueError): return {"ok": False, "mensaje": "Cuenta inválida."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor(); cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("SELECT id,estado,modalidad FROM nube_cuentas WHERE id=?", (cuenta_id,))
+        cuenta = cursor.fetchone()
+        if not cuenta: raise ValueError("La cuenta no existe.")
+        if cuenta["estado"] != "papelera":
+            conn.rollback(); return {"ok": True, "duplicado": True, "estado": cuenta["estado"]}
+        perfiles, pendientes = _resumen_papelera_cuenta(cursor, cuenta_id)
+        if cuenta["modalidad"] == "perfiles":
+            _limpiar_y_habilitar_cuenta_nube(cursor, cuenta_id)
+        cursor.execute("""UPDATE nube_cuentas SET estado='disponible',fecha_archivada='',
+            motivo_archivo='',cliente_id=NULL,nombre_cliente='',telefono='',fecha_entrega='',
+            dias_cuenta=0,fecha_vencimiento='',fecha_actualizacion=CURRENT_TIMESTAMP
+            WHERE id=? AND estado='papelera'""", (cuenta_id,))
+        cursor.execute("""INSERT INTO nube_movimientos
+            (cuenta_id,tipo,descripcion,estado_anterior,estado_nuevo)
+            VALUES (?,'cuenta_restaurada','Cuenta restaurada sin reactivar clientes anteriores','papelera','disponible')""", (cuenta_id,))
+        conn.commit(); return {"ok": True, "duplicado": False, "estado": "disponible", "perfiles": len(perfiles)}
+    except ValueError as error:
+        conn.rollback(); return {"ok": False, "mensaje": str(error)}
+    except Exception:
+        conn.rollback(); raise
+    finally: conn.close()
+
 # ==========================================
 # NUBE DE CUENTAS — BUSCADOR UNIVERSAL
 # ==========================================
@@ -3480,7 +4147,7 @@ def buscar_cuentas_nube(
     ).strip()
 
 
-    condiciones = []
+    condiciones = ["COALESCE(estado, '') != 'papelera'"]
 
     parametros = []
 
@@ -3652,6 +4319,7 @@ def obtener_plataformas_nube():
         FROM nube_cuentas
         WHERE plataforma IS NOT NULL
           AND TRIM(plataforma) != ''
+          AND COALESCE(estado, '') != 'papelera'
         ORDER BY plataforma ASC
     """)
 
@@ -3683,6 +4351,7 @@ def obtener_tipos_cuenta_nube():
         FROM nube_cuentas
         WHERE tipo_cuenta IS NOT NULL
           AND TRIM(tipo_cuenta) != ''
+          AND COALESCE(estado, '') != 'papelera'
         ORDER BY tipo_cuenta ASC
     """)
 
@@ -5880,7 +6549,11 @@ def obtener_historial_completo_perfil_nube(perfil_id):
                 "destino_despues": _datos_publicos_snapshot_perfil_nube(snapshot_despues)
             }
             operacion = transferencia["tipo_operacion"]
-            if operacion == "liberar":
+            if operacion == "no_renovo":
+                tipo, titulo = "no_renovo", "Servicio no renovado"
+                descripcion = "El cliente no renovó y el perfil volvió a estar disponible."
+                icono, nivel = "user-minus", "advertencia"
+            elif operacion == "liberar":
                 tipo, titulo = "liberacion", "Perfil liberado"
                 descripcion = "El perfil fue liberado sin trasladar días."
                 icono, nivel = "unlock", "advertencia"

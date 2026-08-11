@@ -1,0 +1,23 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Papelera · PECHY{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/nube_papelera.css') }}">{% endblock %}
+{% block contenido %}
+<section class="papelera-page" id="papeleraApp">
+  <header class="papelera-hero">
+    <div><span>ARCHIVO OPERATIVO</span><h1>Papelera</h1><p>Cuentas fuera del inventario, con sus perfiles e historial preservados.</p></div>
+    <button id="papeleraActualizar" class="papelera-btn" type="button">↻ Actualizar</button>
+  </header>
+  <section class="papelera-panel" aria-label="Archivo de cuentas">
+    <div class="papelera-filtros">
+      <label class="papelera-busqueda"><span class="sr-only">Buscar plataforma o cuenta</span><input id="papeleraBuscar" type="search" placeholder="Buscar plataforma o cuenta" autocomplete="off"><span aria-hidden="true">⌕</span></label>
+      <select id="papeleraPlataforma" aria-label="Filtrar por plataforma"><option value="">Todas las plataformas</option></select>
+      <label class="papelera-check"><input id="papeleraPinVencido" type="checkbox"><span>PIN vencido</span></label>
+      <span id="papeleraConteo" class="papelera-conteo" aria-live="polite"></span>
+    </div>
+    <div class="papelera-columnas" aria-hidden="true"><span>Cuenta</span><span>Archivo</span><span>Actividad</span><span>Acción</span></div>
+    <div id="papeleraLista" class="papelera-listado"><div class="papelera-vacio">Cargando archivo…</div></div>
+  </section>
+</section>
+<div class="papelera-modal" id="papeleraModal" aria-hidden="true"><button class="papelera-backdrop" data-cerrar aria-label="Cerrar"></button><article class="papelera-dialog" role="dialog" aria-modal="true" aria-labelledby="papeleraTitulo"><header><div class="papelera-modal-identidad"><span id="papeleraModalPlataforma">CUENTA ARCHIVADA</span><h2 id="papeleraTitulo">Detalle</h2><span class="papelera-badge">PAPELERA</span></div><button class="papelera-cerrar" data-cerrar type="button" aria-label="Cerrar">×</button></header><div id="papeleraDetalle" class="papelera-body"></div></article></div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/nube_papelera.js') }}"></script>{% endblock %}

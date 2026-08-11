@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, obtener_historial_completo_perfil_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -801,6 +801,106 @@ def crear_nueva_cuenta_nube():
     )
 
 
+@app.route("/admin/nube-cuentas/alertas", methods=["GET"])
+def obtener_alertas_operativas_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    resultado = obtener_alertas_operativas_nube()
+    return jsonify({"ok": True, **resultado})
+
+
+@app.route("/admin/nube-alertas")
+def admin_nube_alertas():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template("admin/nube_alertas.html")
+
+
+@app.route("/admin/nube-papelera")
+def admin_nube_papelera():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template("admin/nube_papelera.html")
+
+
+@app.route("/admin/nube-papelera/cuentas", methods=["GET"])
+def listar_nube_papelera_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    respuesta = jsonify({"ok": True, "cuentas": obtener_cuentas_papelera_nube()})
+    respuesta.headers["Cache-Control"] = "no-store, max-age=0"
+    return respuesta
+
+
+@app.route("/admin/nube-papelera/<int:cuenta_id>", methods=["GET"])
+def detalle_nube_papelera_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    detalle = obtener_detalle_papelera_nube(cuenta_id)
+    if not detalle:
+        return jsonify({"ok": False, "mensaje": "Cuenta archivada no encontrada"}), 404
+    return jsonify({"ok": True, **detalle})
+
+
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/papelera", methods=["POST"])
+def mover_nube_papelera_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    resultado = mover_cuenta_papelera_nube(cuenta_id, (request.get_json(silent=True) or {}).get("motivo", ""))
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/admin/nube-papelera/<int:cuenta_id>/restaurar", methods=["POST"])
+def restaurar_nube_papelera_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    resultado = restaurar_cuenta_papelera_nube(cuenta_id)
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/admin/nube-cuentas/alertas/detalle", methods=["GET"])
+def obtener_detalle_alerta_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    try:
+        cuenta_id = int(request.args.get("cuenta_id", ""))
+        perfil_raw = request.args.get("perfil_id", "").strip()
+        perfil_id = int(perfil_raw) if perfil_raw else None
+    except ValueError:
+        return jsonify({"ok": False, "mensaje": "Identificador inválido"}), 400
+    detalle = obtener_detalle_alerta_nube(cuenta_id, perfil_id)
+    if not detalle:
+        return jsonify({"ok": False, "mensaje": "Cuenta no encontrada"}), 404
+    return jsonify({"ok": True, **detalle})
+
+
+@app.route("/admin/nube-cuentas/pagos-pin", methods=["POST"])
+def registrar_pago_pin_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    try:
+        resultado = registrar_pago_pin_nube(
+            datos.get("cuenta_id"), datos.get("valor_pin"), datos.get("plan"),
+            datos.get("precio_plan_referencia"), datos.get("fecha_aplicacion"),
+            datos.get("notas", "")
+        )
+    except ValueError as error:
+        return jsonify({"ok": False, "mensaje": str(error)}), 400
+    except sqlite3.Error:
+        return jsonify({"ok": False, "mensaje": "No se pudo registrar el pago."}), 500
+    return jsonify({
+        "ok": True,
+        "pago_registrado": not resultado.get("duplicado", False),
+        "cuenta_restaurada": resultado.get("cuenta_restaurada", False),
+        "estado": "disponible" if (
+            resultado.get("cuenta_restaurada") or resultado.get("cuenta_reactivada")
+        ) else None,
+        "pago": resultado
+    })
+
+
 @app.route(
     "/admin/nube-cuentas/perfil/guardar",
     methods=["POST"]
@@ -1044,6 +1144,17 @@ def liberar_trasladar_perfil_nube_route():
         operacion_uuid=datos.get("operacion_uuid", "")
     )
 
+    return jsonify(resultado), (200 if resultado["ok"] else 409)
+
+
+@app.route("/admin/nube-cuentas/perfil/no-renovo", methods=["POST"])
+def registrar_no_renovacion_perfil_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = registrar_no_renovacion_perfil_nube(
+        datos.get("perfil_id"), datos.get("operacion_uuid", "")
+    )
     return jsonify(resultado), (200 if resultado["ok"] else 409)
 
 

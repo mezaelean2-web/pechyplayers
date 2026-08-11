@@ -226,6 +226,13 @@ Nube de cuentas
     </section>
 
 
+    <a class="nube-alertas-atajo" id="nubeAlertasAtajo" href="/admin/nube-alertas" aria-live="polite">
+        <span class="nube-alertas-atajo-icono"><i data-lucide="bell-ring"></i></span>
+        <span class="nube-alertas-atajo-texto"><strong id="nubeAlertasAtajoTitulo">Consultando alertas…</strong><small id="nubeAlertasAtajoResumen">Centro de alertas operativas</small></span>
+        <span class="nube-alertas-atajo-ver">Ver centro <i data-lucide="arrow-right"></i></span>
+    </a>
+
+
 
     <section class="nube-contenido">
 
@@ -1826,6 +1833,30 @@ Nube de cuentas
         Perfil actualizado correctamente.
     </span>
 </div>
+
+<section id="grupoNoRenovoPerfil" class="nube-liberacion-box" hidden>
+    <button type="button" class="nube-modal-liberacion" id="abrirNoRenovoPerfil">
+        <i data-lucide="user-minus"></i>
+        No renovó
+    </button>
+    <div id="panelNoRenovoPerfil" class="nube-liberacion-panel" hidden>
+        <div id="contenidoNoRenovoPerfil">
+            <div class="nube-liberacion-titulo">
+                <strong>¿Marcar este servicio como no renovado?</strong>
+                <span>El cliente será retirado de este perfil y el espacio volverá a estar disponible. El historial de la venta se conservará.</span>
+            </div>
+            <div class="nube-liberacion-acciones">
+                <button type="button" class="nube-caida-cancelar" id="cancelarNoRenovoPerfil">Cancelar</button>
+                <button type="button" class="nube-caida-confirmar" id="confirmarNoRenovoPerfil">Confirmar no renovación</button>
+            </div>
+        </div>
+        <div id="exitoNoRenovoPerfil" class="nube-liberacion-exito" hidden>
+            <i data-lucide="circle-check"></i>
+            <strong>✓ Servicio marcado como no renovado</strong>
+            <span>El perfil volvió a estar disponible.</span>
+        </div>
+    </div>
+</section>
 
 <section
     id="grupoLiberacionPerfil"
