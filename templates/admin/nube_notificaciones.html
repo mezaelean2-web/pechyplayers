@@ -1,0 +1,27 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Centro de notificaciones{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/nube_operativo.css') }}">{% endblock %}
+{% block contenido %}
+<main class="nube-op" id="notificacionesApp" aria-busy="true">
+  <header class="nube-op-hero">
+    <div class="nube-op-title"><span><i data-lucide="message-circle"></i></span><div><small>INVENTARIO / RENOVACIONES</small><h1>CENTRO DE NOTIFICACIONES</h1><p>Renovaciones y vencimientos de clientes</p></div></div>
+    <button class="nube-op-btn" id="notificacionesActualizar" type="button"><i data-lucide="refresh-cw"></i><span>Actualizar</span></button>
+  </header>
+  <section class="nube-op-stats">
+    <button class="nube-op-stat activo" data-tab="pendientes" type="button"><small>Pendientes</small><strong id="notifPendientes">0</strong></button>
+    <button class="nube-op-stat" data-filtro="hoy" type="button"><small>Individuales</small><strong id="notifHoy">0</strong></button>
+    <button class="nube-op-stat" data-tab="notificados" type="button"><small>Notificados hoy</small><strong id="notifNotificadosHoy">0</strong></button>
+    <button class="nube-op-stat" data-filtro="combo" type="button"><small>Combos</small><strong id="notifCombos">0</strong></button>
+  </section>
+  <section class="nube-op-panel">
+    <div class="nube-op-toolbar">
+      <div class="nube-op-tabs"><button class="activo" data-tab="pendientes" type="button">Pendientes</button><button data-tab="notificados" type="button">Notificados</button></div>
+      <input id="notificacionesBuscar" type="search" placeholder="Buscar cliente, telefono o plataforma">
+      <select id="notificacionesTipo"><option value="">Todas</option><option value="individual">Individual</option><option value="combo">Combo</option></select>
+    </div>
+    <div class="nube-op-lista" id="notificacionesLista"></div>
+  </section>
+</main>
+<div class="nube-op-modal" id="notificacionModal" aria-hidden="true"><button class="nube-op-backdrop" type="button" data-cerrar-modal></button><section class="nube-op-dialog"><header><div><small id="notificacionModalTipo"></small><h2 id="notificacionModalTitulo">Notificar</h2></div><button type="button" data-cerrar-modal>×</button></header><div id="notificacionModalBody"></div></section></div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/nube_notificaciones.js') }}"></script>{% endblock %}

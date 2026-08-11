@@ -7,6 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
+import database
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -815,6 +816,89 @@ def admin_nube_alertas():
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
     return render_template("admin/nube_alertas.html")
+
+
+@app.route("/admin/nube-notificaciones")
+def admin_nube_notificaciones():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template("admin/nube_notificaciones.html")
+
+
+@app.route("/admin/nube-notificaciones/datos", methods=["GET"])
+def datos_nube_notificaciones_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    return jsonify({
+        "ok": True,
+        **database.obtener_centro_notificaciones_renovacion_nube()
+    })
+
+
+@app.route("/admin/nube-notificaciones/notificar", methods=["POST"])
+def marcar_nube_notificacion_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = database.marcar_notificacion_renovacion_nube(
+        datos.get("servicios") or [],
+        datos.get("mensaje", ""),
+        datos.get("medio", "manual")
+    )
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/admin/nube-cortes")
+def admin_nube_cortes():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template("admin/nube_cortes.html")
+
+
+@app.route("/admin/nube-cortes/datos", methods=["GET"])
+def datos_nube_cortes_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    return jsonify({"ok": True, **database.obtener_cortes_nube()})
+
+
+@app.route("/admin/nube-cortes/cortar", methods=["POST"])
+def cortar_nube_cortes_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = database.cortar_servicios_nube(
+        datos.get("servicios") or [],
+        datos.get("motivo", "")
+    )
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/admin/nube-cortes/cuenta/credenciales", methods=["POST"])
+def actualizar_credenciales_nube_cortes_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = database.actualizar_credenciales_cuenta_corte_nube(
+        datos.get("cuenta_id"),
+        datos.get("correo"),
+        datos.get("contrasena"),
+        datos.get("pin")
+    )
+    return jsonify(resultado), (200 if resultado.get("ok") else 400)
+
+
+@app.route("/admin/nube-cortes/perfil/pin", methods=["POST"])
+def actualizar_pin_perfil_nube_cortes_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = database.actualizar_pin_perfil_corte_nube(
+        datos.get("cuenta_id"),
+        datos.get("perfil_id"),
+        datos.get("pin")
+    )
+    return jsonify(resultado), (200 if resultado.get("ok") else 400)
 
 
 @app.route("/admin/nube-papelera")

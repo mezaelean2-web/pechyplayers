@@ -1090,6 +1090,8 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
         ON nube_pagos_pin(cuenta_id)
     """)
 
+    _asegurar_notificaciones_renovacion_nube(cursor)
+
 
 
 
@@ -4388,6 +4390,801 @@ def registrar_pago_pin_nube(cuenta_id, valor_pin, plan,
             "cuenta_reactivada": reactivada,
             "cuenta_restaurada": restaurada_papelera,
             "perfiles_liberados": perfiles_liberados
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _columnas_tabla_nube(cursor, tabla):
+    try:
+        cursor.execute(f"PRAGMA table_info({tabla})")
+        return {fila["name"] for fila in cursor.fetchall()}
+    except sqlite3.Error:
+        return set()
+
+
+def _asegurar_notificaciones_renovacion_nube(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS nube_notificaciones_renovacion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cliente_id INTEGER,
+            telefono_normalizado TEXT DEFAULT '',
+            fecha_vencimiento_ciclo TEXT NOT NULL,
+            fecha_notificacion TEXT DEFAULT '',
+            estado TEXT NOT NULL DEFAULT 'notificado',
+            tipo TEXT NOT NULL DEFAULT 'individual',
+            mensaje TEXT DEFAULT '',
+            medio TEXT DEFAULT '',
+            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS nube_notificacion_servicios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            notificacion_id INTEGER NOT NULL,
+            servicio_tipo TEXT NOT NULL,
+            servicio_id INTEGER NOT NULL,
+            cuenta_id INTEGER NOT NULL,
+            perfil_id INTEGER,
+            fecha_vencimiento_ciclo TEXT NOT NULL,
+            snapshot TEXT NOT NULL DEFAULT '{}',
+            estado TEXT NOT NULL DEFAULT 'pendiente_corte',
+            fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(notificacion_id)
+                REFERENCES nube_notificaciones_renovacion(id)
+                ON DELETE CASCADE
+        )
+    """)
+    cursor.execute("""
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_nube_notif_servicio_ciclo
+        ON nube_notificacion_servicios(
+            servicio_tipo, servicio_id, fecha_vencimiento_ciclo
+        )
+    """)
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_nube_notif_servicios_notificacion
+        ON nube_notificacion_servicios(notificacion_id)
+    """)
+
+
+def _fecha_hoy_nube():
+    return datetime.now().date()
+
+
+def _parse_fecha_nube(valor):
+    try:
+        return datetime.strptime((valor or "").strip(), "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def _servicio_expirado_operativo_nube(servicio, hoy=None):
+    hoy = hoy or _fecha_hoy_nube()
+    estado = (servicio.get("estado") or "").strip().lower()
+    if estado in {"disponible", "papelera", "reemplazada", "garantia", "caida"}:
+        return False
+    if not es_asignacion_operativa_nube(
+        servicio.get("nombre_cliente"), servicio.get("fecha_entrega"),
+        servicio.get("dias_cuenta"), servicio.get("fecha_vencimiento")
+    ):
+        return False
+    fecha = _parse_fecha_nube(servicio.get("fecha_vencimiento"))
+    return bool(fecha and fecha <= hoy)
+
+
+def _expr_tabla_columna_nube(columnas, tabla_alias, nombre, alias, defecto="''"):
+    if nombre in columnas:
+        return f"{tabla_alias}.{nombre} AS {alias}"
+    return f"{defecto} AS {alias}"
+
+
+def _leer_servicios_vencidos_reales_nube(cursor, hoy=None):
+    hoy = hoy or _fecha_hoy_nube()
+    servicios = []
+    columnas_cuenta = _columnas_tabla_nube(cursor, "nube_cuentas")
+    columnas_perfil = _columnas_tabla_nube(cursor, "nube_perfiles")
+    cursor.execute(f"""
+        SELECT p.id AS servicio_id, 'perfil' AS servicio_tipo,
+               p.id AS perfil_id, p.cuenta_id AS cuenta_id,
+               c.plataforma AS plataforma, c.correo AS correo,
+               {_expr_tabla_columna_nube(columnas_perfil, 'p', 'nombre_perfil', 'nombre_perfil')},
+               {_expr_tabla_columna_nube(columnas_perfil, 'p', 'pin', 'pin')},
+               {_expr_tabla_columna_nube(columnas_perfil, 'p', 'cliente_id', 'cliente_id', 'NULL')},
+               p.nombre_cliente AS nombre_cliente,
+               {_expr_tabla_columna_nube(columnas_perfil, 'p', 'telefono', 'telefono')},
+               p.fecha_entrega AS fecha_entrega,
+               p.dias_cuenta AS dias_cuenta,
+               p.fecha_vencimiento AS fecha_vencimiento,
+               p.estado AS estado,
+               c.estado AS estado_cuenta
+        FROM nube_perfiles AS p
+        INNER JOIN nube_cuentas AS c ON c.id = p.cuenta_id
+        WHERE COALESCE(c.estado, '') != 'papelera'
+    """)
+    for fila in cursor.fetchall():
+        servicio = dict(fila)
+        if (servicio.get("estado_cuenta") or "").strip().lower() in {"papelera", "reemplazada"}:
+            continue
+        servicio["telefono_normalizado"] = normalizar_telefono_nube(servicio.get("telefono"))
+        if _servicio_expirado_operativo_nube(servicio, hoy):
+            servicios.append(servicio)
+
+    modalidad = (
+        "COALESCE(c.modalidad, 'cuenta_completa') AS modalidad"
+        if "modalidad" in columnas_cuenta
+        else "'cuenta_completa' AS modalidad"
+    )
+    cursor.execute(f"""
+        SELECT c.id AS servicio_id, 'cuenta_completa' AS servicio_tipo,
+               NULL AS perfil_id, c.id AS cuenta_id,
+               c.plataforma AS plataforma, c.correo AS correo,
+               '' AS nombre_perfil,
+               {_expr_tabla_columna_nube(columnas_cuenta, 'c', 'pin', 'pin')},
+               {_expr_tabla_columna_nube(columnas_cuenta, 'c', 'cliente_id', 'cliente_id', 'NULL')},
+               c.nombre_cliente AS nombre_cliente,
+               {_expr_tabla_columna_nube(columnas_cuenta, 'c', 'telefono', 'telefono')},
+               c.fecha_entrega AS fecha_entrega,
+               c.dias_cuenta AS dias_cuenta,
+               c.fecha_vencimiento AS fecha_vencimiento,
+               c.estado AS estado,
+               {modalidad}
+        FROM nube_cuentas AS c
+    """)
+    for fila in cursor.fetchall():
+        servicio = dict(fila)
+        if (servicio.get("modalidad") or "cuenta_completa") == "perfiles":
+            continue
+        servicio["telefono_normalizado"] = normalizar_telefono_nube(servicio.get("telefono"))
+        if _servicio_expirado_operativo_nube(servicio, hoy):
+            servicios.append(servicio)
+    return servicios
+
+
+def _leer_cuenta_madre_operativa_nube(cursor, cuenta_id):
+    columnas = _columnas_tabla_nube(cursor, "nube_cuentas")
+    tipo_cuenta = (
+        "c.tipo_cuenta AS tipo_cuenta"
+        if "tipo_cuenta" in columnas
+        else "'' AS tipo_cuenta"
+    )
+    modalidad = (
+        "c.modalidad AS modalidad"
+        if "modalidad" in columnas
+        else "'cuenta_completa' AS modalidad"
+    )
+    cursor.execute(f"""
+        SELECT c.id, c.plataforma, c.correo, c.contrasena, c.pin,
+               {tipo_cuenta}, {modalidad}, c.estado
+        FROM nube_cuentas AS c
+        WHERE c.id = ?
+    """, (cuenta_id,))
+    fila = cursor.fetchone()
+    if not fila:
+        return None
+    cuenta = dict(fila)
+    return {
+        "id": cuenta["id"],
+        "plataforma": cuenta.get("plataforma") or "",
+        "correo": cuenta.get("correo") or "",
+        "contrasena": cuenta.get("contrasena") or "",
+        "pin": cuenta.get("pin") or "",
+        "tipo": cuenta.get("tipo_cuenta") or "",
+        "modalidad": cuenta.get("modalidad") or "cuenta_completa",
+        "estado": cuenta.get("estado") or ""
+    }
+
+
+def _contar_perfiles_cuenta_nube(cursor, cuenta_id):
+    cursor.execute("SELECT COUNT(*) AS total FROM nube_perfiles WHERE cuenta_id = ?", (cuenta_id,))
+    fila = cursor.fetchone()
+    return int((fila["total"] if fila else 0) or 0)
+
+
+def _identidad_unidad_renovacion_nube(servicio):
+    if servicio.get("cliente_id") is not None:
+        return f"cliente:{servicio.get('cliente_id')}"
+    telefono = servicio.get("telefono_normalizado") or normalizar_telefono_nube(servicio.get("telefono"))
+    if telefono:
+        return f"telefono:{telefono}"
+    nombre = (servicio.get("nombre_cliente") or "").strip().casefold()
+    if nombre and servicio.get("fecha_entrega") and servicio.get("fecha_vencimiento"):
+        return f"fallback:{nombre}:{servicio.get('fecha_entrega')}:{servicio.get('fecha_vencimiento')}"
+    return ""
+
+
+def _snapshot_notificacion_servicio_nube(servicio):
+    publico = {
+        "servicio_tipo": servicio.get("servicio_tipo"),
+        "servicio_id": servicio.get("servicio_id"),
+        "cuenta_id": servicio.get("cuenta_id"),
+        "perfil_id": servicio.get("perfil_id"),
+        "plataforma": servicio.get("plataforma") or "",
+        "correo": servicio.get("correo") or "",
+        "nombre_perfil": servicio.get("nombre_perfil") or "",
+        "pin": servicio.get("pin") or "",
+        "cliente_id": servicio.get("cliente_id"),
+        "nombre_cliente": servicio.get("nombre_cliente") or "",
+        "telefono": servicio.get("telefono") or "",
+        "telefono_normalizado": servicio.get("telefono_normalizado") or "",
+        "fecha_entrega": servicio.get("fecha_entrega") or "",
+        "dias_cuenta": int(servicio.get("dias_cuenta") or 0),
+        "fecha_vencimiento": servicio.get("fecha_vencimiento") or "",
+        "estado": servicio.get("estado") or "",
+        "fecha_snapshot": datetime.now().astimezone().isoformat(timespec="seconds")
+    }
+    return json.dumps(publico, ensure_ascii=False, sort_keys=True)
+
+
+def _mensaje_renovacion_nube(unidad):
+    cliente = unidad.get("cliente") or "Cliente"
+    servicios = unidad.get("servicios") or []
+    plataformas = [s.get("plataforma") or "Servicio" for s in servicios]
+    if unidad.get("tipo") == "combo":
+        lineas = "\n".join(f"- {plataforma}" for plataforma in plataformas)
+        return f"Hola, {cliente}\n\nTu combo de:\n\n{lineas}\n\nha vencido.\n\nDeseas renovarlo?\n\nGracias por preferirnos.\n\nPECHY PLAYERS"
+    plataforma = plataformas[0] if plataformas else "tu servicio"
+    return f"Hola, {cliente}\n\nTe informamos que tu servicio de {plataforma} ha vencido.\n\nDeseas renovarlo?\n\nGracias por preferirnos.\n\nPECHY PLAYERS"
+
+
+def _url_whatsapp_nube(telefono_normalizado, mensaje):
+    from urllib.parse import quote
+    telefono = normalizar_telefono_nube(telefono_normalizado)
+    if not telefono:
+        return ""
+    return f"https://wa.me/{telefono}?text={quote(mensaje or '')}"
+
+
+def _servicio_token_renovacion_nube(servicio):
+    return f"{servicio['servicio_tipo']}:{servicio['servicio_id']}"
+
+
+def _servicios_no_notificados_nube(cursor):
+    _asegurar_notificaciones_renovacion_nube(cursor)
+    pendientes = []
+    for servicio in _leer_servicios_vencidos_reales_nube(cursor):
+        cursor.execute("""
+            SELECT 1 FROM nube_notificacion_servicios
+            WHERE servicio_tipo = ? AND servicio_id = ?
+              AND fecha_vencimiento_ciclo = ?
+            LIMIT 1
+        """, (servicio["servicio_tipo"], servicio["servicio_id"], servicio["fecha_vencimiento"]))
+        if not cursor.fetchone():
+            pendientes.append(servicio)
+    return pendientes
+
+
+def _crear_unidades_renovacion_nube(servicios):
+    grupos = {}
+    sueltos = []
+    for servicio in servicios:
+        identidad = _identidad_unidad_renovacion_nube(servicio)
+        if not identidad:
+            sueltos.append([servicio])
+            continue
+        clave = (
+            identidad, servicio.get("fecha_entrega") or "",
+            int(servicio.get("dias_cuenta") or 0),
+            servicio.get("fecha_vencimiento") or ""
+        )
+        grupos.setdefault(clave, []).append(servicio)
+    unidades = sueltos + list(grupos.values())
+    resultado = []
+    for grupo in unidades:
+        grupo.sort(key=lambda s: (s["plataforma"], s["servicio_tipo"], s["servicio_id"]))
+        primero = grupo[0]
+        tokens = ",".join(_servicio_token_renovacion_nube(s) for s in grupo)
+        unidad = {
+            "unidad_id": f"pendiente:{primero.get('fecha_vencimiento')}:{tokens}",
+            "tipo": "combo" if len(grupo) > 1 else "individual",
+            "cliente_id": primero.get("cliente_id"),
+            "cliente": primero.get("nombre_cliente") or "",
+            "telefono": primero.get("telefono") or "",
+            "telefono_normalizado": primero.get("telefono_normalizado") or "",
+            "fecha_entrega": primero.get("fecha_entrega") or "",
+            "dias_cuenta": int(primero.get("dias_cuenta") or 0),
+            "fecha_vencimiento": primero.get("fecha_vencimiento") or "",
+            "servicios": grupo
+        }
+        unidad["mensaje"] = _mensaje_renovacion_nube(unidad)
+        unidad["whatsapp_url"] = _url_whatsapp_nube(unidad["telefono_normalizado"], unidad["mensaje"])
+        resultado.append(unidad)
+    resultado.sort(key=lambda u: (u["fecha_vencimiento"], u["cliente"].casefold(), u["unidad_id"]))
+    return resultado
+
+
+def obtener_centro_notificaciones_renovacion_nube():
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        _asegurar_notificaciones_renovacion_nube(cursor)
+        pendientes = _crear_unidades_renovacion_nube(_servicios_no_notificados_nube(cursor))
+        cursor.execute("""
+            SELECT * FROM nube_notificaciones_renovacion
+            ORDER BY COALESCE(fecha_notificacion, fecha_creacion) DESC, id DESC
+            LIMIT 250
+        """)
+        notificados = []
+        for fila in cursor.fetchall():
+            item = dict(fila)
+            cursor.execute("""
+                SELECT snapshot, estado
+                FROM nube_notificacion_servicios
+                WHERE notificacion_id = ?
+                ORDER BY id
+            """, (item["id"],))
+            servicios = []
+            for fila_servicio in cursor.fetchall():
+                snapshot = json.loads(fila_servicio["snapshot"] or "{}")
+                snapshot["estado_corte"] = fila_servicio["estado"]
+                servicios.append(snapshot)
+            item["servicios"] = servicios
+            item["cliente"] = servicios[0].get("nombre_cliente") if servicios else ""
+            item["telefono"] = servicios[0].get("telefono") if servicios else ""
+            item["fecha_vencimiento"] = item["fecha_vencimiento_ciclo"]
+            item["whatsapp_url"] = _url_whatsapp_nube(item.get("telefono_normalizado"), item.get("mensaje"))
+            notificados.append(item)
+        hoy = _fecha_hoy_nube().isoformat()
+        return {
+            "pendientes": pendientes,
+            "notificados": notificados,
+            "resumen": {
+                "pendientes": len(pendientes),
+                "vencen_hoy": sum(u["fecha_vencimiento"] == hoy for u in pendientes),
+                "notificados_hoy": sum((n.get("fecha_notificacion") or "").startswith(hoy) for n in notificados),
+                "combos": sum(u["tipo"] == "combo" for u in pendientes),
+                "individuales": sum(u["tipo"] == "individual" for u in pendientes)
+            }
+        }
+    finally:
+        conn.close()
+
+
+def marcar_notificacion_renovacion_nube(servicios_payload, mensaje="", medio="manual"):
+    solicitados = {
+        (str(item.get("servicio_tipo") or ""), int(item.get("servicio_id") or 0))
+        for item in (servicios_payload or [])
+        if item.get("servicio_tipo") in {"perfil", "cuenta_completa"}
+    }
+    solicitados = {item for item in solicitados if item[1] > 0}
+    if not solicitados:
+        return {"ok": False, "mensaje": "Selecciona al menos un servicio vencido."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        _asegurar_notificaciones_renovacion_nube(cursor)
+        reales = {(s["servicio_tipo"], int(s["servicio_id"])): s for s in _servicios_no_notificados_nube(cursor)}
+        seleccionados = []
+        for clave in solicitados:
+            servicio = reales.get(clave)
+            if not servicio:
+                conn.rollback()
+                return {"ok": False, "codigo": "servicio_no_elegible", "mensaje": "El servicio ya fue renovado, liberado o notificado."}
+            seleccionados.append(servicio)
+        unidad = _crear_unidades_renovacion_nube(seleccionados)[0]
+        mensaje = (mensaje or "").strip() or _mensaje_renovacion_nube(unidad)
+        cursor.execute("""
+            INSERT INTO nube_notificaciones_renovacion (
+                cliente_id, telefono_normalizado, fecha_vencimiento_ciclo,
+                fecha_notificacion, estado, tipo, mensaje, medio
+            ) VALUES (?, ?, ?, datetime('now','localtime'), 'notificado', ?, ?, ?)
+        """, (
+            seleccionados[0].get("cliente_id"),
+            seleccionados[0].get("telefono_normalizado") or "",
+            seleccionados[0].get("fecha_vencimiento") or "",
+            "combo" if len(seleccionados) > 1 else "individual",
+            mensaje, (medio or "manual").strip()
+        ))
+        notificacion_id = cursor.lastrowid
+        for servicio in seleccionados:
+            cursor.execute("""
+                INSERT INTO nube_notificacion_servicios (
+                    notificacion_id, servicio_tipo, servicio_id, cuenta_id,
+                    perfil_id, fecha_vencimiento_ciclo, snapshot
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                notificacion_id, servicio["servicio_tipo"], servicio["servicio_id"],
+                servicio["cuenta_id"], servicio.get("perfil_id"),
+                servicio["fecha_vencimiento"], _snapshot_notificacion_servicio_nube(servicio)
+            ))
+        cursor.execute("""
+            INSERT INTO nube_movimientos (cuenta_id, tipo, descripcion, cliente_nombre)
+            VALUES (?, 'renovacion_notificada', ?, ?)
+        """, (
+            seleccionados[0]["cuenta_id"],
+            f"Notificacion de renovacion registrada para {len(seleccionados)} servicio(s)",
+            seleccionados[0].get("nombre_cliente") or ""
+        ))
+        conn.commit()
+        return {"ok": True, "notificacion_id": notificacion_id}
+    except sqlite3.IntegrityError:
+        conn.rollback()
+        return {"ok": False, "codigo": "duplicado", "mensaje": "Este ciclo de vencimiento ya fue notificado."}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _horas_desde_nube(fecha_texto):
+    if not fecha_texto:
+        return 0
+    try:
+        fecha = datetime.fromisoformat(str(fecha_texto).replace(" ", "T"))
+    except ValueError:
+        return 0
+    return max(int((datetime.now() - fecha).total_seconds() // 3600), 0)
+
+
+def obtener_historial_cortes_nube(cursor):
+    cursor.execute("""
+        SELECT ns.*, n.fecha_notificacion, n.tipo AS tipo_notificacion
+        FROM nube_notificacion_servicios AS ns
+        INNER JOIN nube_notificaciones_renovacion AS n ON n.id = ns.notificacion_id
+        WHERE ns.estado IN ('cortado', 'retirado_renovacion')
+        ORDER BY ns.fecha_actualizacion DESC, ns.id DESC
+        LIMIT 120
+    """)
+    historial = []
+    for fila in cursor.fetchall():
+        item = dict(fila)
+        snapshot = json.loads(item.pop("snapshot") or "{}")
+        snapshot.update({
+            "notificacion_id": item["notificacion_id"],
+            "estado_corte": item["estado"],
+            "fecha_notificacion": item["fecha_notificacion"],
+            "fecha_actualizacion": item["fecha_actualizacion"],
+            "tipo_notificacion": item["tipo_notificacion"] or "individual"
+        })
+        historial.append(snapshot)
+    cursor.execute("""
+        SELECT m.cuenta_id, m.tipo, m.descripcion, m.fecha,
+               c.plataforma, c.correo
+        FROM nube_movimientos AS m
+        LEFT JOIN nube_cuentas AS c ON c.id = m.cuenta_id
+        WHERE m.tipo IN (
+            'credenciales_actualizadas_corte',
+            'pin_perfil_actualizado_corte'
+        )
+        ORDER BY m.fecha DESC, m.id DESC
+        LIMIT 80
+    """)
+    for fila in cursor.fetchall():
+        item = dict(fila)
+        historial.append({
+            "cuenta_id": item.get("cuenta_id"),
+            "plataforma": item.get("plataforma") or "Cuenta madre",
+            "correo": item.get("correo") or "",
+            "servicio_tipo": "evento",
+            "nombre_perfil": "",
+            "nombre_cliente": "",
+            "telefono": "",
+            "telefono_normalizado": "",
+            "estado_corte": item.get("tipo") or "evento",
+            "tipo_evento": item.get("tipo") or "evento",
+            "descripcion": item.get("descripcion") or "Evento operativo",
+            "fecha_actualizacion": item.get("fecha") or "",
+            "tipo_notificacion": "operativo"
+        })
+    historial.sort(key=lambda item: item.get("fecha_actualizacion") or "", reverse=True)
+    historial = historial[:120]
+    return historial
+
+
+def obtener_cortes_nube():
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        _asegurar_notificaciones_renovacion_nube(cursor)
+        reales = {
+            (s["servicio_tipo"], int(s["servicio_id"]), s["fecha_vencimiento"]): s
+            for s in _leer_servicios_vencidos_reales_nube(cursor)
+        }
+        cursor.execute("""
+            SELECT ns.*, n.fecha_notificacion, n.medio, n.tipo AS tipo_notificacion
+            FROM nube_notificacion_servicios AS ns
+            INNER JOIN nube_notificaciones_renovacion AS n ON n.id = ns.notificacion_id
+            WHERE ns.estado = 'pendiente_corte'
+            ORDER BY n.fecha_notificacion ASC, ns.id ASC
+        """)
+        por_cuenta = {}
+        cuentas_madre = {}
+        retirados = 0
+        for fila in cursor.fetchall():
+            item = dict(fila)
+            clave = (item["servicio_tipo"], int(item["servicio_id"]), item["fecha_vencimiento_ciclo"])
+            real = reales.get(clave)
+            if not real:
+                retirados += 1
+                cursor.execute("""
+                    UPDATE nube_notificacion_servicios
+                    SET estado = 'retirado_renovacion',
+                        fecha_actualizacion = CURRENT_TIMESTAMP
+                    WHERE id = ? AND estado = 'pendiente_corte'
+                """, (item["id"],))
+                continue
+            cuenta_madre = cuentas_madre.get(real["cuenta_id"])
+            if cuenta_madre is None:
+                cuenta_madre = _leer_cuenta_madre_operativa_nube(cursor, real["cuenta_id"]) or {}
+                cuenta_madre["perfiles_totales"] = _contar_perfiles_cuenta_nube(cursor, real["cuenta_id"])
+                cuentas_madre[real["cuenta_id"]] = cuenta_madre
+            real["cuenta_madre"] = cuenta_madre
+            real["notificacion_id"] = item["notificacion_id"]
+            real["fecha_notificacion"] = item["fecha_notificacion"] or ""
+            real["medio"] = item["medio"] or ""
+            real["tipo_notificacion"] = item["tipo_notificacion"] or "individual"
+            grupo = por_cuenta.setdefault(real["cuenta_id"], {
+                "cuenta_id": real["cuenta_id"],
+                "grupo_id": f"cuenta:{real['cuenta_id']}",
+                "tipo": "individual",
+                "fecha_notificacion": real["fecha_notificacion"],
+                "medio": real["medio"],
+                "cliente": real.get("nombre_cliente") or "",
+                "telefono": real.get("telefono") or "",
+                "telefono_normalizado": real.get("telefono_normalizado") or "",
+                "fecha_vencimiento": real.get("fecha_vencimiento") or "",
+                "cuenta_madre": cuenta_madre,
+                "perfiles_totales": cuenta_madre.get("perfiles_totales", 0),
+                "servicios": []
+            })
+            grupo["servicios"].append(real)
+            if real["fecha_notificacion"] and (
+                not grupo["fecha_notificacion"] or real["fecha_notificacion"] < grupo["fecha_notificacion"]
+            ):
+                grupo["fecha_notificacion"] = real["fecha_notificacion"]
+            if real.get("fecha_vencimiento") and (
+                not grupo["fecha_vencimiento"] or real["fecha_vencimiento"] < grupo["fecha_vencimiento"]
+            ):
+                grupo["fecha_vencimiento"] = real["fecha_vencimiento"]
+            if real.get("tipo_notificacion") == "combo":
+                grupo["tipo"] = "combo"
+        pendientes = []
+        for grupo in por_cuenta.values():
+            grupo["pendientes_count"] = len(grupo["servicios"])
+            grupo["vigentes_count"] = max(int(grupo.get("perfiles_totales") or 0) - grupo["pendientes_count"], 0)
+            if grupo["pendientes_count"] > 1 and grupo["tipo"] != "combo":
+                grupo["tipo"] = "individual"
+            pendientes.append(grupo)
+        pendientes.sort(key=lambda g: (g["fecha_notificacion"], (g["cuenta_madre"].get("correo") or "").casefold(), g["cuenta_id"]))
+        hoy = _fecha_hoy_nube().isoformat()
+        servicios_pendientes = sum(len(g["servicios"]) for g in pendientes)
+        if retirados:
+            conn.commit()
+        return {
+            "pendientes": pendientes,
+            "historial": obtener_historial_cortes_nube(cursor),
+            "resumen": {
+                "cuentas_pendientes": len(pendientes),
+                "servicios_pendientes": servicios_pendientes,
+                "pendientes": len(pendientes),
+                "notificados_hoy": sum(g["fecha_notificacion"].startswith(hoy) for g in pendientes),
+                "mas_de_x_horas": sum(_horas_desde_nube(g["fecha_notificacion"]) >= 8 for g in pendientes),
+                "combos": sum(1 for g in pendientes for s in g["servicios"] if s.get("tipo_notificacion") == "combo"),
+                "individuales": sum(1 for g in pendientes for s in g["servicios"] if s.get("tipo_notificacion") != "combo"),
+                "servicios_individuales": servicios_pendientes
+            },
+            "retirados_por_renovacion": retirados
+        }
+    finally:
+        conn.close()
+
+
+def actualizar_credenciales_cuenta_corte_nube(cuenta_id, correo=None, contrasena=None, pin=None):
+    try:
+        cuenta_id = int(cuenta_id or 0)
+    except (TypeError, ValueError):
+        cuenta_id = 0
+    correo = (correo or "").strip()
+    contrasena = (contrasena or "").strip()
+    pin_recibido = pin is not None
+    pin = (pin or "").strip()
+    if cuenta_id <= 0:
+        return {"ok": False, "mensaje": "Cuenta invalida."}
+    if not correo:
+        return {"ok": False, "mensaje": "El correo no puede estar vacio."}
+    if not contrasena:
+        return {"ok": False, "mensaje": "La contrasena no puede estar vacia."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            SELECT id, correo, contrasena, pin
+            FROM nube_cuentas
+            WHERE id = ?
+        """, (cuenta_id,))
+        actual = cursor.fetchone()
+        if not actual:
+            conn.rollback()
+            return {"ok": False, "mensaje": "La cuenta madre no existe."}
+        pin_final = pin if pin_recibido else (actual["pin"] or "")
+        cursor.execute("""
+            UPDATE nube_cuentas
+            SET correo = ?, contrasena = ?, pin = ?,
+                fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (correo, contrasena, pin_final, cuenta_id))
+        cursor.execute("""
+            INSERT INTO nube_movimientos (
+                cuenta_id, tipo, descripcion, estado_anterior,
+                estado_nuevo, cliente_nombre
+            ) VALUES (?, 'credenciales_actualizadas_corte', ?, '', '', '')
+        """, (
+            cuenta_id,
+            "Credenciales de cuenta madre actualizadas desde Cortes"
+        ))
+        conn.commit()
+        return {
+            "ok": True,
+            "mensaje": "Datos de la cuenta actualizados.",
+            "cuenta": {
+                "id": cuenta_id,
+                "correo": correo,
+                "contrasena": contrasena,
+                "pin": pin_final
+            }
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def actualizar_pin_perfil_corte_nube(cuenta_id, perfil_id, pin=None):
+    try:
+        cuenta_id = int(cuenta_id or 0)
+        perfil_id = int(perfil_id or 0)
+    except (TypeError, ValueError):
+        return {"ok": False, "mensaje": "Perfil invalido."}
+    pin = (pin or "").strip()
+    if cuenta_id <= 0 or perfil_id <= 0:
+        return {"ok": False, "mensaje": "Perfil invalido."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        cursor.execute("""
+            SELECT id, cuenta_id, nombre_perfil
+            FROM nube_perfiles
+            WHERE id = ?
+        """, (perfil_id,))
+        perfil = cursor.fetchone()
+        if not perfil or int(perfil["cuenta_id"] or 0) != cuenta_id:
+            conn.rollback()
+            return {"ok": False, "mensaje": "El perfil no pertenece a esta cuenta madre."}
+        cursor.execute("""
+            UPDATE nube_perfiles
+            SET pin = ?, fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ? AND cuenta_id = ?
+        """, (pin, perfil_id, cuenta_id))
+        cursor.execute("""
+            INSERT INTO nube_movimientos (
+                cuenta_id, tipo, descripcion, estado_anterior,
+                estado_nuevo, cliente_nombre
+            ) VALUES (?, 'pin_perfil_actualizado_corte', ?, '', '', '')
+        """, (
+            cuenta_id,
+            f"PIN de perfil actualizado desde Cortes ({perfil['nombre_perfil'] or 'Perfil'})"
+        ))
+        conn.commit()
+        return {"ok": True, "mensaje": "PIN del perfil actualizado.", "perfil": {"id": perfil_id, "cuenta_id": cuenta_id, "pin": pin}}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def _limpiar_servicio_cortado_nube(cursor, servicio):
+    if servicio["servicio_tipo"] == "perfil":
+        cursor.execute("""
+            UPDATE nube_perfiles
+            SET cliente_id = NULL, nombre_cliente = '', telefono = '',
+                fecha_entrega = '', dias_cuenta = 0, fecha_vencimiento = '',
+                estado = 'disponible', fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ? AND fecha_vencimiento = ?
+        """, (servicio["servicio_id"], servicio["fecha_vencimiento"]))
+        return cursor.rowcount
+    cursor.execute("""
+        UPDATE nube_cuentas
+        SET cliente_id = NULL, nombre_cliente = '', telefono = '',
+            fecha_entrega = '', dias_cuenta = 0, fecha_vencimiento = '',
+            estado = 'disponible', fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = ? AND fecha_vencimiento = ?
+    """, (servicio["servicio_id"], servicio["fecha_vencimiento"]))
+    return cursor.rowcount
+
+
+def cortar_servicios_nube(servicios_payload, motivo=""):
+    solicitados = {}
+    for item in (servicios_payload or []):
+        servicio_tipo = str(item.get("servicio_tipo") or "")
+        if servicio_tipo not in {"perfil", "cuenta_completa"}:
+            continue
+        try:
+            servicio_id = int(item.get("servicio_id") or 0)
+            cuenta_id = int(item.get("cuenta_id") or 0)
+        except (TypeError, ValueError):
+            continue
+        if servicio_id > 0:
+            solicitados[(servicio_tipo, servicio_id)] = cuenta_id
+    if not solicitados:
+        return {"ok": False, "mensaje": "Selecciona al menos un servicio para cortar."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("BEGIN IMMEDIATE")
+        _asegurar_notificaciones_renovacion_nube(cursor)
+        reales = {(s["servicio_tipo"], int(s["servicio_id"])): s for s in _leer_servicios_vencidos_reales_nube(cursor)}
+        cortados = 0
+        retirados = 0
+        omitidos = []
+        for clave, cuenta_id_payload in solicitados.items():
+            servicio = reales.get(clave)
+            if not servicio:
+                cursor.execute("""
+                    UPDATE nube_notificacion_servicios
+                    SET estado = 'retirado_renovacion',
+                        fecha_actualizacion = CURRENT_TIMESTAMP
+                    WHERE servicio_tipo = ? AND servicio_id = ?
+                      AND estado = 'pendiente_corte'
+                """, clave)
+                retirados += cursor.rowcount
+                omitidos.append({"servicio_tipo": clave[0], "servicio_id": clave[1], "codigo": "servicio_renovado"})
+                continue
+            if cuenta_id_payload and int(servicio["cuenta_id"] or 0) != cuenta_id_payload:
+                conn.rollback()
+                return {"ok": False, "mensaje": "El servicio no pertenece a esta cuenta madre."}
+            cursor.execute("""
+                SELECT id FROM nube_notificacion_servicios
+                WHERE servicio_tipo = ? AND servicio_id = ?
+                  AND fecha_vencimiento_ciclo = ?
+                  AND estado = 'pendiente_corte'
+            """, (servicio["servicio_tipo"], servicio["servicio_id"], servicio["fecha_vencimiento"]))
+            fila_notificada = cursor.fetchone()
+            if not fila_notificada:
+                conn.rollback()
+                return {"ok": False, "mensaje": "El servicio no tiene una notificacion pendiente de corte."}
+            snapshot = _snapshot_notificacion_servicio_nube(servicio)
+            if _limpiar_servicio_cortado_nube(cursor, servicio) != 1:
+                raise RuntimeError("El servicio cambio durante el corte.")
+            cursor.execute("""
+                UPDATE nube_notificacion_servicios
+                SET snapshot = ?, estado = 'cortado',
+                    fecha_actualizacion = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (snapshot, fila_notificada["id"]))
+            cursor.execute("""
+                INSERT INTO nube_movimientos (
+                    cuenta_id, tipo, descripcion, estado_anterior,
+                    estado_nuevo, cliente_nombre
+                ) VALUES (?, 'servicio_cortado', ?, ?, 'disponible', ?)
+            """, (
+                servicio["cuenta_id"],
+                "Servicio cortado manualmente desde Cortes" + (f". Motivo: {(motivo or '').strip()}" if (motivo or "").strip() else ""),
+                servicio.get("estado") or "",
+                servicio.get("nombre_cliente") or ""
+            ))
+            cortados += 1
+        conn.commit()
+        if cortados:
+            mensaje = f"{cortados} servicio(s) cortado(s)."
+            if retirados:
+                mensaje += f" {retirados} retirado(s) porque ya no eran elegibles."
+            return {"ok": True, "cortados": cortados, "retirados": retirados, "omitidos": omitidos, "mensaje": mensaje}
+        return {
+            "ok": False,
+            "codigo": "sin_elegibles",
+            "cortados": 0,
+            "retirados": retirados,
+            "omitidos": omitidos,
+            "mensaje": "Ningun servicio seguia pendiente de corte."
         }
     except Exception:
         conn.rollback()

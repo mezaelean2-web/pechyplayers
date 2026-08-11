@@ -62,6 +62,18 @@
     <span>Centro de alertas</span>
 </a>
 
+<a href="/admin/nube-notificaciones"
+   class="sidebar-link {% if request.path.startswith('/admin/nube-notificaciones') %}active{% endif %}">
+    <i data-lucide="message-circle" class="sidebar-icon"></i>
+    <span>Centro de notificaciones</span>
+</a>
+
+<a href="/admin/nube-cortes"
+   class="sidebar-link {% if request.path.startswith('/admin/nube-cortes') %}active{% endif %}">
+    <i data-lucide="scissors" class="sidebar-icon"></i>
+    <span>Cortes</span>
+</a>
+
 <a href="/admin/nube-papelera"
    class="sidebar-link {% if request.path.startswith('/admin/nube-papelera') %}active{% endif %}">
     <i data-lucide="archive" class="sidebar-icon"></i>

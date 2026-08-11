@@ -1,0 +1,30 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Cortes{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/nube_operativo.css') }}">{% endblock %}
+{% block contenido %}
+<main class="nube-op" id="cortesApp" aria-busy="true">
+  <header class="nube-op-hero">
+    <div class="nube-op-title"><span><i data-lucide="scissors"></i></span><div><small>INVENTARIO / CICLO DE VENCIMIENTOS</small><h1>CORTES</h1><p>Servicios notificados pendientes de liberar</p></div></div>
+    <button class="nube-op-btn" id="cortesActualizar" type="button"><i data-lucide="refresh-cw"></i><span>Actualizar</span></button>
+  </header>
+  <section class="nube-op-stats">
+    <button class="nube-op-stat activo" data-tab="pendientes" type="button"><small>Cuentas pendientes</small><strong id="cortesCuentas">0</strong></button>
+    <button class="nube-op-stat" type="button"><small>Servicios pendientes</small><strong id="cortesServiciosPendientes">0</strong></button>
+    <button class="nube-op-stat" type="button"><small>Notificados hoy</small><strong id="cortesHoy">0</strong></button>
+    <button class="nube-op-stat" type="button"><small>Combos</small><strong id="cortesCombos">0</strong></button>
+    <button class="nube-op-stat" type="button"><small>Individuales</small><strong id="cortesIndividuales">0</strong></button>
+  </section>
+  <section class="nube-op-panel">
+    <div class="nube-op-toolbar">
+      <div class="nube-op-tabs"><button class="activo" data-tab="pendientes" type="button">Pendientes</button><button data-tab="historial" type="button">Historial</button></div>
+      <input id="cortesBuscar" type="search" placeholder="Buscar madre, cliente, telefono, perfil o plataforma">
+      <select id="cortesTipo"><option value="">Todas</option><option value="individual">Individual</option><option value="combo">Combo</option></select>
+      <select id="cortesCantidad"><option value="">Pendientes</option><option value="uno">Con 1 pendiente</option><option value="varios">Con varios pendientes</option></select>
+      <input id="cortesFecha" type="date" aria-label="Fecha de notificacion">
+    </div>
+    <div class="nube-op-lista" id="cortesLista"></div>
+  </section>
+</main>
+<div class="nube-op-modal" id="corteModal" aria-hidden="true"><button class="nube-op-backdrop" type="button" data-cerrar-modal></button><section class="nube-op-dialog"><header><div><small id="corteModalTipo"></small><h2 id="corteModalTitulo">Confirmar corte</h2></div><button type="button" data-cerrar-modal>x</button></header><div id="corteModalBody"></div></section></div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/nube_cortes.js') }}"></script>{% endblock %}

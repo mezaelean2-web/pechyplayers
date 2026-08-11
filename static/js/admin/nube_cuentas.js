@@ -252,6 +252,13 @@ document.addEventListener(
         // Sticky coordinado: toolbar + encabezado real de tabla.
         const paginaNube = document.querySelector(".nube-page");
         const toolbarInventario = document.querySelector(".nube-toolbar-premium");
+        const tablaInventario = document.querySelector(".nube-tabla");
+        let stickyRafNube = null;
+
+        function leerTopStickyNube(){
+            if (!paginaNube) return 0;
+            return parseFloat(getComputedStyle(paginaNube).getPropertyValue("--nube-sticky-top")) || 0;
+        }
 
         function actualizarAlturaStickyNube(){
             if (!paginaNube || !toolbarInventario) return;
@@ -259,27 +266,30 @@ document.addEventListener(
             paginaNube.style.setProperty("--nube-toolbar-sticky-height", `${alto}px`);
         }
 
-        actualizarAlturaStickyNube();
-        window.addEventListener("resize", actualizarAlturaStickyNube, { passive: true });
-
-        if (window.ResizeObserver && toolbarInventario){
-            new ResizeObserver(actualizarAlturaStickyNube).observe(toolbarInventario);
+        function actualizarEstadoStickyNube(){
+            stickyRafNube = null;
+            if (!paginaNube || !toolbarInventario || !tablaInventario) return;
+            actualizarAlturaStickyNube();
+            const topSticky = leerTopStickyNube();
+            const altoToolbar = Math.ceil(toolbarInventario.getBoundingClientRect().height);
+            const toolbarActivo = toolbarInventario.getBoundingClientRect().top <= topSticky + 1;
+            const tablaEnTop = tablaInventario.getBoundingClientRect().top <= topSticky + altoToolbar + 1;
+            toolbarInventario.classList.toggle("nube-toolbar-sticky-activo", toolbarActivo);
+            paginaNube.classList.toggle("nube-inventario-sticky", tablaEnTop);
         }
 
-        if (window.IntersectionObserver && toolbarInventario){
-            const sentinelStickyNube = document.createElement("span");
-            sentinelStickyNube.className = "nube-sticky-sentinel";
-            sentinelStickyNube.setAttribute("aria-hidden", "true");
-            toolbarInventario.before(sentinelStickyNube);
-            const topSticky = parseFloat(getComputedStyle(paginaNube).getPropertyValue("--nube-sticky-top")) || 0;
-            new IntersectionObserver(
-                entradas => {
-                    const activo = !entradas[0].isIntersecting;
-                    toolbarInventario.classList.toggle("nube-toolbar-sticky-activo", activo);
-                    paginaNube.classList.toggle("nube-inventario-sticky", activo);
-                },
-                { rootMargin: `-${topSticky}px 0px 0px 0px`, threshold: 0 }
-            ).observe(sentinelStickyNube);
+        function pedirEstadoStickyNube(){
+            if (stickyRafNube !== null) return;
+            stickyRafNube = window.requestAnimationFrame(actualizarEstadoStickyNube);
+        }
+
+        actualizarAlturaStickyNube();
+        pedirEstadoStickyNube();
+        window.addEventListener("scroll", pedirEstadoStickyNube, { passive: true });
+        window.addEventListener("resize", pedirEstadoStickyNube, { passive: true });
+
+        if (window.ResizeObserver && toolbarInventario){
+            new ResizeObserver(pedirEstadoStickyNube).observe(toolbarInventario);
         }
 
         // ==========================================
