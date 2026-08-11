@@ -7,7 +7,7 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -376,7 +376,7 @@ def admin_nube_cuentas():
 
 
     cuentas = obtener_cuentas_nube(
-        limite=25,
+        limite=1000,
         offset=0
     )
 
@@ -875,6 +875,25 @@ def obtener_detalle_alerta_nube_route():
     return jsonify({"ok": True, **detalle})
 
 
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/drawer", methods=["GET"])
+def obtener_detalle_drawer_nube_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    detalle = obtener_detalle_drawer_cuenta_nube(cuenta_id)
+    if not detalle:
+        return jsonify({"ok": False, "mensaje": "Cuenta no encontrada"}), 404
+    return jsonify({"ok": True, **detalle})
+
+
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/notas", methods=["POST"])
+def actualizar_notas_cuenta_nube_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    datos = request.get_json(silent=True) or {}
+    resultado = actualizar_notas_cuenta_nube(cuenta_id, datos.get("notas", ""))
+    return jsonify(resultado), (200 if resultado.get("ok") else 404)
+
+
 @app.route("/admin/nube-cuentas/pagos-pin", methods=["POST"])
 def registrar_pago_pin_nube_route():
     if not session.get("admin"):
@@ -899,6 +918,55 @@ def registrar_pago_pin_nube_route():
         ) else None,
         "pago": resultado
     })
+
+
+@app.route("/admin/nube-cuentas/asignar-cuenta", methods=["POST"])
+def asignar_cuenta_completa_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    datos = request.get_json(silent=True) or {}
+    try:
+        resultado = asignar_cuenta_completa_nube(
+            cuenta_id=datos.get("cuenta_id"),
+            nombre_cliente=datos.get("nombre_cliente", ""),
+            telefono=datos.get("telefono", ""),
+            fecha_entrega=datos.get("fecha_entrega", ""),
+            dias_cuenta=datos.get("dias_cuenta", 0),
+            notas=datos.get("notas", "")
+        )
+    except sqlite3.Error:
+        return jsonify({"ok": False, "mensaje": "No se pudo asignar la cuenta."}), 500
+
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
+
+
+@app.route("/admin/nube-cuentas/carga-rapida", methods=["POST"])
+def carga_rapida_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+
+    datos = request.get_json(silent=True) or {}
+    credenciales = datos.get("credenciales") or []
+    if not isinstance(credenciales, list):
+        return jsonify({"ok": False, "mensaje": "Credenciales inválidas."}), 400
+
+    try:
+        resultado = crear_cuentas_nube_lote(
+            plataforma=datos.get("plataforma", ""),
+            modalidad=datos.get("modalidad", "cuenta_completa"),
+            tipo_pago=datos.get("tipo_pago", ""),
+            plan_pago=datos.get("plan_pago", ""),
+            cantidad_perfiles=datos.get("cantidad_perfiles", 0),
+            credenciales=credenciales,
+            valor_pin=int(re.sub(r"\D", "", str(datos.get("valor_pin", "0"))) or 0),
+            precio_plan_referencia=int(re.sub(r"\D", "", str(datos.get("precio_plan_referencia", "0"))) or 0),
+            fecha_aplicacion_pin=datos.get("fecha_aplicacion_pin", "")
+        )
+    except sqlite3.Error:
+        return jsonify({"ok": False, "mensaje": "No se pudo completar la carga rápida."}), 500
+
+    return jsonify(resultado), (200 if resultado.get("ok") else 409)
 
 
 @app.route(

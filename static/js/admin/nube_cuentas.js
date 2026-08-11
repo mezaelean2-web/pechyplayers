@@ -1,6 +1,286 @@
 document.addEventListener(
     "DOMContentLoaded",
     () => {
+        // CENTRO DE INVENTARIO: búsqueda y filtros locales combinables.
+        const inventario = {
+            busqueda: "", plataforma: "", tipo: "", estado: "", asignacion: "",
+            pago: "", tipoAvanzado: ""
+        };
+        const normalizarInventario = valor => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const claveInventario = valor => normalizarInventario(valor).replace(/\s+/g, "_");
+        const normalizarTipoInventario = valor => {
+            const clave = claveInventario(valor);
+            if (["cuenta_completa", "cuenta_completas", "completa", "completas"].includes(clave)) return "cuenta_completa";
+            if (["perfil", "perfiles"].includes(clave)) return "perfiles";
+            if (["perfil_extra", "miembro_extra"].includes(clave)) return "perfil_extra";
+            if (clave === "plan_estandar") return "plan_estandar";
+            return clave;
+        };
+        const etiquetaTipoInventario = valor => ({
+            cuenta_completa: "Cuenta completa",
+            perfiles: "Perfiles",
+            perfil_extra: "Perfil Extra",
+            plan_estandar: "Plan estándar"
+        })[normalizarTipoInventario(valor)] || String(valor || "Otros").replaceAll("_", " ").replace(/\b\w/g, letra => letra.toUpperCase());
+        const normalizarTelefonoNubeUi = telefono => {
+            let numero = String(telefono ?? "").replace(/\D/g, "");
+            if (/^3\d{9}$/.test(numero)) numero = `57${numero}`;
+            return /^\d{10,15}$/.test(numero) ? numero : "";
+        };
+        const madresInventario = [...document.querySelectorAll(".nube-cuenta-madre")];
+        const indiceInventario = new Map(madresInventario.map(fila => {
+            const id = fila.dataset.cuentaId;
+            const hijos = [...document.querySelectorAll(`.nube-perfil-row[data-parent-id="${CSS.escape(id)}"]`)];
+            const controles = [fila, ...hijos].flatMap(nodo => [...nodo.querySelectorAll("[data-id]")]);
+            const secretos = controles.flatMap(control => Object.values(control.dataset));
+            return [fila, { hijos, texto: normalizarInventario([fila.textContent, ...hijos.map(h => h.textContent), ...secretos, id].join(" ")) }];
+        }));
+        const resultadoInventario = document.createElement("div");
+        resultadoInventario.className = "nube-resultado-filtros";
+        resultadoInventario.setAttribute("aria-live", "polite");
+        document.querySelector(".nube-tabla-card")?.prepend(resultadoInventario);
+        const selectPlataformaInventario = document.getElementById("nubeFiltroPlataforma");
+        const selectTipoAvanzadoInventario = document.getElementById("nubeFiltroTipoAvanzado");
+
+        function estaAsignadoInventario(nodo){
+            return Boolean(String(nodo?.dataset?.cliente || "").trim());
+        }
+
+        function estaVendibleInventario(nodo){
+            return !["caida", "papelera", "reemplazada"].includes(String(nodo?.dataset?.estado || ""));
+        }
+
+        function esCuentaCompletaDisponibleInventario(fila){
+            return fila.dataset.modalidad !== "perfiles" &&
+                fila.dataset.estado === "disponible" &&
+                !estaAsignadoInventario(fila);
+        }
+
+        function sincronizarPlataformaInventario(plataforma){
+            inventario.plataforma = plataforma || "";
+            const normal = normalizarInventario(inventario.plataforma);
+            document.querySelectorAll(".nube-hoja").forEach(boton => {
+                const activo = normalizarInventario(boton.dataset.plataforma) === normal;
+                boton.classList.toggle("activo", activo);
+                boton.setAttribute("aria-pressed", String(activo));
+            });
+            if (selectPlataformaInventario) selectPlataformaInventario.value = inventario.plataforma;
+        }
+
+        function escribirStatInventario(nombre, valor){
+            const nodo = document.querySelector(`[data-stat-value="${nombre}"]`);
+            if (nodo) nodo.textContent = valor;
+        }
+
+        function escribirDetalleStatInventario(nombre, valor){
+            const nodo = document.querySelector(`[data-stat-detail="${nombre}"]`);
+            if (nodo) nodo.textContent = valor;
+        }
+
+        function recalcularMetricasInventario(){
+            const cuentas = madresInventario.filter(fila =>
+                !inventario.plataforma ||
+                normalizarInventario(fila.dataset.plataforma) === normalizarInventario(inventario.plataforma)
+            );
+            const resumen = {
+                total: cuentas.length,
+                activas: 0,
+                por_vencer: 0,
+                vencidas: 0,
+                caidas: 0,
+                perfiles: 0,
+                madres: 0,
+                completas: 0
+            };
+
+            cuentas.forEach(fila => {
+                const estado = fila.dataset.estado;
+                const hijos = indiceInventario.get(fila)?.hijos || [];
+                if (estado === "activa") resumen.activas += 1;
+                if (estado === "por_vencer") resumen.por_vencer += 1;
+                if (estado === "vencida") resumen.vencidas += 1;
+                if (estado === "caida") resumen.caidas += 1;
+
+                if (fila.dataset.modalidad === "perfiles" && estaVendibleInventario(fila)){
+                    const disponibles = hijos.filter(hijo =>
+                        hijo.dataset.estado === "disponible" &&
+                        !estaAsignadoInventario(hijo)
+                    ).length;
+                    resumen.perfiles += disponibles;
+                    if (disponibles > 0) resumen.madres += 1;
+                } else if (esCuentaCompletaDisponibleInventario(fila)){
+                    resumen.completas += 1;
+                }
+            });
+
+            escribirStatInventario("total", resumen.total);
+            escribirDetalleStatInventario("total", inventario.plataforma ? "Cuentas de la plataforma" : "Todos los registros");
+            escribirStatInventario("activas", resumen.activas);
+            escribirStatInventario("por_vencer", resumen.por_vencer);
+            escribirStatInventario("vencidas", resumen.vencidas);
+            escribirStatInventario("caidas", resumen.caidas);
+            escribirStatInventario("disponibles", resumen.perfiles);
+            escribirDetalleStatInventario("disponibles", `${resumen.madres} madres · ${resumen.perfiles} perfiles · ${resumen.completas} completas`);
+        }
+
+        function poblarTiposAvanzadosInventario(){
+            if (!selectTipoAvanzadoInventario) return;
+            const tipos = new Map();
+            madresInventario.forEach(fila => {
+                const tipoMadre = fila.dataset.modalidad === "perfiles" ? "perfiles" : fila.dataset.tipo;
+                tipos.set(normalizarTipoInventario(tipoMadre), etiquetaTipoInventario(tipoMadre));
+                indiceInventario.get(fila)?.hijos.forEach(hijo =>
+                    tipos.set(normalizarTipoInventario(hijo.dataset.tipo), etiquetaTipoInventario(hijo.dataset.tipo))
+                );
+            });
+            [...tipos.entries()].sort((a, b) => a[1].localeCompare(b[1], "es")).forEach(([valor, etiqueta]) => {
+                const option = document.createElement("option");
+                option.value = valor;
+                option.textContent = etiqueta;
+                selectTipoAvanzadoInventario.append(option);
+            });
+        }
+
+        function aplicarFiltrosInventario(){
+            let visibles = 0;
+            madresInventario.forEach(fila => {
+                const registro = indiceInventario.get(fila);
+                const coincideBusqueda = !inventario.busqueda || registro.texto.includes(normalizarInventario(inventario.busqueda));
+                const coincidePlataforma = !inventario.plataforma || normalizarInventario(fila.dataset.plataforma) === normalizarInventario(inventario.plataforma);
+                const tipoFila = normalizarTipoInventario(fila.dataset.modalidad === "perfiles" ? "perfiles" : fila.dataset.tipo);
+                const coincideTipo = !inventario.tipo || tipoFila === normalizarTipoInventario(inventario.tipo);
+                const coincideEstado = !inventario.estado || fila.dataset.estado === inventario.estado || registro.hijos.some(h => h.dataset.estado === inventario.estado);
+                const tieneCliente = estaAsignadoInventario(fila) || registro.hijos.some(estaAsignadoInventario);
+                const tieneCapacidad = (
+                    fila.dataset.modalidad === "perfiles" &&
+                    estaVendibleInventario(fila) &&
+                    registro.hijos.some(h => h.dataset.estado === "disponible" && !estaAsignadoInventario(h))
+                ) || esCuentaCompletaDisponibleInventario(fila);
+                const coincideAsignacion = !inventario.asignacion || (inventario.asignacion === "con_cliente" && tieneCliente) || (inventario.asignacion === "sin_cliente" && !tieneCliente) || (inventario.asignacion === "con_capacidad" && tieneCapacidad);
+                const coincidePago = !inventario.pago || fila.dataset.tipoPago === inventario.pago;
+                const coincideTipoAvanzado = !inventario.tipoAvanzado || tipoFila === inventario.tipoAvanzado || registro.hijos.some(h => normalizarTipoInventario(h.dataset.tipo) === inventario.tipoAvanzado);
+                const mostrar = coincideBusqueda && coincidePlataforma && coincideTipo && coincideEstado && coincideAsignacion && coincidePago && coincideTipoAvanzado;
+                fila.hidden = !mostrar;
+                registro.hijos.forEach(hijo => { if (!mostrar) hijo.hidden = true; });
+                if (mostrar) visibles += 1;
+            });
+            resultadoInventario.textContent = visibles ? `${visibles} cuenta${visibles === 1 ? "" : "s"} en esta vista` : "No hay resultados para los filtros seleccionados.";
+            recalcularMetricasInventario();
+        }
+        let debounceInventario;
+        document.getElementById("nubeBuscar")?.addEventListener("input", evento => { clearTimeout(debounceInventario); debounceInventario = setTimeout(() => { inventario.busqueda = evento.target.value; aplicarFiltrosInventario(); }, 180); });
+        document.getElementById("nubeHojas")?.addEventListener("click", evento => { const boton = evento.target.closest("[data-plataforma]"); if (!boton) return; sincronizarPlataformaInventario(boton.dataset.plataforma); aplicarFiltrosInventario(); });
+        selectPlataformaInventario?.addEventListener("change", evento => { sincronizarPlataformaInventario(evento.target.value); aplicarFiltrosInventario(); });
+        document.getElementById("nubeTipos")?.addEventListener("click", evento => { const boton = evento.target.closest("[data-tipo]"); if (!boton) return; inventario.tipo = boton.dataset.tipo; document.querySelectorAll("#nubeTipos [data-tipo]").forEach(b => { const activo = b === boton; b.classList.toggle("activo", activo); b.setAttribute("aria-pressed", String(activo)); }); aplicarFiltrosInventario(); });
+        const abrirFiltrosInventario = document.getElementById("nubeAbrirFiltros"), panelFiltrosInventario = document.getElementById("nubeFiltrosPanel");
+        abrirFiltrosInventario?.addEventListener("click", () => { const abrir = panelFiltrosInventario.hidden; panelFiltrosInventario.hidden = !abrir; abrirFiltrosInventario.setAttribute("aria-expanded", String(abrir)); requestAnimationFrame(actualizarAlturaStickyNube); });
+        document.getElementById("nubeFiltroEstado")?.addEventListener("change", evento => { inventario.estado = evento.target.value; aplicarFiltrosInventario(); });
+        document.getElementById("nubeFiltroAsignacion")?.addEventListener("change", evento => { inventario.asignacion = evento.target.value; aplicarFiltrosInventario(); });
+        document.getElementById("nubeFiltroPago")?.addEventListener("change", evento => { inventario.pago = evento.target.value; aplicarFiltrosInventario(); });
+        selectTipoAvanzadoInventario?.addEventListener("change", evento => { inventario.tipoAvanzado = evento.target.value; aplicarFiltrosInventario(); });
+        document.getElementById("nubeLimpiarFiltros")?.addEventListener("click", () => { Object.keys(inventario).forEach(k => inventario[k] = ""); document.getElementById("nubeBuscar").value = ""; document.getElementById("nubeFiltroEstado").value = ""; document.getElementById("nubeFiltroAsignacion").value = ""; document.getElementById("nubeFiltroPago").value = ""; if (selectTipoAvanzadoInventario) selectTipoAvanzadoInventario.value = ""; sincronizarPlataformaInventario(""); document.querySelector("#nubeTipos [data-tipo='']")?.click(); aplicarFiltrosInventario(); });
+        document.querySelector(".nube-resumen")?.addEventListener("click", evento => { const tarjeta = evento.target.closest("[data-inventario-estado]"); if (!tarjeta) return; inventario.estado = tarjeta.dataset.inventarioEstado; document.getElementById("nubeFiltroEstado").value = inventario.estado; document.querySelectorAll("[data-inventario-estado]").forEach(t => t.classList.toggle("activo", t === tarjeta)); aplicarFiltrosInventario(); });
+        const registryVisualNube = [
+            { prueba: v => v.includes("perfil_extra") || v.includes("miembro_extra"), clase: "netflix", label: "Perfil Extra", icono: "N" },
+            { prueba: v => v.includes("netflix"), clase: "netflix", label: "Netflix", icono: "N" },
+            { prueba: v => v.includes("disney_premium"), clase: "disney-premium", label: "Disney Premium", icono: "D+" },
+            { prueba: v => v.includes("disney"), clase: "disney", label: "Disney+", icono: "D+" },
+            { prueba: v => v.includes("max_basica"), clase: "max-basica", label: "Max Básica", icono: "M" },
+            { prueba: v => v.includes("max_premium"), clase: "max-premium", label: "Max Premium", icono: "M" },
+            { prueba: v => v.includes("max") || v.includes("hbo"), clase: "max", label: "Max", icono: "M" },
+            { prueba: v => v.includes("prime") || v.includes("amazon"), clase: "prime", label: "Prime Video", icono: "P" },
+            { prueba: v => v.includes("paramount"), clase: "paramount", label: "Paramount+", icono: "P+" },
+            { prueba: v => v.includes("vix"), clase: "vix", label: "Vix", icono: "V" },
+            { prueba: v => v === "dgo" || v.includes("directv") || v.includes("directv_go"), clase: "directv-go", label: "DIRECTV GO", icono: "DG" }
+        ];
+        const identidadVisualNube = (plataforma, tipo = "") => {
+            const clave = claveInventario(`${plataforma || ""} ${tipo || ""}`);
+            return registryVisualNube.find(item => item.prueba(clave)) ||
+                { clase: "otra", label: String(plataforma || "Otra"), icono: String(plataforma || "O").slice(0, 1).toUpperCase() };
+        };
+        document.querySelectorAll("[data-plataforma],.nube-cuenta-madre").forEach(nodo => {
+            const identidad = identidadVisualNube(nodo.dataset.plataforma, nodo.dataset.tipo);
+            nodo.classList.add(`plataforma-${identidad.clase}`);
+            const icono = nodo.matches(".nube-hoja") ? nodo.querySelector("span") : nodo.querySelector(".nube-plataforma-icono");
+            if (icono) icono.textContent = identidad.icono;
+            if (nodo.matches(".nube-hoja") && nodo.dataset.plataforma){
+                [...nodo.childNodes].filter(n => n.nodeType === Node.TEXT_NODE).forEach(n => { n.textContent = identidad.label; });
+            }
+            const etiqueta = nodo.querySelector?.(".nube-plataforma-info span");
+            if (etiqueta) etiqueta.textContent = identidad.label;
+        });
+        document.querySelector(".nube-tabla")?.addEventListener("click", evento => {
+            const fila = evento.target.closest(".nube-cuenta-madre,.nube-perfil-row"); if (!fila) return;
+            const madre = fila.matches(".nube-cuenta-madre") ? fila : document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(fila.dataset.parentId || "")}"]`);
+            const ver = evento.target.closest(".nube-ver-cuenta,.nube-ver-perfil");
+            if (ver) { abrirDrawer(ver); return; }
+            const gestionar = evento.target.closest(".nube-gestionar-cuenta");
+            if (gestionar) {
+                if (gestionar.dataset.modalidad !== "perfiles" && gestionar.dataset.estado === "disponible"){
+                    abrirModalAsignarCuenta(gestionar);
+                } else {
+                    const perfiles = indiceInventario.get(madre)?.hijos.map(h => h.querySelector(".nube-gestionar-perfil")).filter(Boolean) || [];
+                    if (perfiles.length === 1) perfiles[0].click();
+                    else madre?.querySelector(".nube-expandir-cuenta")?.click();
+                }
+                return;
+            }
+            const recordatorio = evento.target.closest(".nube-recordatorio-cuenta");
+            if (recordatorio) {
+                const control = fila.querySelector(".nube-ver-cuenta,.nube-ver-perfil,.nube-gestionar-cuenta,.nube-gestionar-perfil");
+                abrirModalRecordatorioCuenta(control, fila);
+                return;
+            }
+            const whatsapp = evento.target.closest(".nube-accion-whatsapp");
+            if (whatsapp) {
+                const control = fila.querySelector(".nube-ver-cuenta,.nube-ver-perfil,.nube-gestionar-perfil");
+                if (fila.matches(".nube-cuenta-madre") && fila.dataset.modalidad === "perfiles"){
+                    abrirSelectorWhatsappFila(whatsapp, fila);
+                } else {
+                    const numero = normalizarTelefonoNubeUi(control?.dataset.telefono || fila.dataset.telefono);
+                    if (numero) window.open(`https://wa.me/${numero}`, "_blank", "noopener,noreferrer");
+                }
+                return;
+            }
+            const mas = evento.target.closest(".nube-mas-acciones");
+            if (mas) { evento.stopPropagation(); abrirMenuAccionesNube(mas, fila); return; }
+        });
+        poblarTiposAvanzadosInventario();
+        sincronizarPlataformaInventario("");
+        aplicarFiltrosInventario();
+
+        // Sticky coordinado: toolbar + encabezado real de tabla.
+        const paginaNube = document.querySelector(".nube-page");
+        const toolbarInventario = document.querySelector(".nube-toolbar-premium");
+
+        function actualizarAlturaStickyNube(){
+            if (!paginaNube || !toolbarInventario) return;
+            const alto = Math.ceil(toolbarInventario.getBoundingClientRect().height);
+            paginaNube.style.setProperty("--nube-toolbar-sticky-height", `${alto}px`);
+        }
+
+        actualizarAlturaStickyNube();
+        window.addEventListener("resize", actualizarAlturaStickyNube, { passive: true });
+
+        if (window.ResizeObserver && toolbarInventario){
+            new ResizeObserver(actualizarAlturaStickyNube).observe(toolbarInventario);
+        }
+
+        if (window.IntersectionObserver && toolbarInventario){
+            const sentinelStickyNube = document.createElement("span");
+            sentinelStickyNube.className = "nube-sticky-sentinel";
+            sentinelStickyNube.setAttribute("aria-hidden", "true");
+            toolbarInventario.before(sentinelStickyNube);
+            const topSticky = parseFloat(getComputedStyle(paginaNube).getPropertyValue("--nube-sticky-top")) || 0;
+            new IntersectionObserver(
+                entradas => {
+                    const activo = !entradas[0].isIntersecting;
+                    toolbarInventario.classList.toggle("nube-toolbar-sticky-activo", activo);
+                    paginaNube.classList.toggle("nube-inventario-sticky", activo);
+                },
+                { rootMargin: `-${topSticky}px 0px 0px 0px`, threshold: 0 }
+            ).observe(sentinelStickyNube);
+        }
 
         // ==========================================
         // CENTRO DE ALERTAS OPERATIVAS
@@ -385,14 +665,385 @@ document.addEventListener(
                 "toggleDrawerPassword"
             );
 
-        const botonPapeleraDrawer = drawer?.querySelector(".nube-drawer-papelera");
+        const botonPapeleraDrawer = document.getElementById("drawerPapelera");
+        const drawerRenovar = document.getElementById("drawerRenovar");
+        const drawerReemplazar = document.getElementById("drawerReemplazar");
+        const drawerCaida = document.getElementById("drawerCaida");
+        const drawerCopiar = document.getElementById("drawerCopiar");
+        const drawerWhatsapp = document.getElementById("drawerWhatsapp");
+        const drawerEditar = document.getElementById("drawerEditar");
+        const drawerClienteCard = document.getElementById("drawerClienteCard");
+        const drawerPerfilesCard = document.getElementById("drawerPerfilesCard");
+        const drawerPerfilesResumen = document.getElementById("drawerPerfilesResumen");
+        const drawerHistorialLista = document.getElementById("drawerHistorialLista");
+        const drawerGarantiasResumen = document.getElementById("drawerGarantiasResumen");
+        const drawerGarantiasLista = document.getElementById("drawerGarantiasLista");
+        const drawerNotasTexto = document.getElementById("drawerNotasTexto");
+        const drawerGuardarNotas = document.getElementById("drawerGuardarNotas");
+        const modalRecordatorioCuenta = document.getElementById("modalRecordatorioCuenta");
+        const formRecordatorioCuenta = document.getElementById("formRecordatorioCuenta");
+        const recordatorioCuentaId = document.getElementById("recordatorioCuentaId");
+        const recordatorioPlataforma = document.getElementById("recordatorioPlataforma");
+        const recordatorioCorreo = document.getElementById("recordatorioCorreo");
+        const recordatorioNotas = document.getElementById("recordatorioNotas");
+        const modalWhatsappDrawer = document.getElementById("modalWhatsappDrawer");
+        const whatsappDrawerClientes = document.getElementById("whatsappDrawerClientes");
         let cuentaActualDrawerId = null;
+        let datosActualesDrawer = null;
+        let detalleActualDrawer = null;
 
 
         let passwordActual = "";
 
         let passwordVisible = false;
 
+        function normalizarTelefonoDrawer(valor){
+            return normalizarTelefonoNubeUi(valor);
+        }
+
+        function notificarDrawer(mensaje, error = false){
+            const aviso = document.createElement("div");
+            aviso.className = `nube-drawer-toast${error ? " error" : ""}`;
+            aviso.textContent = mensaje;
+            document.body.append(aviso);
+            setTimeout(() => aviso.remove(), 2600);
+        }
+
+        function escaparHtmlNube(valor){
+            return String(valor ?? "")
+                .replaceAll("&", "&amp;")
+                .replaceAll("<", "&lt;")
+                .replaceAll(">", "&gt;")
+                .replaceAll('"', "&quot;")
+                .replaceAll("'", "&#039;");
+        }
+
+        function cuentaIdDesdeFila(control, fila){
+            return control?.dataset.cuentaId || control?.dataset.id || fila?.dataset.cuentaId || fila?.dataset.parentId || "";
+        }
+
+        function madreDesdeCuentaId(cuentaId){
+            return cuentaId ? document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(String(cuentaId))}"]`) : null;
+        }
+
+        function datosMadreParaCuenta(cuentaId, control, fila){
+            const madre = madreDesdeCuentaId(cuentaId);
+            const controlMadre = madre?.querySelector(".nube-ver-cuenta,.nube-gestionar-cuenta");
+            return controlMadre?.dataset || control?.dataset || fila?.dataset || {};
+        }
+
+        function actualizarNotasLocalesCuenta(cuentaId, notas){
+            if (!cuentaId) return;
+            const selectorCuenta = CSS.escape(String(cuentaId));
+            document.querySelectorAll(`.nube-cuenta-madre [data-id="${selectorCuenta}"]`).forEach(nodo => {
+                if (nodo.dataset) nodo.dataset.notas = notas;
+            });
+            const madre = madreDesdeCuentaId(cuentaId);
+            madre?.querySelectorAll("[data-notas]").forEach(nodo => {
+                nodo.dataset.notas = notas;
+            });
+            if (String(cuentaActualDrawerId || "") === String(cuentaId) && drawerNotasTexto) {
+                drawerNotasTexto.value = notas;
+            }
+            if (detalleActualDrawer?.cuenta && String(detalleActualDrawer.cuenta.id || "") === String(cuentaId)) {
+                detalleActualDrawer.cuenta.notas = notas;
+            }
+            if (datosActualesDrawer && String(cuentaActualDrawerId || "") === String(cuentaId)) {
+                datosActualesDrawer.notas = notas;
+            }
+        }
+
+        function abrirModalRecordatorioCuenta(control, fila){
+            if (!modalRecordatorioCuenta || !recordatorioCuentaId || !recordatorioNotas) return;
+            const cuentaId = cuentaIdDesdeFila(control, fila);
+            const datos = datosMadreParaCuenta(cuentaId, control, fila);
+            recordatorioCuentaId.value = cuentaId;
+            recordatorioPlataforma.textContent = datos.plataforma || "Cuenta";
+            recordatorioCorreo.textContent = datos.correo || datos.identificador || "Sin identificador";
+            recordatorioNotas.value = datos.notas || "";
+            modalRecordatorioCuenta.classList.add("abierto");
+            modalRecordatorioCuenta.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+            setTimeout(() => recordatorioNotas.focus(), 60);
+        }
+
+        function cerrarModalRecordatorioCuenta(){
+            modalRecordatorioCuenta?.classList.remove("abierto");
+            modalRecordatorioCuenta?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto");
+        }
+
+        function abrirModalWhatsappDrawer(clientes){
+            if (!modalWhatsappDrawer || !whatsappDrawerClientes) return;
+            whatsappDrawerClientes.innerHTML = "";
+            clientes.forEach(cliente => {
+                const boton = document.createElement("button");
+                boton.type = "button";
+                boton.className = "nube-whatsapp-cliente";
+                boton.innerHTML = `
+                    <strong>${escaparHtmlNube(cliente.nombre || "Cliente")}</strong>
+                    <span>${escaparHtmlNube(cliente.perfil || "Perfil")} · ${escaparHtmlNube(cliente.telefonoOriginal || cliente.telefono)}</span>
+                `;
+                boton.addEventListener("click", () => {
+                    const numero = normalizarTelefonoDrawer(cliente.telefono);
+                    if (!numero) return;
+                    cerrarModalWhatsappDrawer();
+                    window.open(`https://wa.me/${numero}`, "_blank", "noopener,noreferrer");
+                });
+                whatsappDrawerClientes.append(boton);
+            });
+            modalWhatsappDrawer.classList.add("abierto");
+            modalWhatsappDrawer.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+            lucide?.createIcons?.();
+        }
+
+        function cerrarModalWhatsappDrawer(){
+            modalWhatsappDrawer?.classList.remove("abierto");
+            modalWhatsappDrawer?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto");
+        }
+
+        async function copiarTextoDrawer(texto){
+            if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(texto);
+            const auxiliar = document.createElement("textarea");
+            auxiliar.value = texto;
+            auxiliar.setAttribute("readonly", "");
+            auxiliar.style.position = "fixed";
+            auxiliar.style.opacity = "0";
+            document.body.append(auxiliar);
+            auxiliar.select();
+            const ok = document.execCommand("copy");
+            auxiliar.remove();
+            if (!ok) throw new Error("No se pudo copiar");
+        }
+
+        function abrirPrimerPerfilDrawer(accion){
+            const perfiles = [...document.querySelectorAll(`.nube-perfil-row[data-parent-id="${CSS.escape(String(cuentaActualDrawerId))}"] .nube-gestionar-perfil`)];
+            const elegibles = accion === "reemplazar"
+                ? perfiles.filter(b => b.dataset.estado === "caida")
+                : accion === "caida"
+                    ? perfiles.filter(b => !["caida","papelera","reemplazada"].includes(b.dataset.estado))
+                    : perfiles.filter(b => String(b.dataset.cliente || "").trim());
+            if (elegibles.length === 1) {
+                cerrarPanelCuenta();
+                elegibles[0].click();
+                return;
+            }
+            cerrarPanelCuenta();
+            document.querySelector(`.nube-expandir-cuenta[data-cuenta-id="${CSS.escape(String(cuentaActualDrawerId))}"]`)?.click();
+            notificarDrawer(elegibles.length ? "Selecciona el perfil que deseas gestionar." : "No hay perfiles elegibles para esta acción.", !elegibles.length);
+        }
+
+        async function validarPapeleraDrawer(){
+            const idValidado = cuentaActualDrawerId;
+            try {
+                const respuesta = await fetch(`/admin/nube-cuentas/alertas/detalle?cuenta_id=${encodeURIComponent(idValidado)}`, { headers:{Accept:"application/json"} });
+                const detalle = await respuesta.json();
+                if (!respuesta.ok || !detalle.ok) throw new Error(detalle.mensaje || "No se pudo validar la cuenta.");
+                if (idValidado !== cuentaActualDrawerId) return;
+                const pendientes = Number(detalle.cuenta.servicios_vigentes_pendientes || 0);
+                botonPapeleraDrawer.disabled = !detalle.cuenta.lista_para_papelera;
+                botonPapeleraDrawer.title = detalle.cuenta.lista_para_papelera ? "Mover cuenta a Papelera" : (pendientes === 1 ? "Falta 1 servicio vigente por resolver." : `Faltan ${pendientes} servicios vigentes por resolver.`);
+            } catch(error) {
+                if (idValidado === cuentaActualDrawerId) {
+                    botonPapeleraDrawer.disabled = true;
+                    botonPapeleraDrawer.title = error.message;
+                }
+            }
+        }
+
+        function cambiarTabDrawer(tab){
+            document.querySelectorAll("[data-drawer-tab]").forEach(boton => {
+                const activo = boton.dataset.drawerTab === tab;
+                boton.classList.toggle("activo", activo);
+                boton.setAttribute("aria-selected", String(activo));
+            });
+            document.querySelectorAll("[data-drawer-panel]").forEach(panel => {
+                const activo = panel.dataset.drawerPanel === tab;
+                panel.hidden = !activo;
+                panel.classList.toggle("activo", activo);
+            });
+        }
+
+        function renderizarPerfilesDrawer(perfiles = []){
+            if (!drawerPerfilesResumen) return;
+            drawerPerfilesResumen.replaceChildren();
+            const fragmento = document.createDocumentFragment();
+            perfiles.forEach(perfil => {
+                const item = document.createElement("div");
+                const asignado = Boolean(perfil.asignado || String(perfil.nombre_cliente || "").trim());
+                item.className = `nube-drawer-perfil-item${asignado ? "" : " disponible"}`;
+                const restante = asignado
+                    ? `${Number(perfil.dias_restantes || 0)} días restantes`
+                    : "Disponible";
+                item.innerHTML = `
+                    <strong>${escaparHtmlNube(perfil.nombre_perfil || `Perfil ${perfil.orden || ""}`)}</strong>
+                    <span>${escaparHtmlNube(asignado ? (perfil.nombre_cliente || "Cliente") : "Disponible")}</span>
+                    <small>${escaparHtmlNube(restante)}</small>
+                `;
+                fragmento.append(item);
+            });
+            if (!perfiles.length){
+                const vacio = document.createElement("div");
+                vacio.className = "nube-drawer-vacio";
+                vacio.textContent = "Sin perfiles registrados.";
+                fragmento.append(vacio);
+            }
+            drawerPerfilesResumen.append(fragmento);
+        }
+
+        function eventoDrawer(titulo, descripcion, fecha, icono = "circle"){
+            const item = document.createElement("article");
+            item.className = "nube-drawer-evento";
+            item.innerHTML = `
+                <i data-lucide="${icono}"></i>
+                <div>
+                    <strong>${escaparHtmlNube(titulo)}</strong>
+                    <span>${escaparHtmlNube(descripcion || "")}</span>
+                    <small>${escaparHtmlNube(fecha || "")}</small>
+                </div>
+            `;
+            return item;
+        }
+
+        function renderizarHistorialDrawer(detalle){
+            if (!drawerHistorialLista) return;
+            drawerHistorialLista.replaceChildren();
+            const fragmento = document.createDocumentFragment();
+            const historial = detalle?.historial || {};
+            (historial.movimientos || []).forEach(mov => {
+                fragmento.append(eventoDrawer(
+                    String(mov.tipo || "Movimiento").replaceAll("_", " "),
+                    [mov.descripcion, mov.cliente_nombre ? `Cliente: ${mov.cliente_nombre}` : ""].filter(Boolean).join(" · "),
+                    mov.fecha,
+                    mov.tipo === "creacion" ? "cloud" : "activity"
+                ));
+            });
+            (historial.pagos_pin || []).forEach(pago => {
+                fragmento.append(eventoDrawer(
+                    "Pago PIN",
+                    `${pago.plan || "Plan"} · $${pago.valor_pin || 0} · ${pago.dias_estimados || 0} días`,
+                    pago.fecha_aplicacion || pago.fecha_estimada_fin,
+                    "credit-card"
+                ));
+            });
+            (historial.reemplazos || []).forEach(rep => {
+                fragmento.append(eventoDrawer(
+                    "Reemplazo",
+                    `${rep.perfil_anterior || "Perfil"} → ${rep.plataforma_nueva || ""} ${rep.perfil_nuevo || ""}`.trim(),
+                    rep.fecha,
+                    "repeat-2"
+                ));
+            });
+            (historial.snapshots || []).forEach(snapshot => {
+                const datos = snapshot.datos || {};
+                fragmento.append(eventoDrawer(
+                    snapshot.tipo_origen === "cuenta_completa" ? "Snapshot cuenta completa" : "Snapshot asignación",
+                    [datos.nombre_perfil, datos.nombre_cliente || datos.cliente, datos.fecha_vencimiento].filter(Boolean).join(" · "),
+                    snapshot.fecha,
+                    "archive"
+                ));
+            });
+            if (!fragmento.childNodes.length){
+                fragmento.append(eventoDrawer("Sin historial registrado", "No hay movimientos reales para mostrar.", "", "info"));
+            }
+            drawerHistorialLista.append(fragmento);
+            lucide?.createIcons?.();
+        }
+
+        function renderizarGarantiasDrawer(detalle){
+            if (!drawerGarantiasResumen || !drawerGarantiasLista) return;
+            const garantias = detalle?.garantias || {};
+            drawerGarantiasResumen.innerHTML = `
+                <span>${Number(garantias.total_perfiles || 0)} perfiles</span>
+                <span>${Number(garantias.perfiles_afectados || 0)} afectados</span>
+                <span>${Number(garantias.reemplazados || 0)} reemplazos</span>
+                <span>${Number(garantias.pendientes || 0)} pendientes</span>
+            `;
+            drawerGarantiasLista.replaceChildren();
+            const fragmento = document.createDocumentFragment();
+            (garantias.items || []).forEach(item => {
+                fragmento.append(eventoDrawer(
+                    item.perfil || "Perfil",
+                    [
+                        item.cliente ? `Cliente: ${item.cliente}` : "",
+                        item.estado ? `Estado: ${item.estado}` : "",
+                        item.destino ? `Destino: ${item.destino}` : "",
+                        item.motivo ? `Motivo: ${item.motivo}` : ""
+                    ].filter(Boolean).join(" · "),
+                    item.fecha,
+                    item.tipo === "reemplazo" ? "repeat-2" : "shield-check"
+                ));
+            });
+            if (!fragmento.childNodes.length){
+                fragmento.append(eventoDrawer("Sin garantías registradas", "No hay reemplazos ni garantías reales para esta cuenta.", "", "shield"));
+            }
+            drawerGarantiasLista.append(fragmento);
+            lucide?.createIcons?.();
+        }
+
+        async function cargarDetalleDrawer(cuentaId){
+            if (!cuentaId) return;
+            try {
+                const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(cuentaId)}/drawer`, {
+                    headers: {Accept: "application/json"}
+                });
+                const detalle = await respuesta.json();
+                if (!respuesta.ok || !detalle.ok) throw new Error(detalle.mensaje || "No se pudo cargar el detalle.");
+                detalleActualDrawer = detalle;
+                if (drawerNotasTexto) drawerNotasTexto.value = detalle.cuenta?.notas || "";
+                const esMadre = (detalle.cuenta?.modalidad || "") === "perfiles";
+                if (drawerClienteCard) drawerClienteCard.hidden = esMadre;
+                if (drawerPerfilesCard) drawerPerfilesCard.hidden = !esMadre;
+                renderizarPerfilesDrawer(detalle.perfiles || []);
+                renderizarHistorialDrawer(detalle);
+                renderizarGarantiasDrawer(detalle);
+                actualizarWhatsappDrawer();
+            } catch(error) {
+                notificarDrawer(error.message, true);
+            }
+        }
+
+        function clientesWhatsappDrawer(){
+            const telefonoCuenta = normalizarTelefonoDrawer(datosActualesDrawer?.telefono);
+            if ((detalleActualDrawer?.cuenta?.modalidad || datosActualesDrawer?.modalidad) !== "perfiles"){
+                return telefonoCuenta ? [{
+                    nombre: datosActualesDrawer?.cliente || "Cliente",
+                    perfil: "Cuenta completa",
+                    telefono: telefonoCuenta,
+                    telefonoOriginal: datosActualesDrawer?.telefono || telefonoCuenta
+                }] : [];
+            }
+            return (detalleActualDrawer?.perfiles || [])
+                .map(perfil => ({
+                    etiqueta: `${perfil.nombre_perfil || "Perfil"} · ${perfil.nombre_cliente || "Cliente"} · ${perfil.telefono || ""}`,
+                    nombre: perfil.nombre_cliente || "Cliente",
+                    perfil: perfil.nombre_perfil || `Perfil ${perfil.orden || ""}`.trim(),
+                    telefono: normalizarTelefonoDrawer(perfil.telefono),
+                    telefonoOriginal: perfil.telefono || ""
+                }))
+                .filter(item => item.telefono);
+        }
+
+        function actualizarWhatsappDrawer(){
+            if (!drawerWhatsapp) return;
+            const clientes = clientesWhatsappDrawer();
+            drawerWhatsapp.disabled = clientes.length === 0;
+            drawerWhatsapp.title = clientes.length
+                ? "Abrir WhatsApp"
+                : "Sin teléfono registrado";
+        }
+
+        function abrirSelectorWhatsappDrawer(origen){
+            const clientes = clientesWhatsappDrawer();
+            if (!clientes.length) return;
+            if (clientes.length === 1){
+                window.open(`https://wa.me/${clientes[0].telefono}`, "_blank", "noopener,noreferrer");
+                return;
+            }
+            abrirModalWhatsappDrawer(clientes);
+        }
 
         function abrirDrawer(
             boton
@@ -403,7 +1054,10 @@ document.addEventListener(
             const datos =
                 boton.dataset;
 
-            cuentaActualDrawerId = datos.id || null;
+            cuentaActualDrawerId = datos.cuentaId || datos.id || null;
+            datosActualesDrawer = { ...datos };
+            detalleActualDrawer = null;
+            cambiarTabDrawer("informacion");
 
 
             const plataforma =
@@ -537,12 +1191,31 @@ document.addEventListener(
 
             }
 
+            if (drawerNotasTexto){
+                drawerNotasTexto.value = datos.notas || "";
+            }
+
 
             const estado =
                 datos.estado ||
                 "disponible";
 
-            if (botonPapeleraDrawer) botonPapeleraDrawer.hidden = estado !== "caida";
+            const esPerfiles = datos.modalidad === "perfiles" || datos.modalidad === "perfil";
+            const esMadrePerfiles = datos.modalidad === "perfiles";
+            if (drawerClienteCard) drawerClienteCard.hidden = esMadrePerfiles;
+            if (drawerPerfilesCard) drawerPerfilesCard.hidden = !esMadrePerfiles;
+            if (drawerPerfilesResumen) drawerPerfilesResumen.innerHTML = `<div class="nube-drawer-vacio">Cargando perfiles...</div>`;
+            [drawerRenovar, drawerReemplazar, drawerCaida].forEach(control => {
+                if (control) {
+                    control.disabled = !esPerfiles;
+                    control.hidden = !esPerfiles;
+                    control.title = esPerfiles ? "Seleccionar el perfil sobre el que se realizará la acción" : "Esta acción solo existe para perfiles individuales";
+                }
+            });
+            if (drawerRenovar) drawerRenovar.textContent = esMadrePerfiles ? "Gestionar perfiles" : "Renovar / Extender";
+            if (drawerEditar) { drawerEditar.hidden = true; drawerEditar.disabled = true; }
+            if (drawerWhatsapp) { drawerWhatsapp.disabled = true; drawerWhatsapp.title = "Validando teléfonos..."; }
+            if (botonPapeleraDrawer) { botonPapeleraDrawer.hidden = estado !== "caida"; botonPapeleraDrawer.disabled = true; botonPapeleraDrawer.title = estado === "caida" ? "Validando elegibilidad…" : "Solo una cuenta caída puede archivarse"; }
 
 
             if (drawerEstado){
@@ -572,6 +1245,9 @@ document.addEventListener(
             document.body.classList.add(
                 "nube-modal-abierto"
             );
+
+            if (estado === "caida") validarPapeleraDrawer();
+            cargarDetalleDrawer(cuentaActualDrawerId);
 
         }
 
@@ -625,6 +1301,12 @@ document.addEventListener(
             cerrarPanelCuenta
         );
 
+        document.querySelector(".nube-drawer-tabs")?.addEventListener("click", evento => {
+            const boton = evento.target.closest("[data-drawer-tab]");
+            if (!boton) return;
+            cambiarTabDrawer(boton.dataset.drawerTab);
+        });
+
 
         togglePassword?.addEventListener(
             "click",
@@ -650,6 +1332,487 @@ document.addEventListener(
 
             }
         );
+
+        drawerRenovar?.addEventListener("click", () => abrirPrimerPerfilDrawer("renovar"));
+        drawerReemplazar?.addEventListener("click", () => abrirPrimerPerfilDrawer("reemplazar"));
+        drawerCaida?.addEventListener("click", () => abrirPrimerPerfilDrawer("caida"));
+        drawerCopiar?.addEventListener("click", async () => {
+            if (!datosActualesDrawer) return;
+            const lineas = [
+                ["Plataforma", datosActualesDrawer.plataforma],
+                ["Correo", datosActualesDrawer.correo],
+                ["Contraseña", passwordActual],
+                ["PIN", datosActualesDrawer.pin]
+            ].filter(([, valor]) => String(valor || "").trim()).map(([clave, valor]) => `${clave}: ${valor}`);
+            try {
+                await copiarTextoDrawer(lineas.join("\n"));
+                notificarDrawer("Datos copiados correctamente.");
+            } catch(error) {
+                notificarDrawer(error.message, true);
+            }
+        });
+        drawerWhatsapp?.addEventListener("click", evento => {
+            abrirSelectorWhatsappDrawer(evento.currentTarget);
+        });
+        document.getElementById("cerrarRecordatorioCuenta")?.addEventListener("click", cerrarModalRecordatorioCuenta);
+        document.getElementById("cancelarRecordatorioCuenta")?.addEventListener("click", cerrarModalRecordatorioCuenta);
+        document.getElementById("cerrarRecordatorioBackdrop")?.addEventListener("click", cerrarModalRecordatorioCuenta);
+        document.getElementById("cerrarWhatsappDrawer")?.addEventListener("click", cerrarModalWhatsappDrawer);
+        document.getElementById("cerrarWhatsappDrawerBackdrop")?.addEventListener("click", cerrarModalWhatsappDrawer);
+        formRecordatorioCuenta?.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            const cuentaId = recordatorioCuentaId?.value || "";
+            if (!cuentaId) return;
+            const submit = formRecordatorioCuenta.querySelector("button[type='submit']");
+            submit.disabled = true;
+            try {
+                const notas = recordatorioNotas?.value || "";
+                const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(cuentaId)}/notas`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", Accept: "application/json"},
+                    body: JSON.stringify({notas})
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo guardar el recordatorio.");
+                actualizarNotasLocalesCuenta(cuentaId, notas);
+                cerrarModalRecordatorioCuenta();
+                notificarDrawer("Recordatorio guardado");
+            } catch(error) {
+                notificarDrawer(error.message, true);
+            } finally {
+                submit.disabled = false;
+            }
+        });
+        drawerGuardarNotas?.addEventListener("click", async () => {
+            if (!cuentaActualDrawerId) return;
+            drawerGuardarNotas.disabled = true;
+            try {
+                const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(cuentaActualDrawerId)}/notas`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", Accept: "application/json"},
+                    body: JSON.stringify({notas: drawerNotasTexto?.value || ""})
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo guardar la nota.");
+                if (datosActualesDrawer) datosActualesDrawer.notas = drawerNotasTexto?.value || "";
+                actualizarNotasLocalesCuenta(cuentaActualDrawerId, drawerNotasTexto?.value || "");
+                notificarDrawer("Nota guardada.");
+            } catch(error) {
+                notificarDrawer(error.message, true);
+            } finally {
+                drawerGuardarNotas.disabled = false;
+            }
+        });
+        botonPapeleraDrawer?.addEventListener("click", async () => {
+            if (!cuentaActualDrawerId || botonPapeleraDrawer.disabled) return;
+            if (!confirm("Mover cuenta a Papelera\n\nLa cuenta saldrá del inventario operativo y del Centro de Alertas. Los datos operativos restantes serán limpiados, pero todo el historial se conservará.")) return;
+            botonPapeleraDrawer.disabled = true;
+            try {
+                const respuesta = await fetch(`/admin/nube-cuentas/${cuentaActualDrawerId}/papelera`, {
+                    method:"POST",
+                    headers:{"Content-Type":"application/json",Accept:"application/json"},
+                    body:JSON.stringify({motivo:"Archivada desde Nube"})
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo mover la cuenta a Papelera.");
+                cerrarPanelCuenta();
+                window.location.reload();
+            } catch(error) {
+                notificarDrawer(error.message,true);
+                await validarPapeleraDrawer();
+            }
+        });
+
+        // ==========================================
+        // CUENTA COMPLETA DISPONIBLE - ASIGNAR
+        // ==========================================
+
+        const modalAsignarCuenta = document.getElementById("modalAsignarCuentaCompleta");
+        const formAsignarCuenta = document.getElementById("formAsignarCuentaCompleta");
+        const asignarCuentaId = document.getElementById("asignarCuentaId");
+        const asignarCuentaCliente = document.getElementById("asignarCuentaCliente");
+        const asignarCuentaTelefono = document.getElementById("asignarCuentaTelefono");
+        const asignarCuentaEntrega = document.getElementById("asignarCuentaEntrega");
+        const asignarCuentaDias = document.getElementById("asignarCuentaDias");
+        const asignarCuentaVencimiento = document.getElementById("asignarCuentaVencimiento");
+        const asignarCuentaNotas = document.getElementById("asignarCuentaNotas");
+        const tituloAsignarCuenta = document.getElementById("tituloAsignarCuentaCompleta");
+        const mensajeAsignarCuenta = document.getElementById("mensajeAsignarCuenta");
+        const mensajeAsignarCuentaTexto = document.getElementById("mensajeAsignarCuentaTexto");
+
+        function calcularVencimientoUi(fecha, dias){
+            if (!fecha || Number(dias || 0) <= 0) return "";
+            const base = new Date(`${fecha}T12:00:00`);
+            if (Number.isNaN(base.getTime())) return "";
+            base.setDate(base.getDate() + Number(dias));
+            return base.toISOString().slice(0, 10);
+        }
+
+        function abrirModalAsignarCuenta(control){
+            if (!modalAsignarCuenta) return;
+            const datos = control.dataset;
+            asignarCuentaId.value = datos.id || "";
+            asignarCuentaCliente.value = datos.cliente || "";
+            asignarCuentaTelefono.value = datos.telefono || "";
+            asignarCuentaEntrega.value = datos.entrega || new Date().toISOString().slice(0, 10);
+            asignarCuentaDias.value = datos.dias && Number(datos.dias) > 0 ? datos.dias : "30";
+            asignarCuentaNotas.value = datos.notas || "";
+            tituloAsignarCuenta.textContent = `Asignar ${datos.plataforma || "cuenta"}`;
+            asignarCuentaVencimiento.value = calcularVencimientoUi(asignarCuentaEntrega.value, asignarCuentaDias.value);
+            if (mensajeAsignarCuenta) mensajeAsignarCuenta.hidden = true;
+            modalAsignarCuenta.classList.add("abierto");
+            modalAsignarCuenta.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+        }
+
+        function cerrarModalAsignarCuenta(){
+            modalAsignarCuenta?.classList.remove("abierto");
+            modalAsignarCuenta?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto");
+        }
+
+        [asignarCuentaEntrega, asignarCuentaDias].forEach(campo =>
+            campo?.addEventListener("input", () => {
+                asignarCuentaVencimiento.value = calcularVencimientoUi(asignarCuentaEntrega.value, asignarCuentaDias.value);
+            })
+        );
+        document.getElementById("cerrarAsignarCuentaCompleta")?.addEventListener("click", cerrarModalAsignarCuenta);
+        document.getElementById("cancelarAsignarCuentaCompleta")?.addEventListener("click", cerrarModalAsignarCuenta);
+        document.getElementById("cerrarAsignarCuentaBackdrop")?.addEventListener("click", cerrarModalAsignarCuenta);
+
+        formAsignarCuenta?.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            const submit = formAsignarCuenta.querySelector("button[type='submit']");
+            submit.disabled = true;
+            try {
+                const respuesta = await fetch("/admin/nube-cuentas/asignar-cuenta", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", "Accept": "application/json"},
+                    body: JSON.stringify({
+                        cuenta_id: asignarCuentaId.value,
+                        nombre_cliente: asignarCuentaCliente.value,
+                        telefono: asignarCuentaTelefono.value,
+                        fecha_entrega: asignarCuentaEntrega.value,
+                        dias_cuenta: asignarCuentaDias.value,
+                        notas: asignarCuentaNotas.value
+                    })
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo asignar la cuenta.");
+                mensajeAsignarCuentaTexto.textContent = "Cuenta asignada correctamente.";
+                mensajeAsignarCuenta.classList.remove("error");
+                mensajeAsignarCuenta.hidden = false;
+                setTimeout(() => window.location.reload(), 700);
+            } catch(error) {
+                mensajeAsignarCuentaTexto.textContent = error.message;
+                mensajeAsignarCuenta.classList.add("error");
+                mensajeAsignarCuenta.hidden = false;
+            } finally {
+                submit.disabled = false;
+            }
+        });
+
+        // ==========================================
+        // MÁS ACCIONES - MENÚ CONTEXTUAL
+        // ==========================================
+
+        let menuAccionesNube = null;
+        function cerrarMenuAccionesNube(){
+            menuAccionesNube?.remove();
+            menuAccionesNube = null;
+        }
+
+        function crearBotonMenuAccion(etiqueta, icono, accion){
+            const boton = document.createElement("button");
+            boton.type = "button";
+            boton.dataset.accion = accion;
+            boton.innerHTML = `<i data-lucide="${icono}"></i><span>${etiqueta}</span>`;
+            return boton;
+        }
+
+        function abrirSelectorWhatsappFila(origen, fila){
+            const perfiles = indiceInventario.get(fila)?.hijos || [];
+            const clientes = perfiles.map(perfil => {
+                const control = perfil.querySelector(".nube-gestionar-perfil,.nube-ver-perfil");
+                const telefono = normalizarTelefonoNubeUi(control?.dataset.telefono || perfil.dataset.telefono);
+                return {
+                    telefono,
+                    etiqueta: `${control?.dataset.nombre || perfil.querySelector("strong")?.textContent?.trim() || "Perfil"} · ${control?.dataset.cliente || "Cliente"} · ${control?.dataset.telefono || ""}`
+                };
+            }).filter(item => item.telefono);
+
+            if (!clientes.length) return;
+            if (clientes.length === 1){
+                window.open(`https://wa.me/${clientes[0].telefono}`, "_blank", "noopener,noreferrer");
+                return;
+            }
+
+            cerrarMenuAccionesNube();
+            menuAccionesNube = document.createElement("div");
+            menuAccionesNube.className = "nube-menu-acciones nube-menu-whatsapp";
+            const titulo = document.createElement("strong");
+            titulo.textContent = "Selecciona el cliente";
+            menuAccionesNube.append(titulo);
+            clientes.forEach(cliente => {
+                const boton = document.createElement("button");
+                boton.type = "button";
+                boton.innerHTML = `<i data-lucide="message-circle"></i><span>${escaparHtmlNube(cliente.etiqueta)}</span>`;
+                boton.addEventListener("click", () => {
+                    cerrarMenuAccionesNube();
+                    window.open(`https://wa.me/${cliente.telefono}`, "_blank", "noopener,noreferrer");
+                });
+                menuAccionesNube.append(boton);
+            });
+            document.body.append(menuAccionesNube);
+            lucide?.createIcons?.();
+            const rect = origen.getBoundingClientRect();
+            menuAccionesNube.style.left = `${Math.min(window.innerWidth - 260, Math.max(12, rect.right - 260))}px`;
+            menuAccionesNube.style.top = `${Math.min(window.innerHeight - menuAccionesNube.offsetHeight - 12, rect.bottom + 8)}px`;
+        }
+
+        function abrirMenuAccionesNube(origen, fila){
+            cerrarMenuAccionesNube();
+            const control = fila.querySelector(".nube-ver-cuenta,.nube-ver-perfil,.nube-gestionar-cuenta,.nube-gestionar-perfil");
+            if (!control) return;
+            const estado = control.dataset.estado || fila.dataset.estado || "";
+            const esPerfil = fila.matches(".nube-perfil-row");
+            const esCuentaCompleta = !esPerfil && control.dataset.modalidad !== "perfiles";
+            const acciones = [
+                crearBotonMenuAccion("Ver", "eye", "ver"),
+                crearBotonMenuAccion("Copiar datos", "copy", "copiar")
+            ];
+            if (esPerfil) acciones.splice(1, 0, crearBotonMenuAccion("Gestionar", "user-round-cog", "gestionar"));
+            if (esCuentaCompleta && estado === "disponible") acciones.splice(1, 0, crearBotonMenuAccion("Asignar", "user-plus", "asignar"));
+            if (esPerfil && !["disponible", "papelera", "reemplazada"].includes(estado)) acciones.push(crearBotonMenuAccion("Renovar", "refresh-cw", "gestionar"));
+            if (esPerfil && !["caida", "papelera", "reemplazada"].includes(estado)) acciones.push(crearBotonMenuAccion("Marcar caída", "triangle-alert", "gestionar"));
+            if (!esPerfil && estado === "caida") acciones.push(crearBotonMenuAccion("Mover a Papelera", "trash-2", "papelera"));
+
+            menuAccionesNube = document.createElement("div");
+            menuAccionesNube.className = "nube-menu-acciones";
+            acciones.forEach(boton => menuAccionesNube.append(boton));
+            document.body.append(menuAccionesNube);
+            lucide?.createIcons?.();
+            const rect = origen.getBoundingClientRect();
+            const ancho = 190;
+            menuAccionesNube.style.left = `${Math.min(window.innerWidth - ancho - 12, Math.max(12, rect.right - ancho))}px`;
+            menuAccionesNube.style.top = `${Math.min(window.innerHeight - menuAccionesNube.offsetHeight - 12, rect.bottom + 8)}px`;
+            menuAccionesNube.addEventListener("click", async evento => {
+                const boton = evento.target.closest("[data-accion]");
+                if (!boton) return;
+                const accion = boton.dataset.accion;
+                cerrarMenuAccionesNube();
+                if (accion === "ver") control.click();
+                if (accion === "gestionar") fila.querySelector(".nube-gestionar-perfil")?.click();
+                if (accion === "asignar") abrirModalAsignarCuenta(control);
+                if (accion === "copiar") {
+                    const lineas = [["Plataforma", control.dataset.plataforma], ["Correo", control.dataset.correo], ["Contraseña", control.dataset.contrasena], ["PIN", control.dataset.pin], ["Cliente", control.dataset.cliente], ["Teléfono", control.dataset.telefono]].filter(([,v]) => String(v || "").trim()).map(([k,v]) => `${k}: ${v}`);
+                    try { await copiarTextoDrawer(lineas.join("\n")); notificarDrawer("Datos copiados correctamente."); } catch(error) { notificarDrawer(error.message, true); }
+                }
+                if (accion === "papelera") { control.click(); setTimeout(() => botonPapeleraDrawer?.click(), 120); }
+            });
+        }
+
+        document.addEventListener("click", evento => {
+            if (menuAccionesNube && !evento.target.closest(".nube-menu-acciones,.nube-mas-acciones")) cerrarMenuAccionesNube();
+        });
+
+        // ==========================================
+        // CARGA RÁPIDA
+        // ==========================================
+
+        const modalCargaRapida = document.getElementById("modalCargaRapida");
+        const formCargaRapida = document.getElementById("formCargaRapida");
+        const previaCargaRapida = document.getElementById("cargaRapidaPrevia");
+        const confirmarCargaRapida = document.getElementById("confirmarCargaRapida");
+        const credencialesCargaRapida = document.getElementById("cargaRapidaCredenciales");
+        let credencialesValidasCargaRapida = [];
+        let filasCargaRapida = [];
+        let filtroCargaRapida = "todas";
+        let filaEditandoCargaRapida = null;
+
+        function abrirModalCargaRapida(){
+            modalCargaRapida?.classList.add("abierto");
+            modalCargaRapida?.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+            analizarCargaRapida();
+        }
+
+        function cerrarModalCargaRapida(){
+            modalCargaRapida?.classList.remove("abierto");
+            modalCargaRapida?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto");
+        }
+
+        function correosExistentesNube(){
+            return new Set(madresInventario.map(fila => String(fila.querySelector(".nube-correo")?.textContent || "").trim().toLowerCase()).filter(Boolean));
+        }
+
+        function clasificarLineaCargaRapida(texto, indice, existentes, vistos){
+            const valor = String(texto || "").trim();
+            if (!valor) return null;
+            const partes = valor.split(":");
+            const correo = (partes[0] || "").trim().toLowerCase();
+            const contrasena = (partes[1] || "").trim();
+            const pin = partes.slice(2).join(":").trim();
+            const base = {indice, texto: valor, correo, contrasena, pin, razon: "", estado: "valida"};
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)){
+                return {...base, estado: "invalida", razon: "correo inválido"};
+            }
+            if (!contrasena){
+                return {...base, estado: "invalida", razon: "falta contraseña"};
+            }
+            if (existentes.has(correo)){
+                return {...base, estado: "duplicada", razon: "Correo ya existe en inventario."};
+            }
+            if (vistos.has(correo)){
+                return {...base, estado: "duplicada", razon: "Duplicada dentro del lote."};
+            }
+            vistos.add(correo);
+            return base;
+        }
+
+        function reconstruirTextareaCargaRapida(){
+            if (!credencialesCargaRapida) return;
+            credencialesCargaRapida.value = filasCargaRapida.map(fila => fila.texto).join("\n");
+        }
+
+        function renderizarCargaRapida(){
+            if (!previaCargaRapida) return;
+            const conteos = {
+                todas: filasCargaRapida.length,
+                valida: filasCargaRapida.filter(f => f.estado === "valida").length,
+                duplicada: filasCargaRapida.filter(f => f.estado === "duplicada").length,
+                invalida: filasCargaRapida.filter(f => f.estado === "invalida").length
+            };
+            credencialesValidasCargaRapida = filasCargaRapida
+                .filter(fila => fila.estado === "valida")
+                .map(({correo, contrasena, pin}) => ({correo, contrasena, pin}));
+            confirmarCargaRapida.disabled = credencialesValidasCargaRapida.length === 0;
+            confirmarCargaRapida.innerHTML = `<i data-lucide="cloud-upload"></i>Agregar ${credencialesValidasCargaRapida.length} cuenta${credencialesValidasCargaRapida.length === 1 ? "" : "s"}`;
+
+            const visibles = filasCargaRapida.filter(fila =>
+                filtroCargaRapida === "todas" || fila.estado === filtroCargaRapida
+            );
+            const fragmento = document.createDocumentFragment();
+            const contadores = document.createElement("div");
+            contadores.className = "nube-carga-contadores";
+            [
+                ["todas", conteos.todas, "Todas"],
+                ["valida", conteos.valida, "Válidas"],
+                ["duplicada", conteos.duplicada, "Duplicadas"],
+                ["invalida", conteos.invalida, "Inválidas"]
+            ].forEach(([estado, total, etiqueta]) => {
+                const boton = document.createElement("button");
+                boton.type = "button";
+                boton.dataset.cargaFiltro = estado;
+                boton.className = filtroCargaRapida === estado ? "activo" : "";
+                boton.textContent = `${total} ${etiqueta}`;
+                contadores.append(boton);
+            });
+            fragmento.append(contadores);
+
+            const lista = document.createElement("div");
+            lista.className = "nube-carga-lista";
+            visibles.slice(0, 500).forEach(fila => {
+                const item = document.createElement("button");
+                item.type = "button";
+                item.className = `nube-carga-linea ${fila.estado}`;
+                item.dataset.lineaIndice = String(fila.indice);
+                item.innerHTML = `
+                    <strong>${fila.estado === "valida" ? "✓" : fila.estado === "duplicada" ? "⚠" : "×"} ${escaparHtmlNube(fila.correo || `Línea ${fila.indice + 1}`)}</strong>
+                    <span>${escaparHtmlNube(fila.estado)}${fila.razon ? ` · ${escaparHtmlNube(fila.razon)}` : ""}</span>
+                `;
+                lista.append(item);
+            });
+            fragmento.append(lista);
+
+            const editor = document.createElement("div");
+            editor.className = "nube-carga-editor";
+            const filaEditando = filasCargaRapida.find(f => f.indice === filaEditandoCargaRapida);
+            if (filaEditando){
+                editor.innerHTML = `
+                    <label>
+                        <span>Editando línea ${filaEditando.indice + 1}</span>
+                        <input type="text" id="cargaRapidaEditorLinea" value="${escaparHtmlNube(filaEditando.texto)}">
+                    </label>
+                    <small>${escaparHtmlNube(filaEditando.razon || "Corrige y se revalidará automáticamente.")}</small>
+                `;
+            }
+            fragmento.append(editor);
+            previaCargaRapida.replaceChildren(fragmento);
+            lucide?.createIcons?.();
+        }
+
+        function analizarCargaRapida(){
+            const existentes = correosExistentesNube();
+            const vistos = new Set();
+            filasCargaRapida = String(credencialesCargaRapida?.value || "")
+                .split(/\r?\n/)
+                .map((linea, indice) => clasificarLineaCargaRapida(linea, indice, existentes, vistos))
+                .filter(Boolean);
+            renderizarCargaRapida();
+        }
+
+        document.getElementById("abrirCargaRapida")?.addEventListener("click", abrirModalCargaRapida);
+        document.getElementById("cerrarCargaRapida")?.addEventListener("click", cerrarModalCargaRapida);
+        document.getElementById("cancelarCargaRapida")?.addEventListener("click", cerrarModalCargaRapida);
+        document.getElementById("cerrarCargaRapidaBackdrop")?.addEventListener("click", cerrarModalCargaRapida);
+        formCargaRapida?.addEventListener("input", analizarCargaRapida);
+        previaCargaRapida?.addEventListener("click", evento => {
+            const filtro = evento.target.closest("[data-carga-filtro]");
+            if (filtro){
+                filtroCargaRapida = filtro.dataset.cargaFiltro;
+                renderizarCargaRapida();
+                return;
+            }
+            const linea = evento.target.closest("[data-linea-indice]");
+            if (linea){
+                filaEditandoCargaRapida = Number(linea.dataset.lineaIndice);
+                renderizarCargaRapida();
+            }
+        });
+        previaCargaRapida?.addEventListener("input", evento => {
+            if (evento.target.id !== "cargaRapidaEditorLinea") return;
+            evento.stopPropagation();
+            const fila = filasCargaRapida.find(item => item.indice === filaEditandoCargaRapida);
+            if (!fila) return;
+            fila.texto = evento.target.value;
+            reconstruirTextareaCargaRapida();
+            analizarCargaRapida();
+            filaEditandoCargaRapida = Math.min(filaEditandoCargaRapida, filasCargaRapida.at(-1)?.indice ?? 0);
+            renderizarCargaRapida();
+            const editor = document.getElementById("cargaRapidaEditorLinea");
+            editor?.focus();
+        });
+        formCargaRapida?.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            analizarCargaRapida();
+            if (!credencialesValidasCargaRapida.length) return;
+            confirmarCargaRapida.disabled = true;
+            try {
+                const respuesta = await fetch("/admin/nube-cuentas/carga-rapida", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json", "Accept": "application/json"},
+                    body: JSON.stringify({
+                        plataforma: document.getElementById("cargaRapidaPlataforma").value,
+                        modalidad: document.getElementById("cargaRapidaModalidad").value,
+                        tipo_pago: document.getElementById("cargaRapidaTipoPago").value,
+                        cantidad_perfiles: document.getElementById("cargaRapidaCantidadPerfiles").value,
+                        plan_pago: document.getElementById("cargaRapidaPlan").value,
+                        valor_pin: document.getElementById("cargaRapidaValorPin").value,
+                        precio_plan_referencia: document.getElementById("cargaRapidaPrecioPlan").value,
+                        fecha_aplicacion_pin: document.getElementById("cargaRapidaFechaPin").value,
+                        credenciales: credencialesValidasCargaRapida
+                    })
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo completar la carga rápida.");
+                window.location.reload();
+            } catch(error) {
+                previaCargaRapida.innerHTML = `<strong>No se pudo cargar</strong><span>${error.message}</span>`;
+                confirmarCargaRapida.disabled = false;
+            }
+        });
 
 
 
@@ -1805,6 +2968,7 @@ copiarMensajeCliente?.addEventListener("click", async () => {
             auxiliar.remove();
             if (!copiado) throw new Error("Copia no disponible");
         }
+
         mostrarMensajePerfil("Mensaje copiado al portapapeles.");
     } catch (error) {
         console.error(error);
@@ -2390,26 +3554,6 @@ async function cargarHistorialPerfil(forzar = false){
             {signal: historialPerfilAbortController.signal}
         );
 
-        botonPapeleraDrawer?.addEventListener("click", async () => {
-            if (!cuentaActualDrawerId) return;
-            botonPapeleraDrawer.disabled = true;
-            try {
-                const detalleRespuesta = await fetch(`/admin/nube-cuentas/alertas/detalle?cuenta_id=${encodeURIComponent(cuentaActualDrawerId)}`, { headers: { Accept: "application/json" } });
-                const detalle = await detalleRespuesta.json();
-                if (!detalleRespuesta.ok) throw new Error(detalle.mensaje || "No se pudo validar la cuenta.");
-                if (!detalle.cuenta.lista_para_papelera) {
-                    const pendientes = Number(detalle.cuenta.servicios_vigentes_pendientes || 0);
-                    alert(pendientes === 1 ? "Falta 1 servicio vigente por resolver." : `Faltan ${pendientes} servicios vigentes por resolver.`);
-                    return;
-                }
-                if (!confirm("Mover cuenta a Papelera\n\nLa cuenta saldrá del inventario operativo y del Centro de Alertas. Los datos operativos restantes serán limpiados, pero todo el historial se conservará.")) return;
-                const respuesta = await fetch(`/admin/nube-cuentas/${cuentaActualDrawerId}/papelera`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ motivo: "Archivada desde Nube" }) });
-                const resultado = await respuesta.json();
-                if (!respuesta.ok) throw new Error(resultado.mensaje || "No se pudo mover la cuenta a Papelera.");
-                cerrarPanelCuenta(); window.location.reload();
-            } catch (error) { alert(error.message); }
-            finally { botonPapeleraDrawer.disabled = false; }
-        });
         const resultado = await respuesta.json();
         if (!respuesta.ok || !resultado.ok){
             throw new Error(resultado.mensaje || "No se pudo cargar el historial.");
@@ -3864,6 +5008,48 @@ confirmarReemplazoPerfil?.addEventListener(
                 ){
 
                     cerrarPanelCuenta();
+
+                }
+
+                cerrarMenuAccionesNube();
+
+                if (
+                    modalAsignarCuenta?.classList.contains(
+                        "abierto"
+                    )
+                ){
+
+                    cerrarModalAsignarCuenta();
+
+                }
+
+                if (
+                    modalCargaRapida?.classList.contains(
+                        "abierto"
+                    )
+                ){
+
+                    cerrarModalCargaRapida();
+
+                }
+
+                if (
+                    modalRecordatorioCuenta?.classList.contains(
+                        "abierto"
+                    )
+                ){
+
+                    cerrarModalRecordatorioCuenta();
+
+                }
+
+                if (
+                    modalWhatsappDrawer?.classList.contains(
+                        "abierto"
+                    )
+                ){
+
+                    cerrarModalWhatsappDrawer();
 
                 }
 

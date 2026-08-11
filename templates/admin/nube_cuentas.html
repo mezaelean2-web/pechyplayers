@@ -23,9 +23,6 @@ Nube de cuentas
 
 <div class="nube-page">
 
-
-<div class="nube-page">
-
     <header class="nube-hero">
 
         <div class="nube-hero-texto">
@@ -52,6 +49,7 @@ Nube de cuentas
             <button
                 type="button"
                 class="nube-btn nube-btn-secundario"
+                id="abrirCargaRapida"
             >
                 <i data-lucide="layers-3"></i>
                 Carga rápida
@@ -74,7 +72,7 @@ Nube de cuentas
 
     <section class="nube-resumen">
 
-        <article class="nube-stat nube-stat-total">
+        <button type="button" class="nube-stat nube-stat-total activo" data-inventario-estado="">
 
             <div class="nube-stat-icon">
                 <i data-lucide="layers-3"></i>
@@ -86,20 +84,20 @@ Nube de cuentas
                     Total servicios
                 </span>
 
-                <strong>
+                <strong data-stat-value="total">
                     {{ estadisticas.total }}
                 </strong>
 
-                <small>
+                <small data-stat-detail="total">
                     Todos los registros
                 </small>
 
             </div>
 
-        </article>
+        </button>
 
 
-        <article class="nube-stat nube-stat-activa">
+        <button type="button" class="nube-stat nube-stat-activa" data-inventario-estado="activa">
 
             <div class="nube-stat-icon">
                 <i data-lucide="shield-check"></i>
@@ -111,7 +109,7 @@ Nube de cuentas
                     Activas
                 </span>
 
-                <strong>
+                <strong data-stat-value="activas">
                     {{ estadisticas.activas }}
                 </strong>
 
@@ -121,10 +119,10 @@ Nube de cuentas
 
             </div>
 
-        </article>
+        </button>
 
 
-        <article class="nube-stat nube-stat-vencer">
+        <button type="button" class="nube-stat nube-stat-vencer" data-inventario-estado="por_vencer">
 
             <div class="nube-stat-icon">
                 <i data-lucide="clock-3"></i>
@@ -136,7 +134,7 @@ Nube de cuentas
                     Por vencer
                 </span>
 
-                <strong>
+                <strong data-stat-value="por_vencer">
                     {{ estadisticas.por_vencer }}
                 </strong>
 
@@ -146,10 +144,10 @@ Nube de cuentas
 
             </div>
 
-        </article>
+        </button>
 
 
-        <article class="nube-stat nube-stat-vencida">
+        <button type="button" class="nube-stat nube-stat-vencida" data-inventario-estado="vencida">
 
             <div class="nube-stat-icon">
                 <i data-lucide="triangle-alert"></i>
@@ -161,7 +159,7 @@ Nube de cuentas
                     Vencidas
                 </span>
 
-                <strong>
+                <strong data-stat-value="vencidas">
                     {{ estadisticas.vencidas }}
                 </strong>
 
@@ -171,10 +169,10 @@ Nube de cuentas
 
             </div>
 
-        </article>
+        </button>
 
 
-        <article class="nube-stat nube-stat-disponible">
+        <button type="button" class="nube-stat nube-stat-disponible" data-inventario-estado="disponible">
 
             <div class="nube-stat-icon">
                 <i data-lucide="package-open"></i>
@@ -186,20 +184,15 @@ Nube de cuentas
                     Disponibles
                 </span>
 
-                <strong>
-                    {{ estadisticas.disponibles }}
-                </strong>
-
-                <small>
-                    Listas para asignar
-                </small>
+                <strong data-stat-value="disponibles">{{ estadisticas.perfiles_disponibles }}</strong>
+                <small data-stat-detail="disponibles">{{ estadisticas.cuentas_madre_disponibles }} madres · {{ estadisticas.perfiles_disponibles }} perfiles · {{ estadisticas.cuentas_completas_disponibles }} completas</small>
 
             </div>
 
-        </article>
+        </button>
 
 
-        <article class="nube-stat nube-stat-papelera">
+        <button type="button" class="nube-stat nube-stat-papelera" data-inventario-estado="caida">
 
             <div class="nube-stat-icon">
                 <i data-lucide="trash-2"></i>
@@ -208,11 +201,11 @@ Nube de cuentas
             <div class="nube-stat-contenido">
 
                 <span class="nube-stat-label">
-                    Caídas / Papelera
+                    Caídas
                 </span>
 
-                <strong>
-                    {{ estadisticas.caidas_papelera }}
+                <strong data-stat-value="caidas">
+                    {{ estadisticas.caidas }}
                 </strong>
 
                 <small>
@@ -221,7 +214,7 @@ Nube de cuentas
 
             </div>
 
-        </article>
+        </button>
 
     </section>
 
@@ -237,6 +230,11 @@ Nube de cuentas
     <section class="nube-contenido">
 
         <div class="nube-toolbar-premium">
+
+    <nav class="nube-hojas" id="nubeHojas" aria-label="Inventario por plataforma">
+        <button type="button" class="nube-hoja activo" data-plataforma="" aria-pressed="true"><span>✦</span>Todas</button>
+        {% for plataforma in plataformas %}<button type="button" class="nube-hoja" data-plataforma="{{ plataforma|lower }}" aria-pressed="false"><span>{{ plataforma[:1]|upper }}</span>{{ plataforma }}</button>{% endfor %}
+    </nav>
 
     <div class="nube-buscador">
 
@@ -266,7 +264,7 @@ Nube de cuentas
 
                 {% for plataforma in plataformas %}
 
-                    <option value="{{ plataforma }}">
+                    <option value="{{ plataforma|lower }}">
                         {{ plataforma }}
                     </option>
 
@@ -277,7 +275,7 @@ Nube de cuentas
         </div>
 
 
-        <div class="nube-filtro-item">
+        <div class="nube-tipos" id="nubeTipos" aria-label="Tipo de cuenta"><button type="button" class="activo" data-tipo="" aria-pressed="true">Todos</button>{% for tipo in tipos_cuenta %}<button type="button" data-tipo="{{ tipo|lower }}" aria-pressed="false">{{ tipo }}</button>{% endfor %}</div><div class="nube-filtro-item" hidden>
 
             <span>Tipo de cuenta</span>
 
@@ -302,12 +300,20 @@ Nube de cuentas
 
         <button
             type="button"
-            class="nube-filtro-avanzado"
+            class="nube-filtro-avanzado" id="nubeAbrirFiltros" aria-expanded="false"
         >
             <i data-lucide="sliders-horizontal"></i>
             Filtros avanzados
         </button>
 
+    </div>
+
+    <div class="nube-filtros-panel" id="nubeFiltrosPanel" hidden>
+        <label>Estado<select id="nubeFiltroEstado"><option value="">Todos</option><option value="disponible">Disponible</option><option value="activa">Activa</option><option value="por_vencer">Por vencer</option><option value="vencida">Vencida</option><option value="caida">Caída</option></select></label>
+        <label>Asignación<select id="nubeFiltroAsignacion"><option value="">Todas</option><option value="con_cliente">Con cliente</option><option value="sin_cliente">Sin cliente</option><option value="con_capacidad">Con capacidad disponible</option></select></label>
+        <label>Pago<select id="nubeFiltroPago"><option value="">Todos</option><option value="pin">PIN</option><option value="autopagable">Autopagable</option><option value="mixta">Mixta</option></select></label>
+        <label>Tipo<select id="nubeFiltroTipoAvanzado"><option value="">Todos</option></select></label>
+        <button type="button" class="nube-limpiar-filtros" id="nubeLimpiarFiltros">Limpiar filtros</button>
     </div>
 
 </div>
@@ -347,7 +353,7 @@ Nube de cuentas
          CUENTA MADRE
          ====================================== -->
 
-    <tr class="nube-cuenta-madre">
+    <tr class="nube-cuenta-madre" data-cuenta-id="{{ cuenta.id }}" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="{{ cuenta.tipo_cuenta|lower }}" data-modalidad="{{ cuenta.modalidad }}" data-tipo-pago="{{ cuenta.tipo_pago|lower }}" data-estado="{{ cuenta.estado_calculado }}" data-perfiles-totales="{{ cuenta.perfiles_totales }}" data-perfiles-disponibles="{{ cuenta.perfiles_disponibles }}" data-perfiles-ocupados="{{ cuenta.perfiles_ocupados }}" data-cliente="{{ cuenta.nombre_cliente }}" data-telefono="{{ cuenta.telefono }}">
 
         <td>
 
@@ -570,6 +576,7 @@ Nube de cuentas
                     data-estado="{{ cuenta.estado_calculado }}"
                     data-garantias="{{ cuenta.cantidad_garantias }}"
                     data-notas="{{ cuenta.notas }}"
+                    data-modalidad="{{ cuenta.modalidad }}"
                 >
                     <i data-lucide="eye"></i>
                 </button>
@@ -577,8 +584,23 @@ Nube de cuentas
 
                 <button
                     type="button"
-                    class="nube-accion"
-                    title="Editar"
+                    class="nube-accion nube-gestionar-cuenta"
+                    title="Gestionar"
+                    data-id="{{ cuenta.id }}"
+                    data-plataforma="{{ cuenta.plataforma }}"
+                    data-correo="{{ cuenta.correo }}"
+                    data-contrasena="{{ cuenta.contrasena }}"
+                    data-pin="{{ cuenta.pin }}"
+                    data-tipo="{{ cuenta.tipo_cuenta }}"
+                    data-cliente="{{ cuenta.nombre_cliente }}"
+                    data-telefono="{{ cuenta.telefono }}"
+                    data-entrega="{{ cuenta.fecha_entrega }}"
+                    data-dias="{{ cuenta.dias_cuenta }}"
+                    data-restantes="{{ cuenta.dias_restantes }}"
+                    data-vencimiento="{{ cuenta.fecha_vencimiento }}"
+                    data-estado="{{ cuenta.estado_calculado }}"
+                    data-notas="{{ cuenta.notas }}"
+                    data-modalidad="{{ cuenta.modalidad }}"
                 >
                     <i data-lucide="pencil"></i>
                 </button>
@@ -586,8 +608,8 @@ Nube de cuentas
 
                 <button
                     type="button"
-                    class="nube-accion nube-accion-whatsapp"
-                    title="WhatsApp"
+                    class="nube-accion nube-recordatorio-cuenta"
+                    title="Recordatorio / nota"
                 >
                     <i data-lucide="message-circle"></i>
                 </button>
@@ -595,7 +617,7 @@ Nube de cuentas
 
                 <button
                     type="button"
-                    class="nube-accion"
+                    class="nube-accion nube-mas-acciones"
                     title="Más acciones"
                 >
                     <i data-lucide="ellipsis-vertical"></i>
@@ -617,7 +639,7 @@ Nube de cuentas
         {% for perfil in cuenta.perfiles %}
 
             <tr
-                class="nube-perfil-row"
+                class="nube-perfil-row" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="perfil" data-estado="{{ perfil.estado_calculado }}" data-cliente="{{ perfil.nombre_cliente }}" data-telefono="{{ perfil.telefono }}"
                 data-parent-id="{{ cuenta.id }}"
                 hidden
             >
@@ -781,6 +803,31 @@ Nube de cuentas
                     <div class="nube-acciones-fila">
 
                         <button
+                            type="button"
+                            class="nube-accion nube-ver-perfil"
+                            title="Ver información"
+                            data-id="{{ perfil.id }}"
+                            data-cuenta-id="{{ cuenta.id }}"
+                            data-nombre="{{ perfil.nombre_perfil }}"
+                            data-plataforma="{{ cuenta.plataforma }}"
+                            data-correo="{{ cuenta.correo }}"
+                            data-contrasena="{{ cuenta.contrasena }}"
+                            data-pin="{{ perfil.pin }}"
+                            data-tipo="Perfil"
+                            data-cliente="{{ perfil.nombre_cliente }}"
+                            data-telefono="{{ perfil.telefono }}"
+                            data-entrega="{{ perfil.fecha_entrega }}"
+                            data-dias="{{ perfil.dias_cuenta }}"
+                            data-restantes="{{ perfil.dias_restantes }}"
+                            data-vencimiento="{{ perfil.fecha_vencimiento }}"
+                            data-estado="{{ perfil.estado_calculado }}"
+                            data-notas="{{ perfil.notas }}"
+                            data-modalidad="perfil"
+                        >
+                            <i data-lucide="eye"></i>
+                        </button>
+
+                        <button
     type="button"
     class="nube-accion nube-gestionar-perfil"
     title="Gestionar perfil"
@@ -801,6 +848,22 @@ Nube de cuentas
 >
     <i data-lucide="user-round-cog"></i>
 </button>
+
+                        <button
+                            type="button"
+                            class="nube-accion nube-recordatorio-cuenta"
+                            title="Recordatorio / nota de la madre"
+                        >
+                            <i data-lucide="message-circle"></i>
+                        </button>
+
+                        <button
+                            type="button"
+                            class="nube-accion nube-mas-acciones"
+                            title="Más acciones"
+                        >
+                            <i data-lucide="ellipsis-vertical"></i>
+                        </button>
 
                     </div>
 
@@ -1425,24 +1488,27 @@ Nube de cuentas
         </div>
 
 
-        <div class="nube-drawer-tabs">
+        <div class="nube-drawer-tabs" role="tablist" aria-label="Detalle de cuenta">
 
             <button
                 type="button"
                 class="activo"
+                data-drawer-tab="informacion"
+                role="tab"
+                aria-selected="true"
             >
                 Información
             </button>
 
-            <button type="button">
+            <button type="button" data-drawer-tab="historial" role="tab" aria-selected="false">
                 Historial
             </button>
 
-            <button type="button">
+            <button type="button" data-drawer-tab="garantias" role="tab" aria-selected="false">
                 Garantías
             </button>
 
-            <button type="button">
+            <button type="button" data-drawer-tab="notas" role="tab" aria-selected="false">
                 Notas
             </button>
 
@@ -1450,6 +1516,8 @@ Nube de cuentas
 
 
         <div class="nube-drawer-contenido">
+
+            <section class="nube-drawer-panel-tab activo" data-drawer-panel="informacion" role="tabpanel">
 
             <section class="nube-drawer-card">
 
@@ -1500,7 +1568,7 @@ Nube de cuentas
             </section>
 
 
-            <section class="nube-drawer-card">
+            <section class="nube-drawer-card" id="drawerClienteCard">
 
                 <h3>
                     Datos del cliente
@@ -1543,6 +1611,11 @@ Nube de cuentas
 
             </section>
 
+            <section class="nube-drawer-card" id="drawerPerfilesCard" hidden>
+                <h3>Clientes / perfiles</h3>
+                <div class="nube-drawer-perfiles" id="drawerPerfilesResumen"></div>
+            </section>
+
 
             <section class="nube-drawer-card">
 
@@ -1554,42 +1627,42 @@ Nube de cuentas
 
                     <button
                         type="button"
-                        class="drawer-btn drawer-btn-verde"
+                        class="drawer-btn drawer-btn-verde" id="drawerRenovar"
                     >
                         Renovar / Extender
                     </button>
 
                     <button
                         type="button"
-                        class="drawer-btn drawer-btn-amarillo"
+                        class="drawer-btn drawer-btn-amarillo" id="drawerReemplazar"
                     >
                         Reemplazar cuenta
                     </button>
 
                     <button
                         type="button"
-                        class="drawer-btn drawer-btn-rojo"
+                        class="drawer-btn drawer-btn-rojo" id="drawerCaida"
                     >
                         Marcar caída
                     </button>
 
                     <button
                         type="button"
-                        class="drawer-btn drawer-btn-azul"
+                        class="drawer-btn drawer-btn-azul" id="drawerCopiar"
                     >
                         Copiar datos
                     </button>
 
                     <button
                         type="button"
-                        class="drawer-btn drawer-btn-morado"
+                        class="drawer-btn drawer-btn-morado" id="drawerWhatsapp"
                     >
                         WhatsApp
                     </button>
 
                     <button
                         type="button"
-                        class="drawer-btn"
+                        class="drawer-btn" id="drawerEditar"
                     >
                         Editar cuenta
                     </button>
@@ -1602,10 +1675,40 @@ Nube de cuentas
             <button
                 type="button"
                 class="nube-drawer-papelera"
+                id="drawerPapelera"
             >
                 <i data-lucide="trash-2"></i>
                 Mover a papelera
             </button>
+
+            </section>
+
+            <section class="nube-drawer-panel-tab" data-drawer-panel="historial" role="tabpanel" hidden>
+                <section class="nube-drawer-card">
+                    <h3>Historial de la cuenta</h3>
+                    <div class="nube-drawer-timeline" id="drawerHistorialLista"></div>
+                </section>
+            </section>
+
+            <section class="nube-drawer-panel-tab" data-drawer-panel="garantias" role="tabpanel" hidden>
+                <section class="nube-drawer-card">
+                    <h3>Garantías</h3>
+                    <div class="nube-drawer-garantias-resumen" id="drawerGarantiasResumen"></div>
+                    <div class="nube-drawer-timeline" id="drawerGarantiasLista"></div>
+                </section>
+            </section>
+
+            <section class="nube-drawer-panel-tab" data-drawer-panel="notas" role="tabpanel" hidden>
+                <section class="nube-drawer-card">
+                    <h3>Notas de la madre</h3>
+                    <textarea id="drawerNotasTexto" class="nube-drawer-notas" rows="8" placeholder="Notas internas de esta cuenta..."></textarea>
+                    <div class="nube-drawer-notas-acciones">
+                        <button type="button" class="drawer-btn drawer-btn-azul" id="drawerGuardarNotas">
+                            Guardar nota
+                        </button>
+                    </div>
+                </section>
+            </section>
 
         </div>
 
@@ -1856,6 +1959,7 @@ Nube de cuentas
             <span>El perfil volvió a estar disponible.</span>
         </div>
     </div>
+
 </section>
 
 <section
@@ -2202,6 +2306,108 @@ Nube de cuentas
 
     </div>
 
+</div>
+
+<div class="nube-modal" id="modalAsignarCuentaCompleta" aria-hidden="true">
+    <div class="nube-modal-backdrop" id="cerrarAsignarCuentaBackdrop"></div>
+    <div class="nube-modal-panel">
+        <div class="nube-modal-header">
+            <div>
+                <span>CUENTA COMPLETA</span>
+                <h2 id="tituloAsignarCuentaCompleta">Asignar cuenta</h2>
+                <p id="subtituloAsignarCuentaCompleta">Conserva credenciales y registra el cliente que recibe la cuenta.</p>
+            </div>
+            <button type="button" class="nube-modal-cerrar" id="cerrarAsignarCuentaCompleta"><i data-lucide="x"></i></button>
+        </div>
+        <form class="nube-form" id="formAsignarCuentaCompleta">
+            <input type="hidden" id="asignarCuentaId">
+            <div class="nube-form-grid">
+                <label><span>Cliente *</span><input type="text" id="asignarCuentaCliente" required></label>
+                <label><span>Teléfono</span><input type="text" id="asignarCuentaTelefono" placeholder="+57..."></label>
+                <label><span>Fecha de entrega *</span><input type="date" id="asignarCuentaEntrega" required></label>
+                <label><span>Días de servicio *</span><input type="number" id="asignarCuentaDias" min="1" placeholder="30" required></label>
+                <label><span>Vencimiento calculado</span><input type="text" id="asignarCuentaVencimiento" disabled></label>
+                <label class="nube-form-full"><span>Notas</span><textarea id="asignarCuentaNotas" rows="3"></textarea></label>
+            </div>
+            <div class="nube-perfil-mensaje" id="mensajeAsignarCuenta" hidden><i data-lucide="circle-check"></i><span id="mensajeAsignarCuentaTexto">Cuenta asignada correctamente.</span></div>
+            <div class="nube-modal-footer">
+                <button type="button" class="nube-modal-cancelar" id="cancelarAsignarCuentaCompleta">Cancelar</button>
+                <button type="submit" class="nube-modal-guardar"><i data-lucide="save"></i>Guardar asignación</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="nube-modal" id="modalRecordatorioCuenta" aria-hidden="true">
+    <div class="nube-modal-backdrop" id="cerrarRecordatorioBackdrop"></div>
+    <div class="nube-modal-panel nube-modal-panel-compacto">
+        <div class="nube-modal-header">
+            <div>
+                <span>RECORDATORIO</span>
+                <h2 id="recordatorioPlataforma">Nota de cuenta</h2>
+                <p id="recordatorioCorreo">Cuenta seleccionada</p>
+            </div>
+            <button type="button" class="nube-modal-cerrar" id="cerrarRecordatorioCuenta"><i data-lucide="x"></i></button>
+        </div>
+        <form class="nube-form" id="formRecordatorioCuenta">
+            <input type="hidden" id="recordatorioCuentaId">
+            <label>
+                <span>Recordatorio / nota</span>
+                <textarea id="recordatorioNotas" rows="5" maxlength="500" placeholder="Escribe una nota corta..."></textarea>
+            </label>
+            <div class="nube-modal-footer">
+                <button type="button" class="nube-modal-cancelar" id="cancelarRecordatorioCuenta">Cancelar</button>
+                <button type="submit" class="nube-modal-guardar"><i data-lucide="save"></i>Guardar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="nube-modal" id="modalWhatsappDrawer" aria-hidden="true">
+    <div class="nube-modal-backdrop" id="cerrarWhatsappDrawerBackdrop"></div>
+    <div class="nube-modal-panel nube-modal-panel-compacto nube-whatsapp-modal">
+        <div class="nube-modal-header">
+            <div>
+                <span>WHATSAPP</span>
+                <h2>Enviar por WhatsApp</h2>
+                <p>Selecciona el cliente</p>
+            </div>
+            <button type="button" class="nube-modal-cerrar" id="cerrarWhatsappDrawer"><i data-lucide="x"></i></button>
+        </div>
+        <div class="nube-whatsapp-clientes" id="whatsappDrawerClientes"></div>
+    </div>
+</div>
+
+<div class="nube-modal" id="modalCargaRapida" aria-hidden="true">
+    <div class="nube-modal-backdrop" id="cerrarCargaRapidaBackdrop"></div>
+    <div class="nube-modal-panel nube-modal-panel-amplio">
+        <div class="nube-modal-header">
+            <div>
+                <span>CARGA RÁPIDA</span>
+                <h2>Agregar varias cuentas</h2>
+                <p>Pega una credencial por línea con formato correo:contraseña o correo:contraseña:pin.</p>
+            </div>
+            <button type="button" class="nube-modal-cerrar" id="cerrarCargaRapida"><i data-lucide="x"></i></button>
+        </div>
+        <form class="nube-form" id="formCargaRapida">
+            <div class="nube-form-grid">
+                <label><span>Plataforma *</span><select id="cargaRapidaPlataforma" required><option value="">Selecciona...</option>{% for plataforma in plataformas %}<option value="{{ plataforma }}">{{ plataforma }}</option>{% endfor %}</select></label>
+                <label><span>Modalidad *</span><select id="cargaRapidaModalidad"><option value="perfiles">Perfiles</option><option value="cuenta_completa">Cuenta completa</option></select></label>
+                <label><span>Control de pago</span><select id="cargaRapidaTipoPago"><option value="">Sin control especial</option><option value="pin">PIN</option><option value="autopagable">Autopagable</option></select></label>
+                <label><span>Perfiles por madre</span><input type="number" id="cargaRapidaCantidadPerfiles" min="1" max="10" value="5"></label>
+                <label><span>Plan</span><input type="text" id="cargaRapidaPlan" placeholder="Premium"></label>
+                <label><span>Valor PIN</span><input type="text" id="cargaRapidaValorPin" inputmode="numeric"></label>
+                <label><span>Precio mensual</span><input type="text" id="cargaRapidaPrecioPlan" inputmode="numeric"></label>
+                <label><span>Fecha aplicación PIN</span><input type="date" id="cargaRapidaFechaPin"></label>
+                <label class="nube-form-full"><span>Credenciales *</span><textarea id="cargaRapidaCredenciales" rows="7" placeholder="correo1@gmail.com:clave1&#10;correo2@gmail.com:clave2:1234" required></textarea></label>
+            </div>
+            <div class="nube-carga-previa" id="cargaRapidaPrevia" aria-live="polite"></div>
+            <div class="nube-modal-footer">
+                <button type="button" class="nube-modal-cancelar" id="cancelarCargaRapida">Cancelar</button>
+                <button type="submit" class="nube-modal-guardar" id="confirmarCargaRapida" disabled><i data-lucide="cloud-upload"></i>Agregar cuentas</button>
+            </div>
+        </form>
+    </div>
 </div>
 
 {% endblock %}
