@@ -29,21 +29,16 @@ Configuración | PECHY PLAYERS
 
         <div class="configuracion-header-acciones">
 
-            <button
-                type="button"
-                class="configuracion-btn secundario"
-                disabled>
-
-                ↶ Restaurar
-
-            </button>
+            <span class="configuracion-publicacion" id="configuracionEstadoPublicacion">✓ Todo actualizado</span>
+            <button type="button" class="configuracion-btn secundario" id="configuracionVistaPrevia">Vista previa</button>
+            <button type="button" class="configuracion-btn secundario" id="configuracionRestaurarTodo">↶ Restaurar todo</button>
 
             <button
                 type="button"
                 class="configuracion-btn principal"
-                disabled>
+                id="configuracionPublicar">
 
-                💾 Guardar cambios
+                Publicar cambios
 
             </button>
 
@@ -2530,5 +2525,18 @@ Configuración | PECHY PLAYERS
     </div>
 
 </div>
+
+<div class="config-centro-modal" id="configCentroModal" aria-hidden="true">
+    <button class="config-centro-fondo" type="button" data-config-cerrar aria-label="Cerrar"></button>
+    <section class="config-centro-panel" role="dialog" aria-modal="true" aria-labelledby="configCentroTitulo">
+        <header><div><small id="configCentroNumero">MÓDULO</small><h2 id="configCentroTitulo">Configuración</h2><p id="configCentroDescripcion"></p></div><button type="button" data-config-cerrar aria-label="Cerrar">×</button></header>
+        <div class="config-centro-cuerpo"><aside id="configCentroPreview"></aside><form id="configCentroForm"><div id="configCentroCampos" class="config-centro-campos"></div><div id="configCentroMensaje" class="config-centro-mensaje" aria-live="polite"></div><footer><button type="button" class="configuracion-btn secundario" id="configCentroRestaurar">Restaurar original</button><button type="submit" class="configuracion-btn principal">Guardar cambios</button></footer></form></div>
+    </section>
+</div>
+
+<div class="config-centro-confirm" id="configCentroConfirm" aria-hidden="true"><button class="config-centro-fondo" type="button" data-confirm-cancelar></button><section role="alertdialog" aria-modal="true"><h3 id="configConfirmTitulo">Confirmar</h3><p id="configConfirmTexto"></p><input id="configConfirmEntrada" hidden autocomplete="off"><div><button type="button" class="configuracion-btn secundario" data-confirm-cancelar>Cancelar</button><button type="button" class="configuracion-btn principal" id="configConfirmAceptar">Restaurar original</button></div></section></div>
+
+<script id="configuracionCentroInicial" type="application/json">{{ centro_configuracion|tojson }}</script>
+<script src="{{ url_for('static', filename='js/admin/configuracion_centro.js') }}"></script>
 
 {% endblock %}

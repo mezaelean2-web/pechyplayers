@@ -7,6 +7,10 @@ from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
 from PIL import Image
+from configuracion_centro import (MODULOS as MODULOS_CONFIGURACION, estado_general as estado_configuracion,
+    obtener_modulo as obtener_modulo_configuracion, guardar_borrador as guardar_borrador_configuracion,
+    restaurar_modulo as restaurar_modulo_configuracion, restaurar_todo as restaurar_todo_configuracion,
+    publicar as publicar_configuracion, configuracion_efectiva, auditoria as auditoria_configuracion)
 import database
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
@@ -113,6 +117,8 @@ def guardar_poster_cartelera(imagen_file):
 @app.route("/")
 def inicio():
 
+    config = configuracion_efectiva()
+
     # Todos los productos visibles continúan disponibles
     # para el catálogo principal.
     productos = [
@@ -159,8 +165,6 @@ def inicio():
                 producto.get("nombre", "").lower()
             )
         )
-
-        config = obtener_config()
 
     promociones = [
         promo
@@ -358,11 +362,114 @@ def admin_configuracion():
         return redirect("/pechy-panel-seguro")
 
     config = obtener_config()
+    centro = estado_configuracion()
 
     return render_template(
         "admin/configuracion.html",
-        config=config
+        config=config,
+        centro_configuracion=centro
     )
+
+
+def _usuario_configuracion():
+    return str(session.get("admin_usuario") or "admin")[:80]
+
+
+@app.route("/admin/configuracion/api", methods=["GET"])
+def configuracion_api_estado():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    return jsonify({"ok": True, **estado_configuracion()})
+
+
+@app.route("/admin/configuracion/api/<modulo>", methods=["GET", "PATCH"])
+def configuracion_api_modulo(modulo):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    if modulo not in MODULOS_CONFIGURACION:
+        return jsonify({"ok": False, "mensaje": "Módulo desconocido."}), 404
+    try:
+        if request.method == "PATCH":
+            datos = (request.get_json(silent=True) or {}).get("datos", {})
+            resultado = guardar_borrador_configuracion(modulo, datos, usuario=_usuario_configuracion())
+        else:
+            resultado = obtener_modulo_configuracion(modulo)
+        return jsonify({"ok": True, **resultado})
+    except ValueError as error:
+        return jsonify({"ok": False, "mensaje": str(error)}), 400
+
+
+@app.route("/admin/configuracion/api/<modulo>/restaurar", methods=["POST"])
+def configuracion_api_restaurar_modulo(modulo):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    if modulo not in MODULOS_CONFIGURACION:
+        return jsonify({"ok": False, "mensaje": "Módulo desconocido."}), 404
+    resultado = restaurar_modulo_configuracion(modulo, usuario=_usuario_configuracion())
+    return jsonify({"ok": True, **resultado})
+
+
+@app.route("/admin/configuracion/api/restaurar-todo", methods=["POST"])
+def configuracion_api_restaurar_todo():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    confirmacion = (request.get_json(silent=True) or {}).get("confirmacion")
+    if confirmacion != "RESTAURAR TODO":
+        return jsonify({"ok": False, "mensaje": "Confirmación inválida."}), 400
+    restaurar_todo_configuracion(usuario=_usuario_configuracion())
+    return jsonify({"ok": True, **estado_configuracion()})
+
+
+@app.route("/admin/configuracion/api/publicar", methods=["POST"])
+def configuracion_api_publicar():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    publicar_configuracion(usuario=_usuario_configuracion())
+    return jsonify({"ok": True, **estado_configuracion()})
+
+
+@app.route("/admin/configuracion/api/auditoria", methods=["GET"])
+def configuracion_api_auditoria():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    return jsonify({"ok": True, "eventos": auditoria_configuracion(
+        modulo=request.args.get("modulo", ""), accion=request.args.get("accion", "")
+    )})
+
+
+@app.route("/admin/configuracion/preview")
+def configuracion_preview():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template("admin/configuracion_preview.html", config=configuracion_efectiva(borrador=True))
+
+
+@app.route("/admin/configuracion/api/upload", methods=["POST"])
+def configuracion_api_upload():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    archivo = request.files.get("archivo")
+    if not archivo or not archivo.filename:
+        return jsonify({"ok": False, "mensaje": "Selecciona una imagen."}), 400
+    if request.content_length and request.content_length > 3 * 1024 * 1024:
+        return jsonify({"ok": False, "mensaje": "La imagen supera 3 MB."}), 413
+    try:
+        imagen = Image.open(archivo.stream); imagen.verify()
+        formato = (imagen.format or "").upper()
+    except Exception:
+        return jsonify({"ok": False, "mensaje": "El archivo no es una imagen válida."}), 400
+    extensiones = {"PNG": ".png", "JPEG": ".jpg", "WEBP": ".webp", "ICO": ".ico"}
+    if formato not in extensiones:
+        return jsonify({"ok": False, "mensaje": "Formato no permitido."}), 400
+    archivo.stream.seek(0); imagen = Image.open(archivo.stream)
+    if imagen.width > 4000 or imagen.height > 4000:
+        return jsonify({"ok": False, "mensaje": "Dimensiones máximas: 4000 × 4000."}), 400
+    import secrets
+    carpeta = os.path.join(app.static_folder, "uploads", "configuracion", "default")
+    os.makedirs(carpeta, exist_ok=True)
+    nombre = secrets.token_hex(16) + extensiones[formato]
+    imagen.save(os.path.join(carpeta, nombre), formato=formato)
+    return jsonify({"ok": True, "url": f"/static/uploads/configuracion/default/{nombre}"})
 
 
 

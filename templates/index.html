@@ -59,6 +59,25 @@
 
   :root{
 
+    --brand-primary: {{ config.modulos.apariencia.brand_primary }};
+    --brand-secondary: {{ config.modulos.apariencia.brand_secondary }};
+    --brand-accent: {{ config.modulos.apariencia.brand_accent }};
+    --bg-primary: {{ config.modulos.apariencia.bg_primary }};
+    --bg-secondary: {{ config.modulos.apariencia.bg_secondary }};
+    --surface: {{ config.modulos.apariencia.surface }};
+    --text-primary: {{ config.modulos.apariencia.text_primary }};
+    --text-secondary: {{ config.modulos.apariencia.text_secondary }};
+    --success: {{ config.modulos.apariencia.success }};
+    --warning: {{ config.modulos.apariencia.warning }};
+    --danger: {{ config.modulos.apariencia.danger }};
+    --border: {{ config.modulos.apariencia.border }};
+    --radius: {{ config.modulos.apariencia.radius }}px;
+    --shadow: 0 18px 45px rgba(0,0,0,.{{ '55' if config.modulos.apariencia.shadow == 'profunda' else '35' if config.modulos.apariencia.shadow == 'media' else '20' }});
+    --public-font: {{ config.modulos.apariencia.fuente | tojson }};
+    --public-font-size: {{ config.modulos.apariencia.tamano_base }}px;
+    --public-heading-weight: {{ config.modulos.apariencia.peso_titulos }};
+    --desktop-catalog-columns: {{ config.modulos.catalogo.columnas }};
+
     --pechy-principal:
       {{ config.get(
         "color_principal",
@@ -651,6 +670,13 @@
 </head>
 <body>
 
+{% if config.modulos.sistema.mantenimiento or config.modulos.sistema.aviso_global %}
+<div role="status" style="position:relative;z-index:9999;padding:10px 16px;text-align:center;color:var(--text-primary);border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--brand-primary) 24%,var(--bg-secondary));font:700 .82rem/1.3 system-ui">
+  {{ config.modulos.sistema.mensaje_mantenimiento if config.modulos.sistema.mantenimiento else config.modulos.sistema.aviso_global }}
+  {% if config.modulos.sistema.fecha_estimada %}<small style="display:block;opacity:.75">{{ config.modulos.sistema.fecha_estimada }}</small>{% endif %}
+</div>
+{% endif %}
+
 <div id="splashMobile">
   <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Pechy Players">
   <h1>
@@ -890,6 +916,35 @@
 
 {% endif %}
 
+{% if categorias %}
+<nav class="desktop-category-access" aria-label="Accesos rápidos a categorías">
+  <div class="desktop-category-access__intro">
+    <small>EXPLORA RÁPIDO</small>
+    <strong>Categorías</strong>
+  </div>
+  <div class="desktop-category-access__links">
+    <a href="#catalogo" class="is-active" aria-current="page"><span aria-hidden="true">✦</span>Todos los productos</a>
+    {% for nombre_categoria in categorias %}
+      {% set categoria_normalizada = nombre_categoria|lower %}
+      <a href="#categoria-{{ loop.index }}">
+        <span aria-hidden="true">
+          {%- if 'music' in categoria_normalizada or 'música' in categoria_normalizada -%}♫
+          {%- elif 'anime' in categoria_normalizada -%}✧
+          {%- elif 'iptv' in categoria_normalizada or 'tv' in categoria_normalizada -%}▣
+          {%- elif 'deport' in categoria_normalizada -%}●
+          {%- elif 'combo' in categoria_normalizada -%}⊞
+          {%- elif 'stream' in categoria_normalizada or 'película' in categoria_normalizada -%}▶
+          {%- elif 'juego' in categoria_normalizada or 'gaming' in categoria_normalizada -%}◆
+          {%- else -%}◇
+          {%- endif -%}
+        </span>
+        {{ nombre_categoria }}
+      </a>
+    {% endfor %}
+  </div>
+</nav>
+{% endif %}
+
 {% if promociones %}
 <section class="promo-destacada-pc">
 
@@ -1030,6 +1085,11 @@
     </div>
 
 </div>
+
+    <div class="cartelera-desktop-nav" aria-label="Navegación de cartelera">
+      <button type="button" data-cartelera-direccion="anterior" aria-label="Ver títulos anteriores">‹</button>
+      <button type="button" data-cartelera-direccion="siguiente" aria-label="Ver títulos siguientes">›</button>
+    </div>
 
 </div>
 
@@ -1343,7 +1403,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
 {% for nombre_categoria, productos in categorias.items() %}
 
-<section class="categoria-home categoria-{{ nombre_categoria|lower|replace(' ','-') }}">
+<section id="categoria-{{ loop.index }}" class="categoria-home categoria-{{ nombre_categoria|lower|replace(' ','-') }}{% if productos|length <= 2 %} categoria-home--editorial{% endif %}">
 
     <div class="top-section categoria-encabezado">
 
@@ -1499,6 +1559,21 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
         {% endfor %}
 
     </div>
+
+    {% if productos|length <= 2 and productos %}
+    <aside class="categoria-editorial-visual" aria-hidden="true">
+        <img
+            src="{{ url_for('static', filename='img/platforms/' + productos[0].imagen) }}"
+            alt=""
+            loading="lazy"
+            decoding="async">
+        <div class="categoria-editorial-visual__overlay">
+            <small>COLECCIÓN</small>
+            <strong>{{ nombre_categoria }}</strong>
+            <span>Explora la selección completa</span>
+        </div>
+    </aside>
+    {% endif %}
 
     <div class="catalogo-contador">
 
@@ -1893,6 +1968,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script defer src="{{ url_for('static', filename='js/pc-v2.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
+<script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
 
 <script>
 
