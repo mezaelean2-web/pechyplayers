@@ -5,7 +5,13 @@
 <section class="papelera-page" id="papeleraApp">
   <header class="papelera-hero">
     <div><span>ARCHIVO OPERATIVO</span><h1>Papelera</h1><p>Cuentas fuera del inventario, con sus perfiles e historial preservados.</p></div>
-    <button id="papeleraActualizar" class="papelera-btn" type="button">↻ Actualizar</button>
+    <div class="papelera-hero-acciones">
+      <div class="papelera-total" aria-label="Cuentas madre actualmente archivadas">
+        <span class="papelera-total-icono" aria-hidden="true"><i data-lucide="archive"></i></span>
+        <span class="papelera-total-texto"><small>CUENTAS EN PAPELERA</small><strong id="papeleraTotal" aria-live="polite">0</strong><em>Archivadas actualmente</em></span>
+      </div>
+      <button id="papeleraActualizar" class="papelera-btn" type="button"><i data-lucide="refresh-cw"></i><span>Actualizar</span></button>
+    </div>
   </header>
   <section class="papelera-panel" aria-label="Archivo de cuentas">
     <div class="papelera-filtros">

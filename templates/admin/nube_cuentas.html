@@ -97,7 +97,7 @@ Nube de cuentas
         </button>
 
 
-        <button type="button" class="nube-stat nube-stat-activa" data-inventario-estado="activa">
+        <button type="button" class="nube-stat nube-stat-activa" data-inventario-estado="vendida">
 
             <div class="nube-stat-icon">
                 <i data-lucide="shield-check"></i>
@@ -106,21 +106,30 @@ Nube de cuentas
             <div class="nube-stat-contenido">
 
                 <span class="nube-stat-label">
-                    Activas
+                    Vendidas
                 </span>
 
-                <strong data-stat-value="activas">
-                    {{ estadisticas.activas }}
+                <strong data-stat-value="vendidas">
+                    {{ estadisticas.vendidas }}
                 </strong>
 
                 <small>
-                    Servicios vigentes
+                    Servicios asignados
                 </small>
 
             </div>
 
         </button>
 
+
+        <button type="button" class="nube-stat nube-stat-notificada" data-inventario-estado="notificada">
+            <div class="nube-stat-icon"><i data-lucide="send"></i></div>
+            <div class="nube-stat-contenido">
+                <span class="nube-stat-label">Notificadas</span>
+                <strong data-stat-value="notificadas">{{ estadisticas.notificadas }}</strong>
+                <small>Pendientes de corte</small>
+            </div>
+        </button>
 
         <button type="button" class="nube-stat nube-stat-vencer" data-inventario-estado="por_vencer">
 
@@ -184,7 +193,7 @@ Nube de cuentas
                     Disponibles
                 </span>
 
-                <strong data-stat-value="disponibles">{{ estadisticas.perfiles_disponibles }}</strong>
+                <strong data-stat-value="disponibles">{{ estadisticas.disponibles }}</strong>
                 <small data-stat-detail="disponibles">{{ estadisticas.cuentas_madre_disponibles }} madres · {{ estadisticas.perfiles_disponibles }} perfiles · {{ estadisticas.cuentas_completas_disponibles }} completas</small>
 
             </div>
@@ -309,7 +318,7 @@ Nube de cuentas
     </div>
 
     <div class="nube-filtros-panel" id="nubeFiltrosPanel" hidden>
-        <label>Estado<select id="nubeFiltroEstado"><option value="">Todos</option><option value="disponible">Disponible</option><option value="activa">Activa</option><option value="por_vencer">Por vencer</option><option value="vencida">Vencida</option><option value="caida">Caída</option></select></label>
+        <label>Estado<select id="nubeFiltroEstado"><option value="">Todos</option><option value="vendida">Vendida</option><option value="disponible">Disponible</option><option value="por_vencer">Por vencer</option><option value="vencida">Vencida</option><option value="notificada">Notificada</option><option value="caida">Caída</option></select></label>
         <label>Asignación<select id="nubeFiltroAsignacion"><option value="">Todas</option><option value="con_cliente">Con cliente</option><option value="sin_cliente">Sin cliente</option><option value="con_capacidad">Con capacidad disponible</option></select></label>
         <label>Pago<select id="nubeFiltroPago"><option value="">Todos</option><option value="pin">PIN</option><option value="autopagable">Autopagable</option><option value="mixta">Mixta</option></select></label>
         <label>Tipo<select id="nubeFiltroTipoAvanzado"><option value="">Todos</option></select></label>
@@ -353,7 +362,7 @@ Nube de cuentas
          CUENTA MADRE
          ====================================== -->
 
-    <tr class="nube-cuenta-madre" data-cuenta-id="{{ cuenta.id }}" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="{{ cuenta.tipo_cuenta|lower }}" data-modalidad="{{ cuenta.modalidad }}" data-tipo-pago="{{ cuenta.tipo_pago|lower }}" data-estado="{{ cuenta.estado_calculado }}" data-perfiles-totales="{{ cuenta.perfiles_totales }}" data-perfiles-disponibles="{{ cuenta.perfiles_disponibles }}" data-perfiles-ocupados="{{ cuenta.perfiles_ocupados }}" data-cliente="{{ cuenta.nombre_cliente }}" data-telefono="{{ cuenta.telefono }}">
+    <tr class="nube-cuenta-madre" data-cuenta-id="{{ cuenta.id }}" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="{{ cuenta.tipo_cuenta|lower }}" data-modalidad="{{ cuenta.modalidad }}" data-tipo-pago="{{ cuenta.tipo_pago|lower }}" data-estado="{{ cuenta.estado_visual }}" data-estado-real="{{ cuenta.estado_calculado }}" data-asignado="{{ '1' if cuenta.asignacion_operativa else '0' }}" data-dias-restantes="{{ cuenta.dias_restantes }}" data-perfiles-totales="{{ cuenta.perfiles_totales }}" data-perfiles-disponibles="{{ cuenta.perfiles_disponibles }}" data-perfiles-ocupados="{{ cuenta.perfiles_ocupados }}" data-cliente="{{ cuenta.nombre_cliente }}" data-telefono="{{ cuenta.telefono }}">
 
         <td>
 
@@ -515,11 +524,14 @@ Nube de cuentas
             <span
                 class="
                     nube-estado
-                    nube-estado-{{ cuenta.estado_calculado }}
+                    nube-estado-{{ cuenta.estado_visual }}
                 "
             >
 
-                {% if cuenta.estado_calculado == "activa" %}
+                {% if cuenta.estado_visual == "notificada" %}
+                    Notificada
+
+                {% elif cuenta.estado_calculado == "activa" %}
                     Activa
 
                 {% elif cuenta.estado_calculado == "por_vencer" %}
@@ -639,7 +651,7 @@ Nube de cuentas
         {% for perfil in cuenta.perfiles %}
 
             <tr
-                class="nube-perfil-row" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="perfil" data-estado="{{ perfil.estado_calculado }}" data-cliente="{{ perfil.nombre_cliente }}" data-telefono="{{ perfil.telefono }}"
+                class="nube-perfil-row" data-plataforma="{{ cuenta.plataforma|lower }}" data-tipo="perfil" data-estado="{{ perfil.estado_visual }}" data-estado-real="{{ perfil.estado_calculado }}" data-asignado="{{ '1' if perfil.asignacion_operativa else '0' }}" data-dias-restantes="{{ perfil.dias_restantes }}" data-cliente="{{ perfil.nombre_cliente }}" data-telefono="{{ perfil.telefono }}"
                 data-parent-id="{{ cuenta.id }}"
                 hidden
             >
@@ -761,11 +773,14 @@ Nube de cuentas
                     <span
                         class="
                             nube-estado
-                            nube-estado-{{ perfil.estado_calculado }}
+                            nube-estado-{{ perfil.estado_visual }}
                         "
                     >
 
-                        {% if perfil.estado_calculado == "activa" %}
+                        {% if perfil.estado_visual == "notificada" %}
+                            Notificada
+
+                        {% elif perfil.estado_calculado == "activa" %}
                             Activa
 
                         {% elif perfil.estado_calculado == "por_vencer" %}

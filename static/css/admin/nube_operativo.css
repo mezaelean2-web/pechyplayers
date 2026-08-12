@@ -3,11 +3,18 @@
 .nube-op-hero{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:108px;padding:20px 22px;border:1px solid var(--op-line);border-radius:14px;background:linear-gradient(135deg,rgba(20,22,29,.98),rgba(5,5,6,.98));box-shadow:0 18px 44px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.035)}
 .nube-op-title{display:flex;align-items:center;gap:15px;min-width:0}.nube-op-title>span{display:grid;place-items:center;width:48px;height:48px;flex:0 0 auto;border:1px solid rgba(210,180,94,.28);border-radius:14px;color:var(--op-gold);background:rgba(210,180,94,.08)}.nube-op-title svg{width:22px;height:22px}.nube-op-title small,.nube-op-dialog small{color:var(--op-gold);font-size:.62rem;font-weight:800;letter-spacing:.14em}.nube-op-title h1{margin:4px 0 2px;font-size:clamp(1.5rem,3vw,2.15rem);line-height:1.05;text-transform:uppercase}.nube-op-title p{margin:0;color:var(--op-muted);font-size:.84rem}
 .nube-op-btn,.nube-op-accion,.nube-op-dialog button,.nube-op-dialog a{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;border:1px solid rgba(210,180,94,.24);border-radius:8px;padding:8px 12px;color:#e9e3d7;background:linear-gradient(145deg,rgba(25,25,25,.95),rgba(11,13,18,.96));cursor:pointer;text-decoration:none}.nube-op-btn svg{width:16px;height:16px;color:var(--op-gold)}.nube-op-btn:hover,.nube-op-accion:hover,.nube-op-dialog button:hover,.nube-op-dialog a:hover{border-color:rgba(210,180,94,.48);color:#fff;transform:translateY(-1px)}
+.nube-op-btn:disabled{opacity:.65;cursor:wait;transform:none!important}.nube-op-btn.actualizando svg{animation:nube-op-giro .8s linear infinite}.nube-op-toast{position:fixed;right:22px;bottom:22px;z-index:5000;padding:11px 15px;border:1px solid rgba(74,222,128,.28);border-radius:10px;color:#bbf7d0;background:rgba(8,18,15,.97);box-shadow:0 14px 38px rgba(0,0,0,.4);font-size:.8rem}.nube-op-toast.error{color:#fecaca;border-color:rgba(248,113,113,.3);background:rgba(25,10,13,.97)}@keyframes nube-op-giro{to{transform:rotate(360deg)}}
 .nube-op-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:14px 0}.nube-op-stat{min-height:72px;padding:12px 14px;text-align:left;border:1px solid var(--op-line-soft);border-radius:10px;color:var(--op-muted);background:linear-gradient(145deg,rgba(18,21,28,.94),rgba(7,8,11,.94));cursor:pointer}.nube-op-stat.activo{border-color:rgba(210,180,94,.42);box-shadow:inset 0 0 20px rgba(210,180,94,.04)}.nube-op-stat small{display:block;font-size:.63rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}.nube-op-stat strong{display:block;margin-top:5px;color:#f7f4ed;font-size:1.75rem;line-height:1}
 .nube-op-panel{padding:14px;border:1px solid var(--op-line-soft);border-radius:14px;background:linear-gradient(155deg,rgba(12,15,21,.92),rgba(5,5,6,.9));box-shadow:0 16px 40px rgba(0,0,0,.18)}.nube-op-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.06)}.nube-op-tabs{display:flex;gap:6px}.nube-op-tabs button{padding:7px 12px;border:1px solid rgba(255,255,255,.08);border-radius:999px;color:#8d929c;background:rgba(19,22,29,.75);cursor:pointer}.nube-op-tabs button.activo{color:#f2dfaa;border-color:rgba(210,180,94,.42);background:rgba(210,180,94,.08)}
 .nube-op-toolbar input,.nube-op-toolbar select,.nube-op-textarea,.nube-op-motivo,.nube-op-field input{box-sizing:border-box;border:1px solid rgba(210,180,94,.18);border-radius:8px;color:#eee8db;background:#0b0e14}.nube-op-toolbar input{min-width:280px;padding:9px 11px}.nube-op-toolbar select{padding:9px 28px 9px 11px}.nube-op-lista{display:grid;gap:8px;margin-top:12px}.nube-op-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;min-height:78px;padding:11px 13px;border:1px solid var(--op-line-soft);border-left:3px solid var(--op-gold);border-radius:10px;background:linear-gradient(105deg,rgba(19,22,29,.96),rgba(8,9,13,.94))}.nube-op-card.combo{border-left-color:var(--op-red-hot)}.nube-op-card h3{margin:0;color:#f6f1e8;font-size:.95rem}.nube-op-card p{margin:4px 0 0;color:#8c929d;font-size:.75rem}.nube-op-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}.nube-op-tags span{padding:3px 7px;border:1px solid rgba(255,255,255,.055);border-radius:6px;color:#bfc0bd;background:rgba(255,255,255,.028);font-size:.64rem}.nube-op-tags .oro{color:#e5cf83;border-color:rgba(210,180,94,.18);background:rgba(210,180,94,.06)}
 .nube-op-vacio,.nube-op-error{padding:42px 18px;text-align:center;color:#858b96;border:1px dashed rgba(210,180,94,.17);border-radius:13px;background:rgba(255,255,255,.018)}.nube-op-vacio strong,.nube-op-error strong{display:block;color:#e5e1d7}
 .nube-op-modal{position:fixed;inset:0;z-index:3200;display:none;place-items:center;padding:18px}.nube-op-modal.abierto{display:grid}.nube-op-backdrop{position:absolute;inset:0;border:0;background:rgba(2,3,6,.86);backdrop-filter:blur(9px)}.nube-op-dialog{position:relative;width:min(920px,100%);max-height:92vh;overflow:auto;border:1px solid rgba(210,180,94,.25);border-radius:14px;color:var(--op-text);background:linear-gradient(155deg,#11141a,#080a0e);box-shadow:0 32px 100px rgba(0,0,0,.7)}.nube-op-dialog>header{position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px;border-bottom:1px solid rgba(210,180,94,.12);background:rgba(11,13,18,.96)}.nube-op-dialog h2{margin:5px 0 0;font-size:1.18rem}.nube-op-dialog>header button{padding:2px 10px;border:0;color:#8d929c;background:transparent;font-size:1.8rem}.nube-op-dialog>div{padding:18px}.nube-op-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-bottom:12px}.nube-op-grid-servicio{margin-bottom:0}.nube-op-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.nube-op-dato,.nube-op-field{padding:9px;border:1px solid rgba(255,255,255,.05);border-radius:8px;background:rgba(255,255,255,.028)}.nube-op-dato span,.nube-op-field span{display:block;color:#777d87;font-size:.63rem;text-transform:uppercase}.nube-op-dato strong{display:block;margin-top:3px;overflow-wrap:anywhere;font-size:.78rem}.nube-op-field input{width:100%;margin-top:6px;padding:8px}.nube-op-password{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}.nube-op-eye{align-self:end;min-width:78px}.nube-op-block{margin-bottom:12px;padding:12px;border:1px solid rgba(210,180,94,.095);border-radius:10px;background:rgba(255,255,255,.022)}.nube-op-block h3{margin:0 0 9px;color:#d8c06c;font-size:.7rem;letter-spacing:.12em;text-transform:uppercase}.nube-op-stack{display:grid;gap:8px}.nube-op-service-card{padding:9px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.025)}.nube-op-service-card>strong{display:block;margin-bottom:8px;font-size:.84rem}.nube-op-servicios{display:grid;gap:7px;margin:10px 0}.nube-op-servicio{padding:9px 10px;border:1px solid rgba(255,255,255,.055);border-radius:8px;background:rgba(255,255,255,.03)}.nube-op-servicio strong{display:block;font-size:.82rem}.nube-op-servicio small{display:block;margin-top:3px;color:#8b909a;letter-spacing:0;text-transform:none}.nube-op-textarea{width:100%;min-height:180px;padding:12px;resize:vertical;line-height:1.45}.nube-op-motivo{width:100%;min-height:72px;padding:10px;resize:vertical}.nube-op-actions,.nube-op-row-actions{display:flex;flex-wrap:wrap;gap:8px}.nube-op-actions{justify-content:flex-end;margin-top:12px}.nube-op-row-actions{justify-content:flex-end}.nube-op-primary{border-color:rgba(210,180,94,.48)!important;color:#17140c!important;background:linear-gradient(135deg,#dfc46d,#aa812d)!important;font-weight:800}.nube-op-secondary{border-color:rgba(255,255,255,.1)!important;color:#d8d2c8!important;background:rgba(255,255,255,.035)!important}.nube-op-danger{border-color:rgba(191,41,56,.45)!important;color:#ffe4e8!important;background:rgba(143,23,34,.32)!important}.nube-op-critical{font-weight:800}.nube-op-status{align-self:center;color:#aeb3bc;font-size:.72rem;text-transform:uppercase}.nube-op-msg{min-height:20px;margin-top:8px;color:#9aa0a9;font-size:.78rem}.nube-op-msg.error{color:#efa1a7}.nube-op-modal-abierto{overflow:hidden}
+.nube-op-eye{align-self:end;min-width:104px;height:35px;padding:0 12px!important;border:1px solid rgba(210,180,94,.2)!important;border-radius:8px!important;color:#c9c5bc!important;background:linear-gradient(145deg,#1a1c21,#0d0f13)!important;box-shadow:inset 0 1px rgba(255,255,255,.035);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:.75rem;font-weight:650;letter-spacing:.01em;transition:border-color .18s ease,color .18s ease,background .18s ease,box-shadow .18s ease,transform .18s ease}
+.nube-op-eye svg{width:15px;height:15px;color:#b89d50;transition:color .18s ease,transform .18s ease}
+.nube-op-eye:hover{border-color:rgba(191,41,56,.55)!important;color:#fff!important;background:linear-gradient(145deg,#23252b,#121419)!important;box-shadow:0 7px 18px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.05)}
+.nube-op-eye:hover svg{color:#d5b75f;transform:scale(1.05)}
+.nube-op-eye:focus-visible{outline:2px solid rgba(210,180,94,.82);outline-offset:2px;box-shadow:0 0 0 4px rgba(210,180,94,.1)}
+.nube-op-eye[aria-pressed="true"]{border-color:rgba(191,41,56,.35)!important;color:#e8d9d9!important;background:linear-gradient(145deg,#21171a,#101114)!important}
 @media(max-width:900px){.nube-op-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.nube-op-toolbar{align-items:flex-start;flex-direction:column}.nube-op-toolbar input{width:100%;min-width:0}.nube-op-card{grid-template-columns:1fr}.nube-op-grid,.nube-op-form-grid{grid-template-columns:1fr 1fr}}
 @media(max-width:520px){.nube-op{padding:16px 14px 30px}.nube-op-hero{align-items:flex-start}.nube-op-title>span{display:none}.nube-op-stats{grid-template-columns:1fr}.nube-op-grid,.nube-op-form-grid{grid-template-columns:1fr}.nube-op-actions,.nube-op-row-actions{flex-direction:column}.nube-op-actions>*,.nube-op-row-actions>*{width:100%}}
 
@@ -23,3 +30,67 @@
 .nube-op-service-title{display:flex;align-items:center;gap:8px;margin-bottom:8px}
 .nube-op-service-title input{width:16px;height:16px;accent-color:var(--op-gold)}
 @media(max-width:900px){.nube-op-toolbar input,.nube-op-toolbar select{width:100%;min-width:0}.nube-op-card.nube-op-madre,.nube-op-hijo{grid-template-columns:1fr}.nube-op-hijos{margin-left:0}.nube-op-platform,.nube-op-expand{display:none}}
+
+/* Cortes: la cuenta desplegada es el espacio operativo principal. */
+.nube-op-card.nube-op-madre{grid-template-columns:auto auto minmax(0,1fr) auto;min-height:88px;padding:14px 16px;border-color:rgba(255,255,255,.065);border-left:3px solid #8f1722;background:linear-gradient(110deg,rgba(20,23,30,.94),rgba(7,8,11,.96));transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease}
+.nube-op-card.nube-op-madre:hover{border-color:rgba(166,34,46,.42);box-shadow:0 12px 32px rgba(0,0,0,.3),inset 0 1px rgba(255,255,255,.025);transform:translateY(-1px)}
+.nube-op-card.nube-op-madre.plataforma-netflix{border-left-color:#b51f2e}.nube-op-card.nube-op-madre.plataforma-disney{border-left-color:#315c9b}.nube-op-card.nube-op-madre.plataforma-prime-video{border-left-color:#3187aa}.nube-op-card.nube-op-madre.plataforma-max{border-left-color:#6550a5}.nube-op-card.nube-op-madre.plataforma-spotify{border-left-color:#2f8652}
+.nube-op-card.nube-op-madre .nube-op-email{margin-top:6px;color:#ddd8ce;font-size:.82rem;overflow-wrap:anywhere}
+.nube-op-pendientes{padding:7px 10px;border:1px solid rgba(181,31,46,.32);border-radius:999px;color:#f0c8cc;background:rgba(143,23,34,.13);font-size:.72rem;font-weight:700}
+.nube-op-cuenta-panel{display:grid;gap:20px;margin:-4px 0 10px 50px;padding:20px 22px;border:1px solid rgba(210,180,94,.16);border-top:0;border-radius:0 0 14px 14px;background:linear-gradient(145deg,rgba(12,14,19,.96),rgba(6,7,9,.98));box-shadow:0 18px 36px rgba(0,0,0,.22)}
+.nube-op-credenciales,.nube-op-perfiles{display:grid;gap:12px}
+.nube-op-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#e6e0d7;font-size:.68rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}
+.nube-op-section-title span{padding:4px 8px;border-radius:999px;color:#a7a49c;background:rgba(255,255,255,.04);font-size:.61rem;letter-spacing:.05em}
+.nube-op-account-form{display:grid;grid-template-columns:minmax(120px,.55fr) minmax(220px,1.25fr) minmax(250px,1.35fr) auto;gap:10px;align-items:end}
+.nube-op-account-form .nube-op-dato,.nube-op-account-form .nube-op-field{min-height:62px;padding:10px 12px;border-color:rgba(255,255,255,.045);background:rgba(255,255,255,.018)}
+.nube-op-account-form .nube-op-password{align-items:end}
+.nube-op-account-form>.nube-op-primary{min-height:42px;margin-bottom:1px;white-space:nowrap}
+.nube-op-cuenta-panel .nube-op-primary{border-color:rgba(191,41,56,.6)!important;color:#fff!important;background:linear-gradient(135deg,#a92130,#71111c)!important;box-shadow:0 8px 20px rgba(86,8,17,.2)}
+.nube-op-profile-row{display:grid;grid-template-columns:auto minmax(220px,1.5fr) minmax(130px,.55fr) auto;gap:16px;align-items:center;padding:13px 10px;border-bottom:1px solid rgba(255,255,255,.055);background:linear-gradient(90deg,rgba(0,0,0,.16),transparent);border-radius:8px}
+.nube-op-profile-row:last-child{border-bottom:0}
+.nube-op-profile-check{width:17px;height:17px;margin:0;accent-color:var(--op-gold);cursor:pointer}
+.nube-op-profile-identity strong{display:block;color:#f3efe7;font-size:.9rem}
+.nube-op-profile-identity small{display:block;margin-top:4px;color:#aaa79f;font-size:.75rem}
+.nube-op-profile-identity>span{display:block;margin-top:5px;color:#a9afb9;font-size:.69rem}
+.nube-op-profile-pin span{display:block;color:#747a84;font-size:.61rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.nube-op-profile-pin strong{display:block;margin-top:5px;color:#f4f0e7;font-size:.9rem;letter-spacing:.06em}
+.nube-op-pin-input{box-sizing:border-box;width:100%;max-width:140px;margin-top:5px;padding:8px 9px;border:1px solid rgba(210,180,94,.32);border-radius:7px;color:#fff;background:#090b0f;outline:none}
+.nube-op-pin-input:focus{border-color:rgba(210,180,94,.7);box-shadow:0 0 0 3px rgba(210,180,94,.08)}
+.nube-op-selection-actions{display:flex;justify-content:flex-end;min-height:0}
+.nube-op-seleccionados[hidden]{display:none!important}
+.nube-op-details{border-top:1px solid rgba(210,180,94,.12);color:#aaa69d}
+.nube-op-details summary{padding:13px 2px 4px;color:#c9b66f;font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;list-style-position:inside}
+.nube-op-details-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.nube-op-details .nube-op-dato{background:rgba(255,255,255,.018)}
+.nube-op-note{display:block;margin-top:10px;color:#7f858e;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.nube-op-note .nube-op-motivo{display:block;margin-top:7px;min-height:62px;color:#eee;text-transform:none}
+.nube-op-cuenta-panel>.nube-op-msg:empty{display:none}
+#cortesApp .nube-op-stat.activo,#cortesApp .nube-op-tabs button.activo{border-color:rgba(191,41,56,.48);color:#f1d5d8;background:rgba(143,23,34,.13);box-shadow:inset 0 0 20px rgba(143,23,34,.05)}
+#cortesApp .nube-op-expand{border-color:rgba(181,31,46,.3)!important;color:#eee3df!important;background:linear-gradient(145deg,rgba(28,25,27,.96),rgba(9,10,13,.98))}
+#cortesApp .nube-op-expand:hover{border-color:rgba(191,41,56,.62)!important;background:rgba(143,23,34,.18)}
+#cortesApp .nube-op-platform{border-color:rgba(255,255,255,.1);color:#f2ece4;background:linear-gradient(145deg,rgba(143,23,34,.58),rgba(17,20,27,.95))}
+
+@media(max-width:1050px){
+    .nube-op-account-form{grid-template-columns:1fr 1fr}
+    .nube-op-account-form>.nube-op-primary{justify-self:start}
+}
+@media(max-width:900px){
+    .nube-op-card.nube-op-madre{grid-template-columns:auto minmax(0,1fr) auto}
+    .nube-op-card.nube-op-madre .nube-op-platform{display:none}
+    .nube-op-card.nube-op-madre .nube-op-expand{display:inline-flex}
+    .nube-op-cuenta-panel{margin-left:0;padding:18px}
+    .nube-op-profile-row{grid-template-columns:auto minmax(0,1fr) auto}
+    .nube-op-profile-pin{grid-column:2}
+    .nube-op-profile-row .nube-op-row-actions{grid-column:3;grid-row:1 / span 2}
+}
+@media(max-width:620px){
+    .nube-op-card.nube-op-madre{grid-template-columns:auto minmax(0,1fr)}
+    .nube-op-pendientes{grid-column:2;justify-self:start}
+    .nube-op-account-form,.nube-op-details-grid{grid-template-columns:1fr}
+    .nube-op-account-form>.nube-op-primary{width:100%}
+    .nube-op-profile-row{grid-template-columns:auto minmax(0,1fr);gap:10px}
+    .nube-op-profile-pin{grid-column:2}
+    .nube-op-profile-row .nube-op-row-actions{grid-column:2;grid-row:auto;justify-content:flex-start;flex-direction:row}
+    .nube-op-profile-row .nube-op-row-actions>*{width:auto}
+    .nube-op-selection-actions .nube-op-seleccionados{width:100%}
+}

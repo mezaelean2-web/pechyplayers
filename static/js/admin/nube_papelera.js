@@ -39,7 +39,10 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     const modal = document.getElementById("papeleraModal");
     const body = document.getElementById("papeleraDetalle");
     const conteo = document.getElementById("papeleraConteo");
+    const total = document.getElementById("papeleraTotal");
+    const botonActualizar = document.getElementById("papeleraActualizar");
     let cuentas = [];
+    let actualizando = false;
     const el = (tag, clase, texto) => { const nodo = document.createElement(tag); if (clase) nodo.className = clase; if (texto !== undefined) nodo.textContent = texto; return nodo; };
     const fecha = formatearFechaSegura;
     const dinero = valor => new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(Number(valor || 0));
@@ -47,12 +50,20 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     const seccion = titulo => { const nodo = el("section", "papelera-seccion"); nodo.append(el("h3", "", titulo)); return nodo; };
     const nombreMovimiento = valor => String(valor || "Sin actividad").replaceAll("_", " ");
     const iniciales = valor => String(valor || "?").trim().split(/\s+/).slice(0, 2).map(parte => parte[0]).join("").toUpperCase();
+    const toast = (mensaje, error = false) => {
+        document.querySelector(".papelera-toast")?.remove();
+        const aviso = el("div", `papelera-toast${error ? " error" : ""}`, mensaje);
+        aviso.setAttribute("role", error ? "alert" : "status");
+        document.body.append(aviso);
+        window.setTimeout(() => aviso.remove(), 2800);
+    };
 
     function render() {
         const consulta = document.getElementById("papeleraBuscar").value.trim().toLowerCase();
         const plataforma = document.getElementById("papeleraPlataforma").value;
         const pinVencido = document.getElementById("papeleraPinVencido").checked;
         const items = filtrarCuentasPapelera(cuentas, consulta, plataforma, pinVencido);
+        total.textContent = String(cuentas.length);
         conteo.textContent = `${items.length} de ${cuentas.length}`;
         lista.replaceChildren();
         if (!items.length) { lista.append(el("div", "papelera-vacio", "No hay cuentas archivadas para estos filtros.")); return; }
@@ -72,11 +83,27 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     }
 
     async function cargar() {
-        const respuesta = await fetch(`/admin/nube-papelera/cuentas?_=${Date.now()}`, { cache: "no-store", headers: { Accept: "application/json" } }); const datos = await respuesta.json();
-        if (!respuesta.ok) throw Error(datos.mensaje); cuentas = datos.cuentas || [];
-        const selector = document.getElementById("papeleraPlataforma"), actual = selector.value;
-        selector.replaceChildren(new Option("Todas las plataformas", ""));
-        [...new Set(cuentas.map(c => c.plataforma))].sort().forEach(x => selector.add(new Option(x, x))); selector.value = actual; render();
+        app.setAttribute("aria-busy", "true");
+        try {
+            const respuesta = await fetch(`/admin/nube-papelera/cuentas?_=${Date.now()}`, { cache: "no-store", headers: { Accept: "application/json" } }); const datos = await respuesta.json();
+            if (!respuesta.ok) throw Error(datos.mensaje); cuentas = datos.cuentas || [];
+            const selector = document.getElementById("papeleraPlataforma"), actual = selector.value;
+            selector.replaceChildren(new Option("Todas las plataformas", ""));
+            [...new Set(cuentas.map(c => c.plataforma))].sort().forEach(x => selector.add(new Option(x, x))); selector.value = actual; render();
+        } finally {
+            app.setAttribute("aria-busy", "false");
+        }
+    }
+    async function actualizar() {
+        if (actualizando) return;
+        actualizando = true; botonActualizar.disabled = true; botonActualizar.classList.add("actualizando");
+        botonActualizar.setAttribute("aria-busy", "true"); botonActualizar.querySelector("span").textContent = "Actualizando...";
+        try { await cargar(); toast("Información actualizada."); }
+        catch (_) { toast("No pudimos actualizar. Intenta nuevamente.", true); }
+        finally {
+            actualizando = false; botonActualizar.disabled = false; botonActualizar.classList.remove("actualizando");
+            botonActualizar.setAttribute("aria-busy", "false"); botonActualizar.querySelector("span").textContent = "Actualizar";
+        }
     }
 
     async function abrir(id) {
@@ -144,7 +171,7 @@ if (typeof document !== "undefined") document.addEventListener("DOMContentLoaded
     lista.addEventListener("click", evento => { const fila = evento.target.closest("[data-cuenta-id]"); if (fila) abrir(fila.dataset.cuentaId); });
     document.addEventListener("keydown", evento => { if (evento.key === "Escape" && modal.classList.contains("abierto")) cerrarModal(); });
     ["papeleraBuscar", "papeleraPlataforma", "papeleraPinVencido"].forEach(id => document.getElementById(id).addEventListener(id === "papeleraBuscar" ? "input" : "change", render));
-    document.getElementById("papeleraActualizar").onclick = cargar;
+    botonActualizar.onclick = actualizar;
     function mostrarErrorCarga(error) {
         console.error("No fue posible cargar Papelera:", error);
         const estado = el("div", "papelera-vacio");

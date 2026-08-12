@@ -27,14 +27,15 @@ document.addEventListener(
             if (/^3\d{9}$/.test(numero)) numero = `57${numero}`;
             return /^\d{10,15}$/.test(numero) ? numero : "";
         };
-        const madresInventario = [...document.querySelectorAll(".nube-cuenta-madre")];
-        const indiceInventario = new Map(madresInventario.map(fila => {
+        let madresInventario = [...document.querySelectorAll(".nube-cuenta-madre")];
+        const crearRegistroInventario = fila => {
             const id = fila.dataset.cuentaId;
             const hijos = [...document.querySelectorAll(`.nube-perfil-row[data-parent-id="${CSS.escape(id)}"]`)];
             const controles = [fila, ...hijos].flatMap(nodo => [...nodo.querySelectorAll("[data-id]")]);
             const secretos = controles.flatMap(control => Object.values(control.dataset));
-            return [fila, { hijos, texto: normalizarInventario([fila.textContent, ...hijos.map(h => h.textContent), ...secretos, id].join(" ")) }];
-        }));
+            return { hijos, texto: normalizarInventario([fila.textContent, ...hijos.map(h => h.textContent), ...secretos, id].join(" ")) };
+        };
+        const indiceInventario = new Map(madresInventario.map(fila => [fila, crearRegistroInventario(fila)]));
         const resultadoInventario = document.createElement("div");
         resultadoInventario.className = "nube-resultado-filtros";
         resultadoInventario.setAttribute("aria-live", "polite");
@@ -43,7 +44,14 @@ document.addEventListener(
         const selectTipoAvanzadoInventario = document.getElementById("nubeFiltroTipoAvanzado");
 
         function estaAsignadoInventario(nodo){
-            return Boolean(String(nodo?.dataset?.cliente || "").trim());
+            return nodo?.dataset?.asignado === "1";
+        }
+
+        function coincideEstadoInventario(nodo, filtro){
+            if (!filtro) return true;
+            if (filtro === "vendida") return estaAsignadoInventario(nodo);
+            if (filtro === "vencida") return nodo?.dataset?.estadoReal === "vencida";
+            return nodo?.dataset?.estado === filtro;
         }
 
         function estaVendibleInventario(nodo){
@@ -83,10 +91,11 @@ document.addEventListener(
                 normalizarInventario(fila.dataset.plataforma) === normalizarInventario(inventario.plataforma)
             );
             const resumen = {
-                total: cuentas.length,
-                activas: 0,
+                total: 0,
+                vendidas: 0,
                 por_vencer: 0,
                 vencidas: 0,
+                notificadas: 0,
                 caidas: 0,
                 perfiles: 0,
                 madres: 0,
@@ -94,12 +103,16 @@ document.addEventListener(
             };
 
             cuentas.forEach(fila => {
-                const estado = fila.dataset.estado;
                 const hijos = indiceInventario.get(fila)?.hijos || [];
-                if (estado === "activa") resumen.activas += 1;
-                if (estado === "por_vencer") resumen.por_vencer += 1;
-                if (estado === "vencida") resumen.vencidas += 1;
-                if (estado === "caida") resumen.caidas += 1;
+                const servicios = fila.dataset.modalidad === "perfiles" ? hijos : [fila];
+                resumen.total += servicios.length;
+                if (fila.dataset.estadoReal === "caida" || fila.dataset.estado === "caida") resumen.caidas += 1;
+                servicios.forEach(servicio => {
+                    if (estaAsignadoInventario(servicio)) resumen.vendidas += 1;
+                    if (servicio.dataset.estadoReal === "por_vencer" && estaAsignadoInventario(servicio)) resumen.por_vencer += 1;
+                    if (servicio.dataset.estadoReal === "vencida" && estaAsignadoInventario(servicio)) resumen.vencidas += 1;
+                    if (servicio.dataset.estado === "notificada" && estaAsignadoInventario(servicio)) resumen.notificadas += 1;
+                });
 
                 if (fila.dataset.modalidad === "perfiles" && estaVendibleInventario(fila)){
                     const disponibles = hijos.filter(hijo =>
@@ -114,14 +127,101 @@ document.addEventListener(
             });
 
             escribirStatInventario("total", resumen.total);
-            escribirDetalleStatInventario("total", inventario.plataforma ? "Cuentas de la plataforma" : "Todos los registros");
-            escribirStatInventario("activas", resumen.activas);
+            escribirDetalleStatInventario("total", inventario.plataforma ? "Servicios de la plataforma" : "Capacidad del inventario");
+            escribirStatInventario("vendidas", resumen.vendidas);
             escribirStatInventario("por_vencer", resumen.por_vencer);
             escribirStatInventario("vencidas", resumen.vencidas);
+            escribirStatInventario("notificadas", resumen.notificadas);
             escribirStatInventario("caidas", resumen.caidas);
-            escribirStatInventario("disponibles", resumen.perfiles);
+            escribirStatInventario("disponibles", resumen.perfiles + resumen.completas);
             escribirDetalleStatInventario("disponibles", `${resumen.madres} madres · ${resumen.perfiles} perfiles · ${resumen.completas} completas`);
         }
+
+        function aplicarIdentidadVisualFilaNube(fila){
+            const identidad = identidadVisualNube(fila.dataset.plataforma, fila.dataset.tipo);
+            fila.classList.add(`plataforma-${identidad.clase}`);
+            const icono = fila.querySelector(".nube-plataforma-icono");
+            if (icono) icono.textContent = identidad.icono;
+            const etiqueta = fila.querySelector(".nube-plataforma-info span");
+            if (etiqueta) etiqueta.textContent = identidad.label;
+        }
+
+        async function refreshAlertasCompactas(){
+            const atajo = document.getElementById("nubeAlertasAtajo");
+            if (!atajo) return;
+            const respuesta = await fetch("/admin/nube-cuentas/alertas", {headers:{Accept:"application/json"}});
+            const datos = await respuesta.json();
+            if (!respuesta.ok || !datos.ok) throw new Error("No se pudieron actualizar las alertas.");
+            const resumen = datos.resumen || {};
+            document.getElementById("nubeAlertasAtajoTitulo").textContent = resumen.total
+                ? `${resumen.total} alerta${resumen.total === 1 ? "" : "s"} requieren atención`
+                : "Todo está al día";
+            document.getElementById("nubeAlertasAtajoResumen").textContent =
+                `${resumen.criticas || 0} críticas · ${resumen.hoy || 0} hoy · ${resumen.proximas || 0} próximas`;
+        }
+
+        async function refreshCuentaNube(cuentaId){
+            const id = String(cuentaId || "");
+            const madreAnterior = document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(id)}"]`);
+            if (!madreAnterior) throw new Error("No se encontró la cuenta que se debe actualizar.");
+            const estabaExpandida = madreAnterior.querySelector(".nube-expandir-cuenta")?.classList.contains("activo") ||
+                [...document.querySelectorAll(`.nube-perfil-row[data-parent-id="${CSS.escape(id)}"]`)].some(fila => !fila.hidden);
+            const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(id)}/resumen`, {headers:{Accept:"application/json"}});
+            const resultado = await respuesta.json();
+            if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo actualizar la cuenta.");
+            const tablaTemporal = document.createElement("table");
+            tablaTemporal.innerHTML = `<tbody>${resultado.html}</tbody>`;
+            const filasNuevas = [...tablaTemporal.tBodies[0].rows];
+            const registroAnterior = indiceInventario.get(madreAnterior);
+            registroAnterior?.hijos.forEach(fila => fila.remove());
+            madreAnterior.replaceWith(...filasNuevas);
+            indiceInventario.delete(madreAnterior);
+            const madreNueva = filasNuevas.find(fila => fila.classList.contains("nube-cuenta-madre"));
+            madresInventario = madresInventario.map(fila => fila === madreAnterior ? madreNueva : fila);
+            indiceInventario.set(madreNueva, crearRegistroInventario(madreNueva));
+            aplicarIdentidadVisualFilaNube(madreNueva);
+            if (estabaExpandida) madreNueva.querySelector(".nube-expandir-cuenta")?.click();
+            aplicarFiltrosInventario();
+            window.lucide?.createIcons();
+            refreshAlertasCompactas().catch(() => {});
+            return madreNueva;
+        }
+
+        function cuentaIdDePerfilNube(perfilId){
+            return document.querySelector(`.nube-gestionar-perfil[data-id="${CSS.escape(String(perfilId || ""))}"]`)?.closest(".nube-perfil-row")?.dataset.parentId || "";
+        }
+
+        async function refreshPerfilNube(perfilId){
+            const cuentaId = cuentaIdDePerfilNube(perfilId);
+            if (!cuentaId) throw new Error("No se pudo identificar la cuenta del perfil.");
+            return refreshCuentaNube(cuentaId);
+        }
+
+        function reportarFalloRefrescoNube(error){
+            const recargar = window.confirm(`${error.message || error}\n\n¿Deseas recargar manualmente la página?`);
+            if (recargar) window.location.reload();
+        }
+
+        let marcaCuentaCortesProcesada = localStorage.getItem("pechy:nube-cuenta-actualizada") || "";
+        async function sincronizarCuentaEditadaEnCortes(valor){
+            const marca = valor || localStorage.getItem("pechy:nube-cuenta-actualizada") || "";
+            if (!marca || marca === marcaCuentaCortesProcesada) return;
+            marcaCuentaCortesProcesada = marca;
+            let cambio;
+            try { cambio = JSON.parse(marca); } catch (_) { return; }
+            const ids = [...new Set([cambio?.cuenta_id, ...(cambio?.cuenta_ids || [])].filter(Boolean).map(String))];
+            for (const id of ids) {
+                if (document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(id)}"]`)) await refreshCuentaNube(id);
+            }
+        }
+        window.addEventListener("storage", evento => {
+            if (evento.key === "pechy:nube-cuenta-actualizada") {
+                sincronizarCuentaEditadaEnCortes(evento.newValue).catch(reportarFalloRefrescoNube);
+            }
+        });
+        window.addEventListener("focus", () => {
+            sincronizarCuentaEditadaEnCortes().catch(reportarFalloRefrescoNube);
+        });
 
         function poblarTiposAvanzadosInventario(){
             if (!selectTipoAvanzadoInventario) return;
@@ -149,7 +249,11 @@ document.addEventListener(
                 const coincidePlataforma = !inventario.plataforma || normalizarInventario(fila.dataset.plataforma) === normalizarInventario(inventario.plataforma);
                 const tipoFila = normalizarTipoInventario(fila.dataset.modalidad === "perfiles" ? "perfiles" : fila.dataset.tipo);
                 const coincideTipo = !inventario.tipo || tipoFila === normalizarTipoInventario(inventario.tipo);
-                const coincideEstado = !inventario.estado || fila.dataset.estado === inventario.estado || registro.hijos.some(h => h.dataset.estado === inventario.estado);
+                const filtroCaidas = inventario.estado === "caida";
+                const hijosEstado = registro.hijos.filter(hijo => coincideEstadoInventario(hijo, inventario.estado));
+                const coincideEstado = !inventario.estado || (filtroCaidas
+                    ? fila.dataset.estadoReal === "caida" || fila.dataset.estado === "caida"
+                    : coincideEstadoInventario(fila, inventario.estado) || hijosEstado.length > 0);
                 const tieneCliente = estaAsignadoInventario(fila) || registro.hijos.some(estaAsignadoInventario);
                 const tieneCapacidad = (
                     fila.dataset.modalidad === "perfiles" &&
@@ -161,7 +265,10 @@ document.addEventListener(
                 const coincideTipoAvanzado = !inventario.tipoAvanzado || tipoFila === inventario.tipoAvanzado || registro.hijos.some(h => normalizarTipoInventario(h.dataset.tipo) === inventario.tipoAvanzado);
                 const mostrar = coincideBusqueda && coincidePlataforma && coincideTipo && coincideEstado && coincideAsignacion && coincidePago && coincideTipoAvanzado;
                 fila.hidden = !mostrar;
-                registro.hijos.forEach(hijo => { if (!mostrar) hijo.hidden = true; });
+                registro.hijos.forEach(hijo => {
+                    if (!mostrar) hijo.hidden = true;
+                    else if (inventario.estado) hijo.hidden = filtroCaidas || !coincideEstadoInventario(hijo, inventario.estado);
+                });
                 if (mostrar) visibles += 1;
             });
             resultadoInventario.textContent = visibles ? `${visibles} cuenta${visibles === 1 ? "" : "s"} en esta vista` : "No hay resultados para los filtros seleccionados.";
@@ -214,6 +321,8 @@ document.addEventListener(
             const madre = fila.matches(".nube-cuenta-madre") ? fila : document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(fila.dataset.parentId || "")}"]`);
             const ver = evento.target.closest(".nube-ver-cuenta,.nube-ver-perfil");
             if (ver) { abrirDrawer(ver); return; }
+            const gestionarPerfil = evento.target.closest(".nube-gestionar-perfil");
+            if (gestionarPerfil) { abrirGestionPerfil(gestionarPerfil); return; }
             const gestionar = evento.target.closest(".nube-gestionar-cuenta");
             if (gestionar) {
                 if (gestionar.dataset.modalidad !== "perfiles" && gestionar.dataset.estado === "disponible"){
@@ -1512,7 +1621,8 @@ document.addEventListener(
                 mensajeAsignarCuentaTexto.textContent = "Cuenta asignada correctamente.";
                 mensajeAsignarCuenta.classList.remove("error");
                 mensajeAsignarCuenta.hidden = false;
-                setTimeout(() => window.location.reload(), 700);
+                await refreshCuentaNube(asignarCuentaId.value);
+                window.setTimeout(cerrarModalAsignarCuenta, 700);
             } catch(error) {
                 mensajeAsignarCuentaTexto.textContent = error.message;
                 mensajeAsignarCuenta.classList.add("error");
@@ -2482,8 +2592,10 @@ const precio =
                         perfiles.forEach(
                             perfil => {
 
-                                perfil.hidden =
-                                    abierto;
+                                perfil.hidden = abierto || (
+                                    Boolean(inventario.estado) &&
+                                    !coincideEstadoInventario(perfil, inventario.estado)
+                                );
 
                             }
                         );
@@ -3867,8 +3979,9 @@ if (motivoCaidaPerfil){
                 event.preventDefault();
                 event.stopPropagation();
 
+                const perfilId = perfilGestionId?.value || "";
                 cerrarModalPerfil();
-                window.location.reload();
+                refreshPerfilNube(perfilId).catch(reportarFalloRefrescoNube);
             }
         );
 
@@ -3879,8 +3992,9 @@ if (motivoCaidaPerfil){
                 event.preventDefault();
 
                 if (operacionCompletada){
+                    const perfilId = perfilGestionId?.value || "";
                     cerrarModalPerfil();
-                    window.location.reload();
+                    refreshPerfilNube(perfilId).catch(reportarFalloRefrescoNube);
                     return;
                 }
 
@@ -4084,7 +4198,8 @@ if (motivoCaidaPerfil){
                     confirmarLiberacionPerfil.disabled = false;
                 } else {
                     if (panelMensajeCliente) panelMensajeCliente.hidden = true;
-                    window.setTimeout(() => window.location.reload(), 2200);
+                    await refreshPerfilNube(perfilId);
+                    confirmarLiberacionPerfil.disabled = false;
                 }
             } catch (error) {
                 mostrarMensajePerfil(error.message, "error");
@@ -4134,6 +4249,7 @@ if (motivoCaidaPerfil){
                 mostrarMensajePerfil(resultado.mensaje);
                 establecerOperacionCompletada(true);
                 window.lucide?.createIcons();
+                await refreshPerfilNube(perfilId);
             } catch (error) {
                 mostrarMensajePerfil(error.message, "error");
                 confirmarNoRenovoPerfil.disabled = false;

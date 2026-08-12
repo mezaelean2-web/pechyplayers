@@ -4,12 +4,21 @@ document.addEventListener("DOMContentLoaded", () => {
     const lista = document.getElementById("notificacionesLista");
     const modal = document.getElementById("notificacionModal");
     const body = document.getElementById("notificacionModalBody");
+    const botonActualizar = document.getElementById("notificacionesActualizar");
     const estado = { pendientes: [], notificados: [], tab: "pendientes", tipo: "", busqueda: "", activa: null };
+    let actualizando = false;
     const el = (tag, clase, texto) => { const nodo = document.createElement(tag); if (clase) nodo.className = clase; if (texto !== undefined) nodo.textContent = texto; return nodo; };
     const fecha = valor => valor ? new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${valor}T00:00:00Z`)) : "Sin fecha";
     const textoServicios = unidad => (unidad.servicios || []).map(s => s.plataforma || "Servicio").join(" + ");
     const cerrar = () => { modal.classList.remove("abierto"); modal.setAttribute("aria-hidden", "true"); document.body.classList.remove("nube-op-modal-abierto"); };
     const dato = (k, v) => { const n = el("div", "nube-op-dato"); n.append(el("span", "", k), el("strong", "", v || "-")); return n; };
+    const toast = (mensaje, error = false) => {
+        document.querySelector(".nube-op-toast")?.remove();
+        const aviso = el("div", `nube-op-toast${error ? " error" : ""}`, mensaje);
+        aviso.setAttribute("role", error ? "alert" : "status");
+        document.body.append(aviso);
+        window.setTimeout(() => aviso.remove(), 2800);
+    };
     const coincide = unidad => {
         const texto = `${unidad.cliente} ${unidad.telefono} ${unidad.telefono_normalizado} ${textoServicios(unidad)}`.toLowerCase();
         return (!estado.tipo || unidad.tipo === estado.tipo) && (!estado.busqueda || texto.includes(estado.busqueda));
@@ -70,6 +79,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 try {
                     const r = await fetch("/admin/nube-notificaciones/notificar", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ servicios: unidad.servicios, mensaje: mensaje.value, medio: "manual" }) });
                     const data = await r.json(); if (!r.ok || !data.ok) throw new Error(data.mensaje || "No se pudo registrar.");
+                    const cuentaIds = [...new Set((unidad.servicios || []).map(s => Number(s.cuenta_id)).filter(Boolean))];
+                    localStorage.setItem("pechy:nube-cuenta-actualizada", JSON.stringify({ cuenta_ids: cuentaIds, fecha: Date.now(), origen: "notificaciones" }));
                     cerrar(); await cargar();
                 } catch (error) { msg.className = "nube-op-msg error"; msg.textContent = error.message; confirmar.disabled = false; }
             };
@@ -79,22 +90,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     async function cargar() {
         app.setAttribute("aria-busy", "true");
-        const r = await fetch("/admin/nube-notificaciones/datos", { headers: { Accept: "application/json" } });
-        const data = await r.json();
-        if (!r.ok || !data.ok) { lista.replaceChildren(el("div", "nube-op-error", data.mensaje || "No se pudo cargar.")); return; }
-        estado.pendientes = data.pendientes || []; estado.notificados = data.notificados || [];
-        document.getElementById("notifPendientes").textContent = data.resumen?.pendientes ?? 0;
-        document.getElementById("notifHoy").textContent = data.resumen?.individuales ?? 0;
-        document.getElementById("notifNotificadosHoy").textContent = data.resumen?.notificados_hoy ?? 0;
-        document.getElementById("notifCombos").textContent = data.resumen?.combos ?? 0;
-        pintar(); app.setAttribute("aria-busy", "false");
+        try {
+            const r = await fetch("/admin/nube-notificaciones/datos", { headers: { Accept: "application/json" } });
+            const data = await r.json();
+            if (!r.ok || !data.ok) throw new Error(data.mensaje || "No se pudo cargar.");
+            estado.pendientes = data.pendientes || []; estado.notificados = data.notificados || [];
+            document.getElementById("notifPendientes").textContent = data.resumen?.pendientes ?? 0;
+            document.getElementById("notifHoy").textContent = data.resumen?.individuales ?? 0;
+            document.getElementById("notifNotificadosHoy").textContent = data.resumen?.notificados_hoy ?? 0;
+            document.getElementById("notifCombos").textContent = data.resumen?.combos ?? 0;
+            pintar();
+        } finally {
+            app.setAttribute("aria-busy", "false");
+        }
+    }
+    async function actualizar() {
+        if (actualizando) return;
+        actualizando = true; botonActualizar.disabled = true; botonActualizar.classList.add("actualizando");
+        botonActualizar.setAttribute("aria-busy", "true"); botonActualizar.querySelector("span").textContent = "Actualizando...";
+        try { await cargar(); toast("Información actualizada."); }
+        catch (_) { toast("No pudimos actualizar. Intenta nuevamente.", true); }
+        finally {
+            actualizando = false; botonActualizar.disabled = false; botonActualizar.classList.remove("actualizando");
+            botonActualizar.setAttribute("aria-busy", "false"); botonActualizar.querySelector("span").textContent = "Actualizar";
+        }
     }
     document.getElementById("notificacionesBuscar").addEventListener("input", e => { estado.busqueda = e.target.value.trim().toLowerCase(); pintar(); });
     document.getElementById("notificacionesTipo").addEventListener("change", e => { estado.tipo = e.target.value; pintar(); });
     document.querySelectorAll("[data-tab]").forEach(b => b.addEventListener("click", () => { estado.tab = b.dataset.tab; pintar(); }));
     document.querySelectorAll("[data-filtro]").forEach(b => b.addEventListener("click", () => { estado.tipo = b.dataset.filtro === "combo" ? "combo" : ""; pintar(); }));
-    document.getElementById("notificacionesActualizar").addEventListener("click", cargar);
+    botonActualizar.addEventListener("click", actualizar);
     document.querySelectorAll("[data-cerrar-modal]").forEach(b => b.addEventListener("click", cerrar));
     document.addEventListener("keydown", e => { if (e.key === "Escape") cerrar(); });
-    cargar();
+    cargar().catch(error => lista.replaceChildren(el("div", "nube-op-error", error.message)));
 });

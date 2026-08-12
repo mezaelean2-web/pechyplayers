@@ -473,6 +473,116 @@ class NotificacionesCortesNubeTest(unittest.TestCase):
         texto = json.dumps(database.obtener_cortes_nube()["historial"])
         self.assertNotIn("SUPER-SECRETA", texto)
 
+    def test_48_slot_cortado_reasignado_mismo_ciclo_puede_notificarse(self):
+        self.perfil(1, 1, cliente="Cliente anterior", cliente_id=10)
+        self.notificar()
+        servicio = database.obtener_cortes_nube()["pendientes"][0]["servicios"][0]
+        self.assertTrue(database.cortar_servicios_nube([servicio])["ok"])
+        vencimiento = self.fecha(-1)
+        self.execute("""
+            UPDATE nube_perfiles
+            SET cliente_id=20, nombre_cliente='Cliente nuevo', telefono='3009999999',
+                fecha_entrega=?, dias_cuenta=30, fecha_vencimiento=?, estado='vencida'
+            WHERE id=1
+        """, (self.fecha(-31), vencimiento))
+        pendientes_notificacion = self.pendientes()
+        self.assertEqual(len(pendientes_notificacion), 1)
+        self.assertEqual(pendientes_notificacion[0]["servicios"][0]["nombre_cliente"], "Cliente nuevo")
+        perfil_reasignado = database.obtener_cuentas_nube(limite=10)[0]["perfiles"][0]
+        self.assertFalse(perfil_reasignado["notificacion_activa"])
+        self.assertEqual(perfil_reasignado["estado_visual"], "vencida")
+        self.notificar(pendientes_notificacion[0])
+        cortes = database.obtener_cortes_nube()["pendientes"]
+        self.assertEqual(len(cortes), 1)
+        self.assertEqual(len(cortes[0]["servicios"]), 1)
+        self.assertEqual(cortes[0]["servicios"][0]["perfil_id"], 1)
+        self.assertEqual(self.scalar("SELECT COUNT(*) FROM nube_notificacion_servicios WHERE servicio_id=1"), 2)
+
+    def test_49_respuesta_credenciales_es_lectura_persistida(self):
+        self.cuenta(1)
+        resultado = database.actualizar_credenciales_cuenta_corte_nube(
+            1, "persistida@test.com", "NEW", None
+        )
+        self.assertTrue(resultado["ok"])
+        self.assertEqual(resultado["cuenta"]["contrasena"], "NEW")
+        self.assertEqual(
+            resultado["cuenta"]["contrasena"],
+            self.scalar("SELECT contrasena FROM nube_cuentas WHERE id=1")
+        )
+
+    def test_50_respuesta_pin_es_lectura_persistida(self):
+        self.perfil(4, 1, pin="1234")
+        resultado = database.actualizar_pin_perfil_corte_nube(1, 4, "9876")
+        self.assertTrue(resultado["ok"])
+        self.assertEqual(resultado["perfil"], {"id": 4, "cuenta_id": 1, "pin": "9876"})
+        self.assertEqual(self.scalar("SELECT pin FROM nube_perfiles WHERE id=4"), "9876")
+
+    def test_51_metricas_cuentan_servicios_reales(self):
+        self.perfil(1, 1, cliente="Ana", cliente_id=1, vencimiento=10)
+        self.perfil(2, 1, cliente="Luis", cliente_id=2, vencimiento=2)
+        self.perfil(3, 1, cliente="Mia", cliente_id=3, vencimiento=-2)
+        self.cuenta(2, modalidad="cuenta_completa", cliente="Carlos", vencimiento=15)
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual(resumen["total"], 4)
+        self.assertEqual(resumen["vendidas"], 4)
+        self.assertEqual(resumen["por_vencer"], 1)
+        self.assertEqual(resumen["vencidas"], 1)
+
+    def test_52_notificada_es_derivada_solo_del_ciclo_activo(self):
+        self.perfil(1, 1, vencimiento=-1)
+        self.notificar()
+        cuenta = database.obtener_cuentas_nube(limite=10)[0]
+        self.assertEqual(cuenta["perfiles"][0]["estado_calculado"], "vencida")
+        self.assertEqual(cuenta["perfiles"][0]["estado_visual"], "notificada")
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual(resumen["vencidas"], 1)
+        self.assertEqual(resumen["notificadas"], 1)
+        servicio = database.obtener_cortes_nube()["pendientes"][0]["servicios"][0]
+        database.cortar_servicios_nube([servicio])
+        perfil = database.obtener_cuentas_nube(limite=10)[0]["perfiles"][0]
+        self.assertEqual(perfil["estado_visual"], "disponible")
+
+    def test_53_caidas_cuentan_madres_no_hijos(self):
+        self.cuenta(1, estado="caida")
+        self.perfil(1, 1)
+        self.perfil(2, 1)
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual(resumen["caidas"], 1)
+        self.assertEqual(resumen["vendidas"], 0)
+
+    def test_54_vencidas_incluye_notificadas_durante_renovacion_y_corte(self):
+        for perfil_id in range(1, 11):
+            self.perfil(
+                perfil_id, 1, cliente=f"Cliente {perfil_id}",
+                telefono=f"300000{perfil_id:04d}", cliente_id=perfil_id
+            )
+
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual((resumen["vencidas"], resumen["notificadas"]), (10, 0))
+
+        for unidad in self.pendientes()[:4]:
+            self.notificar(unidad)
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual((resumen["vencidas"], resumen["notificadas"]), (10, 4))
+
+        for unidad in list(self.pendientes()):
+            self.notificar(unidad)
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual((resumen["vencidas"], resumen["notificadas"]), (10, 10))
+
+        self.execute(
+            "UPDATE nube_perfiles SET fecha_vencimiento=?, estado='activa' WHERE id IN (1, 2)",
+            (self.fecha(30),)
+        )
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual((resumen["vencidas"], resumen["notificadas"]), (8, 8))
+
+        servicios = database.obtener_cortes_nube()["pendientes"][0]["servicios"][:3]
+        self.assertTrue(database.cortar_servicios_nube(servicios)["ok"])
+        resumen = database.obtener_estadisticas_nube()
+        self.assertEqual((resumen["vencidas"], resumen["notificadas"]), (5, 5))
+        self.assertEqual(resumen["disponibles"], 3)
+
 
 if __name__ == "__main__":
     unittest.main()

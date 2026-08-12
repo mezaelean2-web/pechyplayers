@@ -2,6 +2,7 @@ import json
 import os
 import re
 import sqlite3
+from collections import defaultdict
 
 DB = os.environ.get("PECHY_DB", "pechy.db")
 
@@ -923,6 +924,13 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
         CREATE INDEX IF NOT EXISTS
         idx_nube_perfiles_cuenta
         ON nube_perfiles(cuenta_id)
+    """)
+
+    # Evita el B-tree temporal al cargar perfiles agrupados en su orden visual.
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS
+        idx_nube_perfiles_cuenta_orden_id
+        ON nube_perfiles(cuenta_id, orden, id)
     """)
 
 
@@ -3525,17 +3533,15 @@ def preparar_cuenta_nube(fila):
 # NUBE DE CUENTAS — OBTENER CUENTAS
 # ==========================================
 
-def obtener_cuentas_nube(
-    limite=25,
-    offset=0
-):
+def obtener_cuentas_nube(limite=25, offset=0, cuenta_id=None):
 
     conn = conectar()
     cursor = conn.cursor()
 
-
+    filtro_cuenta = " AND id = ?" if cuenta_id is not None else ""
+    parametros = ([cuenta_id] if cuenta_id is not None else []) + [limite, offset]
     cursor.execute(
-        """
+        f"""
         SELECT
 
             id,
@@ -3572,21 +3578,66 @@ def obtener_cuentas_nube(
 
         FROM nube_cuentas
 
-        WHERE COALESCE(estado, '') != 'papelera'
+        WHERE COALESCE(estado, '') != 'papelera'{filtro_cuenta}
 
         ORDER BY id DESC
 
         LIMIT ?
         OFFSET ?
         """,
-        (
-            limite,
-            offset
-        )
+        parametros
     )
 
 
     filas = cursor.fetchall()
+
+    cursor.execute(
+        f"""
+        WITH pagina AS (
+            SELECT id, modalidad
+            FROM nube_cuentas
+            WHERE COALESCE(estado, '') != 'papelera'{filtro_cuenta}
+            ORDER BY id DESC
+            LIMIT ? OFFSET ?
+        )
+        SELECT
+            p.id, p.cuenta_id, p.nombre_perfil, p.pin, p.cliente_id,
+            p.nombre_cliente, p.telefono, p.fecha_entrega, p.dias_cuenta,
+            p.fecha_vencimiento, p.estado, p.garantia_usada,
+            p.cantidad_garantias, p.notas, p.orden, p.fecha_creacion,
+            p.fecha_actualizacion
+        FROM nube_perfiles AS p
+        WHERE p.cuenta_id IN (
+            SELECT id FROM pagina WHERE modalidad = 'perfiles'
+        )
+        ORDER BY p.cuenta_id ASC, p.orden ASC, p.id ASC
+        """,
+        parametros
+    )
+    perfiles_por_cuenta = defaultdict(list)
+    for fila_perfil in cursor.fetchall():
+        perfil = preparar_perfil_nube(fila_perfil)
+        perfiles_por_cuenta[perfil["cuenta_id"]].append(perfil)
+
+    ids_pagina = [int(fila["id"]) for fila in filas]
+    notificaciones_activas = set()
+    if ids_pagina:
+        placeholders = ",".join("?" for _ in ids_pagina)
+        try:
+            cursor.execute(f"""
+                SELECT servicio_tipo, servicio_id, cuenta_id,
+                       fecha_vencimiento_ciclo
+                FROM nube_notificacion_servicios
+                WHERE estado = 'pendiente_corte'
+                  AND cuenta_id IN ({placeholders})
+            """, ids_pagina)
+            notificaciones_activas = {
+                (item["servicio_tipo"], int(item["servicio_id"]),
+                 int(item["cuenta_id"]), item["fecha_vencimiento_ciclo"] or "")
+                for item in cursor.fetchall()
+            }
+        except sqlite3.OperationalError:
+            notificaciones_activas = set()
 
     conn.close()
 
@@ -3609,15 +3660,41 @@ def obtener_cuentas_nube(
             "perfiles"
         ):
 
-            cuenta["perfiles"] = (
-                obtener_perfiles_nube(
-                    cuenta["id"]
+            cuenta["perfiles"] = perfiles_por_cuenta.get(cuenta["id"], [])
+
+            for perfil in cuenta["perfiles"]:
+                perfil["asignacion_operativa"] = es_asignacion_operativa_nube(
+                    perfil.get("nombre_cliente"), perfil.get("fecha_entrega"),
+                    perfil.get("dias_cuenta"), perfil.get("fecha_vencimiento")
+                ) and (perfil.get("estado") or "").lower() not in {
+                    "disponible", "papelera", "reemplazada", "garantia", "caida"
+                } and (cuenta.get("estado") or "").lower() not in {"papelera", "reemplazada", "caida"}
+                perfil["notificacion_activa"] = (
+                    "perfil", int(perfil["id"]), int(cuenta["id"]),
+                    perfil.get("fecha_vencimiento") or ""
+                ) in notificaciones_activas
+                perfil["estado_visual"] = (
+                    "notificada" if perfil.get("estado_calculado") == "vencida"
+                    and perfil["notificacion_activa"] else perfil.get("estado_calculado")
                 )
-            )
 
         else:
 
             cuenta["perfiles"] = []
+
+        cuenta["asignacion_operativa"] = (
+            cuenta.get("modalidad") != "perfiles" and
+            es_asignacion_operativa_nube(
+                cuenta.get("nombre_cliente"), cuenta.get("fecha_entrega"),
+                cuenta.get("dias_cuenta"), cuenta.get("fecha_vencimiento")
+            )
+        ) and (cuenta.get("estado") or "").lower() not in {
+            "disponible", "papelera", "reemplazada", "garantia", "caida"
+        }
+        cuenta["notificacion_activa"] = (
+            "cuenta_completa", int(cuenta["id"]), int(cuenta["id"]),
+            cuenta.get("fecha_vencimiento") or ""
+        ) in notificaciones_activas
 
 
         cuenta[
@@ -3671,6 +3748,10 @@ def obtener_cuentas_nube(
                 ]
             )
         )
+        cuenta["estado_visual"] = (
+            "notificada" if cuenta.get("estado_calculado") == "vencida"
+            and cuenta["notificacion_activa"] else cuenta.get("estado_calculado")
+        )
 
 
         cuentas.append(
@@ -3685,65 +3766,14 @@ def obtener_cuentas_nube(
 # ==========================================
 
 def obtener_estadisticas_nube():
-
-    conn = conectar()
-    cursor = conn.cursor()
-
-
-    cursor.execute("""
-        SELECT
-            c.id,
-            c.fecha_vencimiento,
-            c.estado,
-            c.modalidad,
-            COUNT(p.id) AS perfiles_totales,
-            COALESCE(SUM(
-                CASE
-                    WHEN COALESCE(c.estado, 'disponible') = 'disponible'
-                     AND p.estado = 'disponible'
-                     AND p.cliente_id IS NULL
-                     AND TRIM(COALESCE(p.nombre_cliente, '')) = ''
-                     AND TRIM(COALESCE(p.fecha_entrega, '')) = ''
-                     AND COALESCE(p.dias_cuenta, 0) = 0
-                     AND TRIM(COALESCE(p.fecha_vencimiento, '')) = '' THEN 1
-                    ELSE 0
-                END
-            ), 0) AS perfiles_disponibles
-        FROM nube_cuentas AS c
-        LEFT JOIN nube_perfiles AS p
-            ON p.cuenta_id = c.id
-        WHERE COALESCE(c.estado, '') != 'papelera'
-        GROUP BY c.id
-    """)
-
-    # Consumir el SELECT antes de ejecutar cualquier sentencia auxiliar.
-    filas = cursor.fetchall()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS nube_archivos_asignaciones (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cuenta_id INTEGER NOT NULL,
-            perfil_id INTEGER,
-            tipo_origen TEXT NOT NULL DEFAULT 'perfil',
-            snapshot TEXT NOT NULL,
-            fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY(cuenta_id) REFERENCES nube_cuentas(id) ON DELETE CASCADE
-        )
-    """)
-    cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_nube_archivos_asignaciones_cuenta
-        ON nube_archivos_asignaciones(cuenta_id)
-    """)
-
-
-    conn.close()
-
-
+    cuentas = obtener_cuentas_nube(limite=1000000, offset=0)
     resumen = {
         "total": 0,
         "activas": 0,
+        "vendidas": 0,
         "por_vencer": 0,
         "vencidas": 0,
+        "notificadas": 0,
         "disponibles": 0,
         "caidas": 0,
         "papelera": 0,
@@ -3755,87 +3785,42 @@ def obtener_estadisticas_nube():
     }
 
 
-    for fila in filas:
-
-        resumen["total"] += 1
-
-
-        estado_actual = (
-            fila["estado"] or
-            "disponible"
-        )
-
-
-        fecha_vencimiento = (
-            fila["fecha_vencimiento"] or
-            ""
-        )
-
-
-        perfiles_totales = (
-            fila["perfiles_totales"] or 0
-        )
-
-        perfiles_disponibles = (
-            fila["perfiles_disponibles"] or 0
-        )
-
-        if (fila["modalidad"] or "cuenta_completa") == "perfiles":
-            resumen["perfiles_disponibles"] += perfiles_disponibles
-            if perfiles_disponibles > 0:
-                resumen["cuentas_madre_disponibles"] += 1
-        elif estado_actual == "disponible":
-            resumen["cuentas_completas_disponibles"] += 1
-
-        estado = calcular_estado_efectivo_cuenta_nube(
-            fecha_vencimiento=fecha_vencimiento,
-            estado_actual=estado_actual,
-            modalidad=fila["modalidad"] or "cuenta_completa",
-            perfiles_disponibles=perfiles_disponibles,
-            perfiles_ocupados=(
-                perfiles_totales - perfiles_disponibles
+    for cuenta in cuentas:
+        if cuenta.get("modalidad") == "perfiles":
+            servicios = cuenta.get("perfiles") or []
+            resumen["total"] += len(servicios)
+            disponibles = sum(
+                perfil.get("estado_calculado") == "disponible"
+                and not perfil.get("asignacion_operativa")
+                and cuenta.get("estado_calculado") != "caida"
+                for perfil in servicios
             )
-        )
+            resumen["perfiles_disponibles"] += disponibles
+            if disponibles:
+                resumen["cuentas_madre_disponibles"] += 1
+        else:
+            servicios = [cuenta]
+            resumen["total"] += 1
+            if cuenta.get("estado_calculado") == "disponible" and not cuenta.get("asignacion_operativa"):
+                resumen["cuentas_completas_disponibles"] += 1
 
-
-        if estado == "activa":
-
-            resumen["activas"] += 1
-
-
-        elif estado == "por_vencer":
-
-            resumen["por_vencer"] += 1
-
-
-        elif estado == "vencida":
-
-            resumen["vencidas"] += 1
-
-
-        elif estado == "disponible":
-
-            resumen["disponibles"] += 1
-
-
-        elif estado == "caida":
-
+        if cuenta.get("estado_calculado") == "caida":
             resumen["caidas"] += 1
+        for servicio in servicios:
+            if not servicio.get("asignacion_operativa"):
+                continue
+            resumen["vendidas"] += 1
+            resumen["activas"] += 1
+            if servicio.get("estado_calculado") == "por_vencer":
+                resumen["por_vencer"] += 1
+            if servicio.get("estado_calculado") == "vencida":
+                resumen["vencidas"] += 1
+            if servicio.get("notificacion_activa"):
+                resumen["notificadas"] += 1
 
-
-        elif estado == "papelera":
-
-            resumen["papelera"] += 1
-
-
-        elif estado == "garantia":
-
-            resumen["garantia"] += 1
-
-
-        elif estado == "reemplazada":
-
-            resumen["reemplazadas"] += 1
+    resumen["disponibles"] = (
+        resumen["perfiles_disponibles"] + resumen["cuentas_completas_disponibles"]
+    )
 
 
     resumen[
@@ -4440,10 +4425,19 @@ def _asegurar_notificaciones_renovacion_nube(cursor):
         )
     """)
     cursor.execute("""
+        SELECT sql FROM sqlite_master
+        WHERE type = 'index' AND name = 'idx_nube_notif_servicio_ciclo'
+    """)
+    indice_ciclo = cursor.fetchone()
+    sql_indice_ciclo = " ".join(str(indice_ciclo["sql"] or "").lower().split()) if indice_ciclo else ""
+    if indice_ciclo and "where estado = 'pendiente_corte'" not in sql_indice_ciclo:
+        cursor.execute("DROP INDEX idx_nube_notif_servicio_ciclo")
+    cursor.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS idx_nube_notif_servicio_ciclo
         ON nube_notificacion_servicios(
             servicio_tipo, servicio_id, fecha_vencimiento_ciclo
         )
+        WHERE estado = 'pendiente_corte'
     """)
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_nube_notif_servicios_notificacion
@@ -4650,6 +4644,7 @@ def _servicios_no_notificados_nube(cursor):
             SELECT 1 FROM nube_notificacion_servicios
             WHERE servicio_tipo = ? AND servicio_id = ?
               AND fecha_vencimiento_ciclo = ?
+              AND estado = 'pendiente_corte'
             LIMIT 1
         """, (servicio["servicio_tipo"], servicio["servicio_id"], servicio["fecha_vencimiento"]))
         if not cursor.fetchone():
@@ -5009,6 +5004,8 @@ def actualizar_credenciales_cuenta_corte_nube(cuenta_id, correo=None, contrasena
                 fecha_actualizacion = CURRENT_TIMESTAMP
             WHERE id = ?
         """, (correo, contrasena, pin_final, cuenta_id))
+        if cursor.rowcount != 1:
+            raise RuntimeError("La cuenta cambio durante la actualizacion de credenciales.")
         cursor.execute("""
             INSERT INTO nube_movimientos (
                 cuenta_id, tipo, descripcion, estado_anterior,
@@ -5018,16 +5015,17 @@ def actualizar_credenciales_cuenta_corte_nube(cuenta_id, correo=None, contrasena
             cuenta_id,
             "Credenciales de cuenta madre actualizadas desde Cortes"
         ))
+        cursor.execute("""
+            SELECT id, correo, contrasena, pin
+            FROM nube_cuentas
+            WHERE id = ?
+        """, (cuenta_id,))
+        persistida = dict(cursor.fetchone())
         conn.commit()
         return {
             "ok": True,
             "mensaje": "Datos de la cuenta actualizados.",
-            "cuenta": {
-                "id": cuenta_id,
-                "correo": correo,
-                "contrasena": contrasena,
-                "pin": pin_final
-            }
+            "cuenta": persistida
         }
     except Exception:
         conn.rollback()
@@ -5063,6 +5061,8 @@ def actualizar_pin_perfil_corte_nube(cuenta_id, perfil_id, pin=None):
             SET pin = ?, fecha_actualizacion = CURRENT_TIMESTAMP
             WHERE id = ? AND cuenta_id = ?
         """, (pin, perfil_id, cuenta_id))
+        if cursor.rowcount != 1:
+            raise RuntimeError("El perfil cambio durante la actualizacion del PIN.")
         cursor.execute("""
             INSERT INTO nube_movimientos (
                 cuenta_id, tipo, descripcion, estado_anterior,
@@ -5072,8 +5072,14 @@ def actualizar_pin_perfil_corte_nube(cuenta_id, perfil_id, pin=None):
             cuenta_id,
             f"PIN de perfil actualizado desde Cortes ({perfil['nombre_perfil'] or 'Perfil'})"
         ))
+        cursor.execute("""
+            SELECT id, cuenta_id, pin
+            FROM nube_perfiles
+            WHERE id = ? AND cuenta_id = ?
+        """, (perfil_id, cuenta_id))
+        persistido = dict(cursor.fetchone())
         conn.commit()
-        return {"ok": True, "mensaje": "PIN del perfil actualizado.", "perfil": {"id": perfil_id, "cuenta_id": cuenta_id, "pin": pin}}
+        return {"ok": True, "mensaje": "PIN del perfil actualizado.", "perfil": persistido}
     except Exception:
         conn.rollback()
         raise
@@ -5801,6 +5807,21 @@ def generar_perfiles_nube(
 # NUBE DE CUENTAS — OBTENER PERFILES
 # ==========================================
 
+def preparar_perfil_nube(fila):
+    """Conserva en un solo lugar los campos calculados de un perfil."""
+    perfil = dict(fila)
+    fecha_vencimiento = perfil.get("fecha_vencimiento") or ""
+    estado_actual = perfil.get("estado") or "disponible"
+    dias_restantes = calcular_dias_restantes(fecha_vencimiento) if fecha_vencimiento else 0
+    if estado_actual in {"activa", "por_vencer", "vencida"}:
+        estado_calculado = calcular_estado_nube(fecha_vencimiento, estado_actual)
+    else:
+        estado_calculado = estado_actual
+    perfil["dias_restantes"] = dias_restantes
+    perfil["estado_calculado"] = estado_calculado
+    return perfil
+
+
 def obtener_perfiles_nube(
     cuenta_id
 ):
@@ -5850,77 +5871,7 @@ def obtener_perfiles_nube(
     conn.close()
 
 
-    perfiles = []
-
-
-    for fila in filas:
-
-        perfil = dict(
-            fila
-        )
-
-
-        fecha_vencimiento = (
-            perfil.get(
-                "fecha_vencimiento"
-            ) or ""
-        )
-
-
-        estado_actual = (
-            perfil.get(
-                "estado"
-            ) or "disponible"
-        )
-
-
-        dias_restantes = 0
-
-
-        if fecha_vencimiento:
-
-            dias_restantes = (
-                calcular_dias_restantes(
-                    fecha_vencimiento
-                )
-            )
-
-
-        if estado_actual in {
-            "activa",
-            "por_vencer",
-            "vencida"
-        }:
-
-            estado_calculado = (
-                calcular_estado_nube(
-                    fecha_vencimiento,
-                    estado_actual
-                )
-            )
-
-        else:
-
-            estado_calculado = (
-                estado_actual
-            )
-
-
-        perfil[
-            "dias_restantes"
-        ] = dias_restantes
-
-        perfil[
-            "estado_calculado"
-        ] = estado_calculado
-
-
-        perfiles.append(
-            perfil
-        )
-
-
-    return perfiles
+    return [preparar_perfil_nube(fila) for fila in filas]
 
 # ==========================================
 # NUBE — CALCULAR DÍAS DE UN PIN

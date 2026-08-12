@@ -969,6 +969,27 @@ def obtener_detalle_drawer_nube_route(cuenta_id):
     return jsonify({"ok": True, **detalle})
 
 
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/resumen", methods=["GET"])
+def obtener_resumen_cuenta_nube_route(cuenta_id):
+    """Devuelve solamente las filas renderizadas de una cuenta y sus perfiles."""
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    cuentas = obtener_cuentas_nube(limite=1, offset=0, cuenta_id=cuenta_id)
+    if not cuentas:
+        return jsonify({"ok": False, "mensaje": "Cuenta no encontrada"}), 404
+    pagina = render_template(
+        "admin/nube_cuentas.html",
+        cuentas=cuentas,
+        estadisticas=defaultdict(int),
+        plataformas=[],
+        tipos_cuenta=[]
+    )
+    cuerpo = re.search(r"<tbody>(.*?)</tbody>", pagina, flags=re.DOTALL)
+    if not cuerpo:
+        return jsonify({"ok": False, "mensaje": "No se pudo renderizar la cuenta"}), 500
+    return jsonify({"ok": True, "cuenta_id": cuenta_id, "html": cuerpo.group(1).strip()})
+
+
 @app.route("/admin/nube-cuentas/<int:cuenta_id>/notas", methods=["POST"])
 def actualizar_notas_cuenta_nube_route(cuenta_id):
     if not session.get("admin"):
