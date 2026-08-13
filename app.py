@@ -3,6 +3,7 @@ import sqlite3
 from flask_compress import Compress
 import os
 import re
+import secrets
 from io import BytesIO
 from openpyxl import Workbook
 from werkzeug.utils import secure_filename
@@ -12,7 +13,7 @@ from configuracion_centro import (MODULOS as MODULOS_CONFIGURACION, estado_gener
     restaurar_modulo as restaurar_modulo_configuracion, restaurar_todo as restaurar_todo_configuracion,
     publicar as publicar_configuracion, configuracion_efectiva, auditoria as auditoria_configuracion)
 import database
-from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
+from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
 from collections import OrderedDict
@@ -73,6 +74,74 @@ def guardar_imagen_optimizada(imagen_file):
 
 PROMO_FOLDER = "static/img/promociones"
 os.makedirs(PROMO_FOLDER, exist_ok=True)
+
+FORMATOS_PROMOCION = {"PNG", "JPEG", "WEBP"}
+
+
+def guardar_imagen_promocion(imagen_file):
+    if not imagen_file or not imagen_file.filename:
+        return None
+    try:
+        imagen = Image.open(imagen_file.stream)
+        imagen.verify()
+        formato = (imagen.format or "").upper()
+    except Exception as error:
+        raise ValueError("El archivo de promoción no es una imagen válida.") from error
+    if formato not in FORMATOS_PROMOCION:
+        raise ValueError("Formato no permitido. Usa PNG, JPG o WEBP.")
+
+    imagen_file.stream.seek(0)
+    imagen = Image.open(imagen_file.stream)
+    if imagen.width > 6000 or imagen.height > 6000:
+        raise ValueError("La imagen supera las dimensiones máximas permitidas.")
+    if imagen.mode not in {"RGB", "RGBA"}:
+        imagen = imagen.convert("RGBA" if "A" in imagen.getbands() else "RGB")
+    if imagen.width > 2400:
+        alto = round(imagen.height * 2400 / imagen.width)
+        imagen = imagen.resize((2400, alto), Image.LANCZOS)
+
+    nombre = f"promo_{secrets.token_hex(16)}.webp"
+    imagen.save(os.path.join(PROMO_FOLDER, nombre), "WEBP", quality=88, optimize=True)
+    return nombre
+
+
+def eliminar_imagen_promocion_si_huerfana(nombre, excluir_id=None):
+    nombre = os.path.basename(nombre or "")
+    if not nombre:
+        return
+    conn = conectar()
+    cursor = conn.cursor()
+    consulta = """
+        SELECT 1 FROM promociones
+        WHERE (imagen = ? OR imagen_desktop = ?)
+    """
+    parametros = [nombre, nombre]
+    if excluir_id is not None:
+        consulta += " AND id != ?"
+        parametros.append(excluir_id)
+    existe = cursor.execute(consulta, parametros).fetchone()
+    conn.close()
+    if existe:
+        return
+    ruta = os.path.abspath(os.path.join(PROMO_FOLDER, nombre))
+    carpeta = os.path.abspath(PROMO_FOLDER)
+    if os.path.commonpath([ruta, carpeta]) == carpeta and os.path.isfile(ruta):
+        os.remove(ruta)
+
+
+def resolver_variantes_promociones(promociones):
+    resueltas = []
+    for promo in promociones:
+        mobile = os.path.basename(promo[1] or "")
+        desktop = os.path.basename(promo[3] or "")
+        mobile_valida = mobile and os.path.isfile(os.path.join(PROMO_FOLDER, mobile))
+        desktop_valida = desktop and os.path.isfile(os.path.join(PROMO_FOLDER, desktop))
+        if not mobile_valida and not desktop_valida:
+            continue
+        mobile_efectiva = mobile if mobile_valida else desktop
+        desktop_efectiva = desktop if desktop_valida else mobile_efectiva
+        resueltas.append((promo[0], mobile_efectiva, promo[2], desktop_efectiva))
+    return resueltas
 
 def guardar_poster_cartelera(imagen_file):
 
@@ -168,22 +237,28 @@ def inicio():
 
     promociones = [
         promo
-        for promo in obtener_promociones()
+        for promo in resolver_variantes_promociones(obtener_promociones())
         if promo[2] == 1
     ]
 
     peliculas = [
         pelicula
         for pelicula in obtener_cartelera()
-        if pelicula.get("publicado", 0) == 1
+        if (
+            pelicula.get("publicado", 0) == 1
+            and pelicula.get("categoria_activa") == 1
+            and pelicula.get("categoria_clave")
+        )
     ]
+
+    categorias_cartelera = obtener_categorias_cartelera(solo_activas=True)
 
     peliculas_por_categoria = OrderedDict()
 
     for pelicula in peliculas:
 
         categoria = (
-            pelicula.get("categoria") or "Otros"
+            pelicula.get("categoria_clave")
         ).strip()
 
         if categoria not in peliculas_por_categoria:
@@ -211,7 +286,8 @@ def inicio():
         config=config,
         promociones=promociones,
         peliculas=peliculas_ordenadas,
-        peliculas_por_categoria=peliculas_por_categoria
+        peliculas_por_categoria=peliculas_por_categoria,
+        categorias_cartelera=categorias_cartelera
     )
 
 @app.route("/pechy-panel-seguro", methods=["GET", "POST"])
@@ -338,7 +414,7 @@ def actualizar_precio():
 
     flash("Precio actualizado correctamente ✅")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/admin/productos")
 def admin_productos():
@@ -362,7 +438,7 @@ def admin_configuracion():
         return redirect("/pechy-panel-seguro")
 
     config = obtener_config()
-    centro = estado_configuracion()
+    centro = estado_configuracion(_tenant_configuracion())
 
     return render_template(
         "admin/configuracion.html",
@@ -375,11 +451,16 @@ def _usuario_configuracion():
     return str(session.get("admin_usuario") or "admin")[:80]
 
 
+def _tenant_configuracion():
+    tenant = str(session.get("tenant_id") or "default")[:80]
+    return tenant if re.fullmatch(r"[A-Za-z0-9_-]+", tenant) else "default"
+
+
 @app.route("/admin/configuracion/api", methods=["GET"])
 def configuracion_api_estado():
     if not session.get("admin"):
         return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
-    return jsonify({"ok": True, **estado_configuracion()})
+    return jsonify({"ok": True, **estado_configuracion(_tenant_configuracion())})
 
 
 @app.route("/admin/configuracion/api/<modulo>", methods=["GET", "PATCH"])
@@ -391,9 +472,9 @@ def configuracion_api_modulo(modulo):
     try:
         if request.method == "PATCH":
             datos = (request.get_json(silent=True) or {}).get("datos", {})
-            resultado = guardar_borrador_configuracion(modulo, datos, usuario=_usuario_configuracion())
+            resultado = guardar_borrador_configuracion(modulo, datos, tenant=_tenant_configuracion(), usuario=_usuario_configuracion())
         else:
-            resultado = obtener_modulo_configuracion(modulo)
+            resultado = obtener_modulo_configuracion(modulo, _tenant_configuracion())
         return jsonify({"ok": True, **resultado})
     except ValueError as error:
         return jsonify({"ok": False, "mensaje": str(error)}), 400
@@ -405,7 +486,7 @@ def configuracion_api_restaurar_modulo(modulo):
         return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
     if modulo not in MODULOS_CONFIGURACION:
         return jsonify({"ok": False, "mensaje": "Módulo desconocido."}), 404
-    resultado = restaurar_modulo_configuracion(modulo, usuario=_usuario_configuracion())
+    resultado = restaurar_modulo_configuracion(modulo, tenant=_tenant_configuracion(), usuario=_usuario_configuracion())
     return jsonify({"ok": True, **resultado})
 
 
@@ -416,23 +497,23 @@ def configuracion_api_restaurar_todo():
     confirmacion = (request.get_json(silent=True) or {}).get("confirmacion")
     if confirmacion != "RESTAURAR TODO":
         return jsonify({"ok": False, "mensaje": "Confirmación inválida."}), 400
-    restaurar_todo_configuracion(usuario=_usuario_configuracion())
-    return jsonify({"ok": True, **estado_configuracion()})
+    restaurar_todo_configuracion(tenant=_tenant_configuracion(), usuario=_usuario_configuracion())
+    return jsonify({"ok": True, **estado_configuracion(_tenant_configuracion())})
 
 
 @app.route("/admin/configuracion/api/publicar", methods=["POST"])
 def configuracion_api_publicar():
     if not session.get("admin"):
         return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
-    publicar_configuracion(usuario=_usuario_configuracion())
-    return jsonify({"ok": True, **estado_configuracion()})
+    publicar_configuracion(tenant=_tenant_configuracion(), usuario=_usuario_configuracion())
+    return jsonify({"ok": True, **estado_configuracion(_tenant_configuracion())})
 
 
 @app.route("/admin/configuracion/api/auditoria", methods=["GET"])
 def configuracion_api_auditoria():
     if not session.get("admin"):
         return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
-    return jsonify({"ok": True, "eventos": auditoria_configuracion(
+    return jsonify({"ok": True, "eventos": auditoria_configuracion(tenant=_tenant_configuracion(),
         modulo=request.args.get("modulo", ""), accion=request.args.get("accion", "")
     )})
 
@@ -441,7 +522,7 @@ def configuracion_api_auditoria():
 def configuracion_preview():
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
-    return render_template("admin/configuracion_preview.html", config=configuracion_efectiva(borrador=True))
+    return render_template("admin/configuracion_preview.html", config=configuracion_efectiva(tenant=_tenant_configuracion(), borrador=True))
 
 
 @app.route("/admin/configuracion/api/upload", methods=["POST"])
@@ -465,11 +546,12 @@ def configuracion_api_upload():
     if imagen.width > 4000 or imagen.height > 4000:
         return jsonify({"ok": False, "mensaje": "Dimensiones máximas: 4000 × 4000."}), 400
     import secrets
-    carpeta = os.path.join(app.static_folder, "uploads", "configuracion", "default")
+    tenant = _tenant_configuracion()
+    carpeta = os.path.join(app.static_folder, "uploads", "configuracion", tenant)
     os.makedirs(carpeta, exist_ok=True)
     nombre = secrets.token_hex(16) + extensiones[formato]
     imagen.save(os.path.join(carpeta, nombre), formato=formato)
-    return jsonify({"ok": True, "url": f"/static/uploads/configuracion/default/{nombre}"})
+    return jsonify({"ok": True, "url": f"/static/uploads/configuracion/{tenant}/{nombre}"})
 
 
 
@@ -1829,6 +1911,24 @@ def admin_cartelera():
         return redirect("/pechy-panel-seguro")
 
     peliculas = obtener_cartelera()
+    categorias_cartelera = obtener_categorias_cartelera(solo_activas=True)
+    categorias_ids = {
+        categoria["id"]
+        for categoria in categorias_cartelera
+    }
+    for pelicula in peliculas:
+        categoria_id_actual = pelicula.get("categoria_id")
+        if not categoria_id_actual or categoria_id_actual in categorias_ids:
+            continue
+        categoria_actual = obtener_categoria_cartelera_por_id(
+            categoria_id_actual
+        )
+        if categoria_actual:
+            categorias_cartelera.append(categoria_actual)
+            categorias_ids.add(categoria_id_actual)
+    categorias_cartelera.sort(
+        key=lambda categoria: (categoria["orden"], categoria["id"])
+    )
     productos = obtener_productos()
 
     plataformas = []
@@ -1861,8 +1961,101 @@ def admin_cartelera():
     return render_template(
         "admin/cartelera.html",
         peliculas=peliculas,
-        plataformas=plataformas
+        plataformas=plataformas,
+        categorias_cartelera=categorias_cartelera
     )
+
+
+@app.route("/admin/cartelera/categorias")
+def admin_cartelera_categorias():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    return render_template(
+        "admin/cartelera_categorias.html",
+        categorias_cartelera=database.obtener_categorias_cartelera_con_conteo(),
+    )
+
+
+def _error_categoria_cartelera(error):
+    if isinstance(error, LookupError):
+        return jsonify({"ok": False, "mensaje": str(error)}), 404
+    if isinstance(error, RuntimeError):
+        return jsonify({"ok": False, "mensaje": str(error)}), 409
+    if isinstance(error, (ValueError, sqlite3.IntegrityError)):
+        mensaje = str(error) if isinstance(error, ValueError) else (
+            "Ya existe una categoría con la misma clave canónica."
+        )
+        return jsonify({"ok": False, "mensaje": mensaje}), 400
+    return jsonify({"ok": False, "mensaje": "No se pudo completar la operación."}), 500
+
+
+@app.route("/admin/cartelera/categorias", methods=["POST"])
+def crear_categoria_cartelera_admin():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    datos = request.get_json(silent=True) or {}
+    try:
+        categoria = database.crear_categoria_cartelera(datos.get("nombre"))
+        return jsonify({"ok": True, "categoria": categoria}), 201
+    except Exception as error:
+        return _error_categoria_cartelera(error)
+
+
+@app.route("/admin/cartelera/categorias/<int:categoria_id>", methods=["PATCH"])
+def renombrar_categoria_cartelera_admin(categoria_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    datos = request.get_json(silent=True) or {}
+    try:
+        categoria = database.renombrar_categoria_cartelera(
+            categoria_id, datos.get("nombre")
+        )
+        return jsonify({"ok": True, "categoria": categoria})
+    except Exception as error:
+        return _error_categoria_cartelera(error)
+
+
+@app.route(
+    "/admin/cartelera/categorias/<int:categoria_id>/estado",
+    methods=["PATCH"],
+)
+def estado_categoria_cartelera_admin(categoria_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    datos = request.get_json(silent=True) or {}
+    try:
+        categoria = database.establecer_categoria_cartelera_activa(
+            categoria_id, datos.get("activa")
+        )
+        return jsonify({"ok": True, "categoria": categoria})
+    except Exception as error:
+        return _error_categoria_cartelera(error)
+
+
+@app.route("/admin/cartelera/categorias/orden", methods=["PUT"])
+def ordenar_categorias_cartelera_admin():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    datos = request.get_json(silent=True) or {}
+    try:
+        database.reordenar_categorias_cartelera(datos.get("orden"))
+        return jsonify({"ok": True, "mensaje": "Orden guardado."})
+    except Exception as error:
+        return _error_categoria_cartelera(error)
+
+
+@app.route(
+    "/admin/cartelera/categorias/<int:categoria_id>",
+    methods=["DELETE"],
+)
+def eliminar_categoria_cartelera_admin(categoria_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado."}), 401
+    try:
+        nombre = database.eliminar_categoria_cartelera_si_vacia(categoria_id)
+        return jsonify({"ok": True, "mensaje": f"Categoría {nombre} eliminada."})
+    except Exception as error:
+        return _error_categoria_cartelera(error)
 
 @app.route("/admin/cartelera/guardar", methods=["POST"])
 def guardar_cartelera():
@@ -1873,7 +2066,7 @@ def guardar_cartelera():
     tipo = request.form.get("tipo", "").strip()
     titulo = request.form.get("titulo", "").strip()
     genero = request.form.get("genero", "").strip()
-    categoria = request.form.get("categoria", "").strip()
+    categoria_id_recibida = request.form.get("categoria_id", "").strip()
     anio = request.form.get("anio", "").strip()
     descripcion = request.form.get("descripcion", "").strip()
     url = request.form.get("url", "").strip()
@@ -1896,6 +2089,36 @@ def guardar_cartelera():
     if not plataformas:
         flash("Selecciona al menos una plataforma ❌")
         return redirect("/admin/cartelera")
+
+    try:
+        categoria_id = int(categoria_id_recibida)
+    except (TypeError, ValueError):
+        flash("Selecciona una categoría válida ❌")
+        return redirect("/admin/cartelera")
+
+    categoria_seleccionada = obtener_categoria_cartelera_por_id(categoria_id)
+    if not categoria_seleccionada:
+        flash("La categoría seleccionada no existe ❌")
+        return redirect("/admin/cartelera")
+
+    if not categoria_seleccionada["activa"]:
+        if not pelicula_id:
+            flash("La categoría seleccionada está inactiva ❌")
+            return redirect("/admin/cartelera")
+
+        conexion_validacion = conectar()
+        pelicula_validacion = conexion_validacion.execute(
+            "SELECT categoria_id FROM cartelera WHERE id = ?",
+            (pelicula_id,)
+        ).fetchone()
+        conexion_validacion.close()
+
+        if (
+            not pelicula_validacion
+            or pelicula_validacion["categoria_id"] != categoria_id
+        ):
+            flash("La categoría seleccionada está inactiva ❌")
+            return redirect("/admin/cartelera")
 
     nombre_poster = ""
     nombre_banner = ""
@@ -1926,13 +2149,13 @@ def guardar_cartelera():
 
     try:
 
-        print("CATEGORIA:", categoria)
+        print("CATEGORIA:", categoria_seleccionada["nombre"])
 
         if pelicula_id:
 
             cursor.execute(
                 """
-                SELECT poster, banner
+                SELECT poster, banner, categoria_id
                 FROM cartelera
                 WHERE id = ?
                 """,
@@ -1948,6 +2171,15 @@ def guardar_cartelera():
 
             poster_actual = pelicula_actual[0] or ""
             banner_actual = pelicula_actual[1] or ""
+            categoria_id_actual = pelicula_actual[2]
+
+            if (
+                not categoria_seleccionada["activa"]
+                and categoria_id != categoria_id_actual
+            ):
+                raise ValueError(
+                    "La categoría seleccionada está inactiva."
+                )
 
             if nombre_poster:
                 poster_final = nombre_poster
@@ -1967,6 +2199,7 @@ def guardar_cartelera():
                     titulo = ?,
                     genero = ?,
                     categoria = ?,
+                    categoria_id = ?,
                     descripcion = ?,
                     anio = ?,
                     url = ?,
@@ -1981,7 +2214,8 @@ def guardar_cartelera():
                     tipo,
                     titulo,
                     genero,
-                    categoria,
+                    categoria_seleccionada["nombre"],
+                    categoria_id,
                     descripcion,
                     int(anio) if anio else None,
                     url,
@@ -2022,6 +2256,11 @@ def guardar_cartelera():
 
         else:
 
+            if not categoria_seleccionada["activa"]:
+                raise ValueError(
+                    "La categoría seleccionada está inactiva."
+                )
+
             cursor.execute(
                 """
                 INSERT INTO cartelera (
@@ -2029,6 +2268,7 @@ def guardar_cartelera():
                     titulo,
                     genero,
                     categoria,
+                    categoria_id,
                     descripcion,
                     anio,
                     url,
@@ -2038,13 +2278,14 @@ def guardar_cartelera():
                     destacado,
                     publicado
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     tipo,
                     titulo,
                     genero,
-                    categoria,
+                    categoria_seleccionada["nombre"],
+                    categoria_id,
                     descripcion,
                     int(anio) if anio else None,
                     url,
@@ -2674,7 +2915,7 @@ def agregar_producto():
     
     flash("Producto agregado correctamente ✅")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/eliminar-plan", methods=["POST"])
 def eliminar_plan():
@@ -2691,7 +2932,7 @@ def eliminar_plan():
     
     flash("Plan eliminado correctamente 🗑️")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/editar-producto", methods=["POST"])
 def editar_producto():
@@ -2723,7 +2964,7 @@ def editar_producto():
 
     flash("Producto actualizado correctamente ✏️")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-oferta", methods=["POST"])
 def actualizar_oferta():
@@ -2747,7 +2988,7 @@ def actualizar_oferta():
 
     flash("Oferta guardada correctamente 🔥")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-categoria", methods=["POST"])
 def actualizar_categoria():
@@ -2766,7 +3007,7 @@ def actualizar_categoria():
 
     if categoria not in categorias_validas:
         flash("Categoría no válida ❌")
-        return redirect("/admin#productos")
+        return redirect("/admin/productos#productos")
 
     conn = conectar()
     cursor = conn.cursor()
@@ -2789,7 +3030,7 @@ def actualizar_categoria():
 
     flash("Categoría actualizada correctamente ✅")
 
-    return redirect("/admin#productos")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-destacado", methods=["POST"])
 def actualizar_destacado():
@@ -2810,7 +3051,7 @@ def actualizar_destacado():
 
     flash("Destacado actualizado correctamente ⭐")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-visible", methods=["POST"])
 def actualizar_visible():
@@ -2831,7 +3072,7 @@ def actualizar_visible():
 
     flash("Visibilidad actualizada correctamente 👁️")
 
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-estado", methods=["POST"])
 def actualizar_estado():
@@ -2849,7 +3090,7 @@ def actualizar_estado():
 
     if not nombre:
         flash("No se pudo actualizar el producto ❌")
-        return redirect("/admin/productos")
+        return redirect("/admin/productos#productos")
 
     conn = conectar()
     cursor = conn.cursor()
@@ -2877,7 +3118,7 @@ def actualizar_estado():
         )
         flash(f"{nombre} ahora está agotado 🔴")
 
-    return redirect("/admin/productos")
+    return redirect("/admin/productos#productos")
 
 @app.route("/actualizar-config", methods=["POST"])
 def actualizar_configuracion():
@@ -3590,7 +3831,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     conn.close()
 
     flash("Producto duplicado correctamente 📄")
-    return redirect("/admin")
+    return redirect("/admin/productos#productos")
 
 @app.route("/guardar-orden", methods=["POST"])
 def guardar_orden():
@@ -3811,21 +4052,36 @@ def actualizar_db():
 def agregar_promocion():
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
+    if request.content_length and request.content_length > 16 * 1024 * 1024:
+        flash("Las imágenes de la promoción superan el tamaño máximo permitido.")
+        return redirect("/admin/promociones")
 
-    imagen_file = request.files["imagen"]
+    imagen_file = request.files.get("imagen")
+    imagen_desktop_file = request.files.get("imagen_desktop")
     activa = 1 if request.form.get("activa") == "on" else 0
 
-    filename = secure_filename(imagen_file.filename)
-    imagen_path = os.path.join(PROMO_FOLDER, filename)
-    imagen_file.save(imagen_path)
+    if not imagen_file or not imagen_file.filename:
+        flash("Selecciona una imagen móvil para crear la promoción.")
+        return redirect("/admin/promociones")
+
+    filename = None
+    filename_desktop = None
+    try:
+        filename = guardar_imagen_promocion(imagen_file)
+        filename_desktop = guardar_imagen_promocion(imagen_desktop_file)
+    except ValueError as error:
+        eliminar_imagen_promocion_si_huerfana(filename)
+        eliminar_imagen_promocion_si_huerfana(filename_desktop)
+        flash(str(error))
+        return redirect("/admin/promociones")
 
     conn = conectar()
     cursor = conn.cursor()
 
     cursor.execute("""
-        INSERT INTO promociones (imagen, activa)
-        VALUES (?, ?)
-    """, (filename, activa))
+        INSERT INTO promociones (imagen, imagen_desktop, activa)
+        VALUES (?, ?, ?)
+    """, (filename, filename_desktop, activa))
 
     conn.commit()
     conn.close()
@@ -3838,6 +4094,9 @@ def actualizar_promocion():
 
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
+    if request.content_length and request.content_length > 16 * 1024 * 1024:
+        flash("Las imágenes de la promoción superan el tamaño máximo permitido.")
+        return redirect("/admin/promociones")
 
     promo_id = request.form.get("id")
 
@@ -3848,44 +4107,59 @@ def actualizar_promocion():
     activa = 1 if request.form.get("activa") == "on" else 0
 
     imagen_file = request.files.get("imagen")
+    imagen_desktop_file = request.files.get("imagen_desktop")
+    eliminar_imagen = request.form.get("eliminar_imagen") == "1"
+    eliminar_imagen_desktop = request.form.get("eliminar_imagen_desktop") == "1"
 
     conn = conectar()
     cursor = conn.cursor()
 
-    if imagen_file and imagen_file.filename:
+    fila_anterior = cursor.execute(
+        "SELECT imagen, imagen_desktop FROM promociones WHERE id = ?",
+        (promo_id,)
+    ).fetchone()
+    if not fila_anterior:
+        conn.close()
+        flash("La promoción seleccionada ya no existe.")
+        return redirect("/admin/promociones")
 
-        filename = secure_filename(imagen_file.filename)
-
-        imagen_path = os.path.join(
-            PROMO_FOLDER,
-            filename
+    filename = fila_anterior[0]
+    filename_desktop = fila_anterior[1]
+    try:
+        filename = (
+            guardar_imagen_promocion(imagen_file)
+            if imagen_file and imagen_file.filename
+            else "" if eliminar_imagen
+            else fila_anterior[0]
         )
+        filename_desktop = (
+            guardar_imagen_promocion(imagen_desktop_file)
+            if imagen_desktop_file and imagen_desktop_file.filename
+            else None if eliminar_imagen_desktop
+            else fila_anterior[1]
+        )
+    except ValueError as error:
+        conn.close()
+        if filename != fila_anterior[0]:
+            eliminar_imagen_promocion_si_huerfana(filename)
+        if filename_desktop != fila_anterior[1]:
+            eliminar_imagen_promocion_si_huerfana(filename_desktop)
+        flash(str(error))
+        return redirect("/admin/promociones")
 
-        imagen_file.save(imagen_path)
-
-        cursor.execute("""
-            UPDATE promociones
-            SET imagen = ?, activa = ?
-            WHERE id = ?
-        """, (
-            filename,
-            activa,
-            promo_id
-        ))
-
-    else:
-
-        cursor.execute("""
-            UPDATE promociones
-            SET activa = ?
-            WHERE id = ?
-        """, (
-            activa,
-            promo_id
-        ))
+    cursor.execute("""
+        UPDATE promociones
+        SET imagen = ?, imagen_desktop = ?, activa = ?
+        WHERE id = ?
+    """, (filename, filename_desktop, activa, promo_id))
 
     conn.commit()
     conn.close()
+
+    if filename != fila_anterior[0]:
+        eliminar_imagen_promocion_si_huerfana(fila_anterior[0])
+    if filename_desktop != fila_anterior[1]:
+        eliminar_imagen_promocion_si_huerfana(fila_anterior[1])
 
     flash("Promoción actualizada correctamente 🔥")
 
@@ -3902,7 +4176,7 @@ def eliminar_promocion():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT imagen FROM promociones WHERE id = ?",
+        "SELECT imagen, imagen_desktop FROM promociones WHERE id = ?",
         (promo_id,)
     )
     fila = cursor.fetchone()
@@ -3916,10 +4190,8 @@ def eliminar_promocion():
     conn.close()
 
     if fila:
-        ruta_imagen = os.path.join(PROMO_FOLDER, fila[0])
-
-        if os.path.exists(ruta_imagen):
-            os.remove(ruta_imagen)
+        eliminar_imagen_promocion_si_huerfana(fila[0])
+        eliminar_imagen_promocion_si_huerfana(fila[1])
 
     flash("Promoción eliminada correctamente 🗑️")
     return redirect("/admin/promociones")

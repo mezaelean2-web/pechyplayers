@@ -90,7 +90,8 @@
 
 }
 
-#promoPreviewGrande{
+#promoPreviewGrande,
+#promoPreviewDesktop{
 
     width:100%;
     height:100%;
@@ -831,4 +832,116 @@
     max-width:none;
     min-width:0;
     box-sizing:border-box;
+}
+
+.promo-variantes-preview{
+    width:100%;
+    display:grid;
+    grid-template-columns:minmax(190px,.62fr) minmax(360px,1.38fr);
+    align-items:start;
+    gap:20px;
+    padding:20px;
+}
+
+.promo-variante{
+    min-width:0;
+    margin:0;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.promo-variante-lienzo{
+    position:relative;
+    width:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.1);
+    border-radius:14px;
+    background:
+        radial-gradient(circle at 50% 30%, rgba(255,255,255,.055), transparent 55%),
+        #070707;
+}
+
+.promo-variante-mobile .promo-variante-lienzo{
+    aspect-ratio:4 / 5;
+    max-height:390px;
+}
+
+.promo-variante-desktop .promo-variante-lienzo{
+    aspect-ratio:16 / 7;
+    min-height:220px;
+}
+
+.promo-variantes-preview figcaption,
+.promo-variantes-preview small{
+    color:#b7bdc8;
+    font-size:12px;
+    font-weight:700;
+}
+
+.promo-variantes-preview img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    object-position:center;
+    border-radius:12px;
+    background:transparent;
+}
+
+.promo-variante-eliminar{
+    position:absolute;
+    top:9px;
+    right:9px;
+    z-index:3;
+    width:32px;
+    height:32px;
+    display:grid;
+    place-items:center;
+    padding:0;
+    border:1px solid rgba(255,255,255,.14);
+    border-radius:9px;
+    background:rgba(8,8,8,.78);
+    color:#fff;
+    font-size:14px;
+    line-height:1;
+    cursor:pointer;
+    opacity:.78;
+    backdrop-filter:blur(8px);
+    transition:opacity .18s ease, border-color .18s ease, background .18s ease;
+}
+
+.promo-variante-eliminar:hover,
+.promo-variante-eliminar:focus-visible{
+    opacity:1;
+    border-color:rgba(255,75,84,.65);
+    background:rgba(126,18,26,.88);
+    outline:none;
+}
+
+@media (max-width:1100px){
+    .promo-variantes-preview{
+        grid-template-columns:minmax(170px,.7fr) minmax(280px,1.3fr);
+        gap:14px;
+        padding:14px;
+    }
+
+    .promo-variante-desktop .promo-variante-lienzo{
+        min-height:180px;
+    }
+}
+
+.promo-variantes{
+    position:absolute;
+    left:10px;
+    bottom:10px;
+    z-index:3;
+    padding:5px 8px;
+    border-radius:999px;
+    background:rgba(0,0,0,.78);
+    color:#fff;
+    font-size:10px;
+    font-weight:800;
 }

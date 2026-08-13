@@ -1564,6 +1564,66 @@ font-size:14px;
     display:none !important;
   }
 }
+
+/* La promoción destacada y las ofertas secundarias comparten composición. */
+@media (max-width:768px){
+  .mobile-featured{
+    min-height:0;
+    aspect-ratio:3 / 5;
+  }
+
+  .mobile-featured-bg{
+    animation:none;
+    transform:none;
+    will-change:auto;
+    z-index:0;
+    overflow:hidden;
+    pointer-events:none;
+    background-size:0 0;
+  }
+
+  .mobile-featured-bg::before,
+  .mobile-featured-bg::after{
+    content:"";
+    position:absolute;
+    background-image:inherit;
+    background-repeat:no-repeat;
+    background-position:center;
+  }
+
+  .mobile-featured-bg::before{
+    inset:-24px;
+    background-size:cover;
+    filter:blur(20px) brightness(.52) saturate(1.08);
+    transform:scale(1.08);
+  }
+
+  .mobile-featured-bg::after{
+    inset:0;
+    background-size:contain;
+  }
+
+  .mobile-featured-overlay{
+    z-index:2;
+  }
+
+  .promo-card picture{
+    display:block;
+    width:100%;
+    aspect-ratio:3 / 5;
+    overflow:hidden;
+    background:#050912;
+  }
+
+  .promo-card picture > img{
+    display:block;
+    width:100%;
+    height:100%;
+    aspect-ratio:auto;
+    object-fit:cover;
+    object-position:center;
+  }
+}
 @keyframes promoZoom{
 
 0%{

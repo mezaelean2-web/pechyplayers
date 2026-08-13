@@ -922,25 +922,31 @@
     <small>EXPLORA RÁPIDO</small>
     <strong>Categorías</strong>
   </div>
-  <div class="desktop-category-access__links">
-    <a href="#catalogo" class="is-active" aria-current="page"><span aria-hidden="true">✦</span>Todos los productos</a>
-    {% for nombre_categoria in categorias %}
-      {% set categoria_normalizada = nombre_categoria|lower %}
-      <a href="#categoria-{{ loop.index }}">
-        <span aria-hidden="true">
-          {%- if 'music' in categoria_normalizada or 'música' in categoria_normalizada -%}♫
-          {%- elif 'anime' in categoria_normalizada -%}✧
-          {%- elif 'iptv' in categoria_normalizada or 'tv' in categoria_normalizada -%}▣
-          {%- elif 'deport' in categoria_normalizada -%}●
-          {%- elif 'combo' in categoria_normalizada -%}⊞
-          {%- elif 'stream' in categoria_normalizada or 'película' in categoria_normalizada -%}▶
-          {%- elif 'juego' in categoria_normalizada or 'gaming' in categoria_normalizada -%}◆
-          {%- else -%}◇
-          {%- endif -%}
-        </span>
-        {{ nombre_categoria }}
-      </a>
-    {% endfor %}
+  <div class="desktop-category-carousel">
+    <button class="desktop-category-carousel__arrow desktop-category-carousel__arrow--previous" type="button" aria-label="Categoría anterior">‹</button>
+    <div class="desktop-category-carousel__viewport">
+      <div class="desktop-category-access__links">
+        <a href="#catalogo" class="is-active" aria-current="page"><span aria-hidden="true">✦</span>Todos los productos</a>
+        {% for nombre_categoria in categorias %}
+          {% set categoria_normalizada = nombre_categoria|lower %}
+          <a href="#categoria-{{ loop.index }}">
+            <span aria-hidden="true">
+              {%- if 'music' in categoria_normalizada or 'música' in categoria_normalizada -%}♫
+              {%- elif 'anime' in categoria_normalizada -%}✧
+              {%- elif 'iptv' in categoria_normalizada or 'tv' in categoria_normalizada -%}▣
+              {%- elif 'deport' in categoria_normalizada -%}●
+              {%- elif 'combo' in categoria_normalizada -%}⊞
+              {%- elif 'stream' in categoria_normalizada or 'película' in categoria_normalizada -%}▶
+              {%- elif 'juego' in categoria_normalizada or 'gaming' in categoria_normalizada -%}◆
+              {%- else -%}◇
+              {%- endif -%}
+            </span>
+            {{ nombre_categoria }}
+          </a>
+        {% endfor %}
+      </div>
+    </div>
+    <button class="desktop-category-carousel__arrow desktop-category-carousel__arrow--next" type="button" aria-label="Categoría siguiente">›</button>
   </div>
 </nav>
 {% endif %}
@@ -949,9 +955,12 @@
 <section class="promo-destacada-pc">
 
   <div class="promo-destacada-pc-imagen">
-    <img
-      src="{{ url_for('static', filename='img/promociones/' + promociones[0][1]) }}"
-      alt="Promoción destacada">
+    <picture>
+      <source media="(min-width: 769px)" srcset="{{ url_for('static', filename='img/promociones/' + (promociones[0][3] or promociones[0][1])) }}">
+      <img
+        src="{{ url_for('static', filename='img/promociones/' + promociones[0][1]) }}"
+        alt="Promoción destacada">
+    </picture>
   </div>
 
   <div class="promo-destacada-pc-info">
@@ -1016,10 +1025,13 @@
         href="https://wa.me/{{ config.whatsapp }}?text=Hola%20quiero%20información%20sobre%20esta%20promoción"
         target="_blank"
       >
-        <img
-          src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
-          alt="Promoción especial"
-        >
+        <picture>
+          <source media="(min-width: 769px)" srcset="{{ url_for('static', filename='img/promociones/' + (promo[3] or promo[1])) }}">
+          <img
+            src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
+            alt="Promoción especial"
+          >
+        </picture>
 
         <div class="promo-card-info">
           <strong>🔥 Promoción especial</strong>
@@ -1059,40 +1071,29 @@
 <h2>¿Qué vemos hoy?</h2>
 
     <div class="cartelera-categorias">
+      <button class="cartelera-categorias-nav cartelera-categorias-nav--anterior" type="button" data-categoria-direccion="anterior" aria-label="Ver géneros anteriores">‹</button>
 
-    <div class="cartelera-categorias-scroll">
+    <div class="cartelera-categorias-scroll" aria-label="Géneros de cartelera">
 
-        <button class="categoria-btn activa" data-categoria="acción">Acción</button>
-
-        <button class="categoria-btn" data-categoria="drama">Drama</button>
-
-        <button class="categoria-btn" data-categoria="comedia">Comedia</button>
-
-        <button class="categoria-btn" data-categoria="terror">Terror</button>
-
-        <button class="categoria-btn" data-categoria="ciencia ficción">Ciencia ficción</button>
-
-        <button class="categoria-btn" data-categoria="infantil">Infantil</button>
-
-       <button class="categoria-btn" data-categoria="romance">Romance</button>
-
-       <button class="categoria-btn" data-categoria="documentales">Documentales</button>
-
-       <button class="categoria-btn" data-categoria="series">Series</button>
-
-       <button class="categoria-btn" data-categoria="anime">Anime</button>
+        {% for categoria in categorias_cartelera %}
+        <button
+          class="categoria-btn{% if loop.first %} activa{% endif %}"
+          data-categoria="{{ categoria.clave }}"
+        >
+          {{ categoria.nombre }}
+        </button>
+        {% endfor %}
 
     </div>
 
-</div>
-
-    <div class="cartelera-desktop-nav" aria-label="Navegación de cartelera">
-      <button type="button" data-cartelera-direccion="anterior" aria-label="Ver títulos anteriores">‹</button>
-      <button type="button" data-cartelera-direccion="siguiente" aria-label="Ver títulos siguientes">›</button>
-    </div>
+      <button class="cartelera-categorias-nav cartelera-categorias-nav--siguiente" type="button" data-categoria-direccion="siguiente" aria-label="Ver géneros siguientes">›</button>
 
 </div>
 
+</div>
+
+    <div class="cartelera-carousel-shell">
+      <button class="cartelera-desktop-nav cartelera-desktop-nav--anterior" type="button" data-cartelera-direccion="anterior" aria-label="Ver título anterior">‹</button>
     <div
         class="cartelera-lista"
         id="carteleraLista"
@@ -1104,7 +1105,7 @@
         <article
     class="cartelera-card"
     data-id="{{ pelicula.id }}"
-    data-categoria="{{ pelicula.categoria|lower }}"
+    data-categoria="{{ pelicula.categoria_clave }}"
 >
 
             <div class="cartelera-poster">
@@ -1209,6 +1210,9 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
         {% endfor %}
 
+    </div>
+
+      <button class="cartelera-desktop-nav cartelera-desktop-nav--siguiente" type="button" data-cartelera-direccion="siguiente" aria-label="Ver título siguiente">›</button>
     </div>
 
     <div class="cartelera-contador">

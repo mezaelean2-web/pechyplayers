@@ -7,6 +7,9 @@ from datetime import datetime
 import database
 
 TENANT_PREDETERMINADO = "default"
+PATRON_ASSET = re.compile(
+    r"^/static/uploads/configuracion/[A-Za-z0-9_-]+/[A-Za-z0-9_.-]+$"
+)
 
 MODULOS = {
     "identidad": {
@@ -61,7 +64,10 @@ MODULOS = {
         "campos": {
             "hero_visible": ("boolean", True, None), "hero_titulo": ("text", "EL MEJOR ENTRETENIMIENTO EN TUS MANOS", 160),
             "hero_subtitulo": ("textarea", "Plataformas premium al mejor precio.", 300), "hero_cta": ("text", "Explorar catálogo →", 60),
-            "hero_imagen": ("asset", "", 240), "secciones_orden": ("text", "productos,promociones,cartelera,beneficios,contacto", 300),
+            "hero_imagen": ("asset", "", 240),
+            "hero_imagen_mobile": ("asset", "", 240),
+            "hero_imagen_desktop": ("asset", "", 240),
+            "secciones_orden": ("text", "productos,promociones,cartelera,beneficios,contacto", 300),
             "productos_visible": ("boolean", True, None), "promociones_visible": ("boolean", True, None),
             "cartelera_visible": ("boolean", True, None), "beneficios_visible": ("boolean", True, None),
         },
@@ -204,7 +210,7 @@ def _validar(modulo, datos):
             if tipo == "phone" and valor and not 7 <= len(valor) <= 15: raise ValueError(f"{clave} no es un teléfono válido.")
             if tipo == "email" and valor and not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", valor): raise ValueError("Correo inválido.")
             if tipo == "url" and valor and not re.match(r"^https://", valor, re.I): raise ValueError(f"{clave} debe usar HTTPS.")
-            if tipo == "asset" and valor and not re.match(r"^/static/uploads/configuracion/[\w./-]+$", valor): raise ValueError(f"{clave} no es un recurso permitido.")
+            if tipo == "asset" and valor and not PATRON_ASSET.fullmatch(valor): raise ValueError(f"{clave} no es un recurso permitido.")
             if modulo == "mensajes":
                 variables = set(re.findall(r"\{([^{}]+)\}", valor))
                 if variables - VARIABLES_MENSAJE: raise ValueError(f"{clave} contiene variables no permitidas.")
@@ -281,6 +287,18 @@ def configuracion_efectiva(tenant=TENANT_PREDETERMINADO, borrador=False):
     plana = database.obtener_config()
     for valores in salida.values(): plana.update(valores)
     plana["modulos"] = salida
+    hero = salida["inicio"]
+    hero_legado = hero.get("hero_imagen") or ""
+    hero["hero_imagen_mobile_efectiva"] = (
+        hero.get("hero_imagen_mobile") or hero_legado or hero.get("hero_imagen_desktop") or ""
+    )
+    hero["hero_imagen_desktop_efectiva"] = (
+        hero.get("hero_imagen_desktop") or hero.get("hero_imagen_mobile") or hero_legado or ""
+    )
+    plana.update({
+        "hero_imagen_mobile_efectiva": hero["hero_imagen_mobile_efectiva"],
+        "hero_imagen_desktop_efectiva": hero["hero_imagen_desktop_efectiva"],
+    })
     plana.update({"color_principal": salida["apariencia"]["brand_primary"], "color_secundario": salida["apariencia"]["brand_secondary"],
                   "color_acento": salida["apariencia"]["brand_accent"], "inicio_hero_activo": "1" if salida["inicio"]["hero_visible"] else "0",
                   "inicio_boton_catalogo": salida["inicio"]["hero_cta"]})

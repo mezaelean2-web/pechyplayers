@@ -6,7 +6,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const campos = document.getElementById("configCentroCampos"), preview = document.getElementById("configCentroPreview");
     const mensaje = document.getElementById("configCentroMensaje"), estadoPublicacion = document.getElementById("configuracionEstadoPublicacion");
     const confirmacion = document.getElementById("configCentroConfirm"), entradaConfirmacion = document.getElementById("configConfirmEntrada");
-    const etiquetas = clave => clave.replaceAll("_", " ").replace(/^./, letra => letra.toUpperCase());
+    const etiquetasEspeciales = {hero_imagen:"Imagen heredada (fallback)",hero_imagen_mobile:"Imagen móvil",hero_imagen_desktop:"Imagen escritorio"};
+    const etiquetas = clave => etiquetasEspeciales[clave] || clave.replaceAll("_", " ").replace(/^./, letra => letra.toUpperCase());
     const api = async (url, opciones = {}) => { const r = await fetch(url, {headers:{"Content-Type":"application/json",Accept:"application/json"}, ...opciones}); const d = await r.json(); if (!r.ok || !d.ok) throw new Error(d.mensaje || "No se pudo completar la operación."); return d; };
     const toast = (texto, error=false) => { document.querySelector(".config-centro-toast")?.remove(); const n=document.createElement("div"); n.className=`config-centro-toast${error?" error":""}`; n.textContent=texto; n.setAttribute("role",error?"alert":"status"); document.body.append(n); setTimeout(()=>n.remove(),3000); };
     function actualizarEstado(){ estadoPublicacion.textContent=centro.pendiente?"● Cambios pendientes":"✓ Todo actualizado"; estadoPublicacion.classList.toggle("pendiente",centro.pendiente); document.getElementById("configuracionPublicar").disabled=!centro.pendiente; }
@@ -21,7 +22,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const archivo=document.createElement("input");archivo.type="file";archivo.accept="image/png,image/jpeg,image/webp,image/x-icon";
             const estado=document.createElement("small");estado.textContent=valor?"Imagen cargada":"PNG, JPG, WEBP o ICO · máximo 3 MB";
             archivo.onchange=async()=>{if(!archivo.files[0])return;archivo.disabled=true;estado.textContent="Subiendo...";const fd=new FormData();fd.append("archivo",archivo.files[0]);try{const r=await fetch("/admin/configuracion/api/upload",{method:"POST",headers:{Accept:"application/json"},body:fd});const d=await r.json();if(!r.ok||!d.ok)throw new Error(d.mensaje||"No se pudo subir.");input.value=d.url;estado.textContent="✓ Imagen lista en el borrador";}catch(e){archivo.value="";estado.textContent=e.message;}finally{archivo.disabled=false;}};
-            label.append(input,archivo,estado);return label;
+            const miniatura=document.createElement("img");miniatura.className="config-centro-asset-preview";miniatura.alt=`Vista previa: ${etiquetas(clave)}`;miniatura.hidden=!valor;if(valor)miniatura.src=valor;
+            archivo.addEventListener("change",()=>{const revisar=setInterval(()=>{if(input.value){miniatura.src=input.value;miniatura.hidden=false;clearInterval(revisar);}if(!archivo.disabled)clearInterval(revisar);},100);});
+            label.append(input,miniatura,archivo,estado);return label;
         }
         else {input=document.createElement("input"); input.type=tipo==="color"?"color":tipo==="range"?"range":tipo==="email"?"email":"text"; if(tipo==="range"){input.min=regla[0];input.max=regla[1];const out=document.createElement("output");out.textContent=valor;input.oninput=()=>out.textContent=input.value;label.append(input,out);} }
         input.name=clave; if(tipo!=="boolean") input.value=valor??""; label.append(input); return label;

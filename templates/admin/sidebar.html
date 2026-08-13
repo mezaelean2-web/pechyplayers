@@ -36,8 +36,8 @@
         <span>Organización</span>
     </a>
 
-    <a href="/admin/cartelera"
-   class="sidebar-link {% if request.path == '/admin/cartelera' %}active{% endif %}">
+<a href="/admin/cartelera"
+   class="sidebar-link {% if request.path.startswith('/admin/cartelera') %}active{% endif %}">
     <i data-lucide="clapperboard" class="sidebar-icon"></i>
     <span>Cartelera</span>
 </a>

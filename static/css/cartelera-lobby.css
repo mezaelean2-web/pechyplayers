@@ -95,6 +95,12 @@
     overflow:hidden;
 }
 
+@media (max-width:768px){
+    .cartelera-categorias-nav{
+        display:none;
+    }
+}
+
 .cartelera-categorias-scroll{
 
     display:flex;

@@ -2,9 +2,20 @@ import json
 import os
 import re
 import sqlite3
+import unicodedata
 from collections import defaultdict
 
 DB = os.environ.get("PECHY_DB", "pechy.db")
+
+
+def _normalizar_clave_categoria_cartelera(valor):
+    texto = unicodedata.normalize("NFD", str(valor or "").strip().lower())
+    texto_sin_acentos = "".join(
+        caracter
+        for caracter in texto
+        if unicodedata.category(caracter) != "Mn"
+    )
+    return " ".join(texto_sin_acentos.split())
 
 def conectar():
     conn = sqlite3.connect(DB)
@@ -475,10 +486,18 @@ def inicializar_db():
 CREATE TABLE IF NOT EXISTS promociones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     imagen TEXT NOT NULL,
+    imagen_desktop TEXT,
     activa INTEGER DEFAULT 1,
     orden INTEGER DEFAULT 999
 )
 """)
+
+    columnas_promociones = {
+        fila[1]
+        for fila in cursor.execute("PRAGMA table_info(promociones)").fetchall()
+    }
+    if "imagen_desktop" not in columnas_promociones:
+        cursor.execute("ALTER TABLE promociones ADD COLUMN imagen_desktop TEXT")
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS categorias (
@@ -512,6 +531,8 @@ CREATE TABLE IF NOT EXISTS cartelera (
     genero TEXT DEFAULT '',
 
     categoria TEXT DEFAULT '',
+
+    categoria_id INTEGER,
 
     descripcion TEXT DEFAULT '',
 
@@ -547,6 +568,7 @@ CREATE TABLE IF NOT EXISTS cartelera (
         "subtitulo TEXT DEFAULT ''",
         "fecha_estreno TEXT DEFAULT ''",
         "categoria TEXT DEFAULT ''",
+        "categoria_id INTEGER",
         "calificacion TEXT DEFAULT ''",
         "banner TEXT DEFAULT ''",
         "destacado INTEGER DEFAULT 0",
@@ -560,6 +582,79 @@ CREATE TABLE IF NOT EXISTS cartelera (
             )
         except sqlite3.OperationalError:
             pass    
+
+    cursor.execute("""
+CREATE TABLE IF NOT EXISTS cartelera_categorias (
+
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    nombre TEXT NOT NULL,
+
+    clave TEXT NOT NULL UNIQUE,
+
+    activa INTEGER NOT NULL DEFAULT 1,
+
+    orden INTEGER NOT NULL DEFAULT 999,
+
+    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
+)
+""")
+
+    categorias_iniciales_cartelera = [
+        ("Acción", "accion", 1),
+        ("Drama", "drama", 2),
+        ("Comedia", "comedia", 3),
+        ("Terror", "terror", 4),
+        ("Ciencia ficción", "ciencia ficcion", 5),
+        ("Infantil", "infantil", 6),
+        ("Romance", "romance", 7),
+        ("Documentales", "documentales", 8),
+        ("Series", "series", 9),
+        ("Anime", "anime", 10),
+    ]
+
+    cursor.executemany("""
+        INSERT OR IGNORE INTO cartelera_categorias (
+            nombre,
+            clave,
+            activa,
+            orden
+        ) VALUES (?, ?, 1, ?)
+    """, categorias_iniciales_cartelera)
+
+    categorias_por_clave = {
+        _normalizar_clave_categoria_cartelera(fila["clave"]): fila["id"]
+        for fila in cursor.execute("""
+            SELECT id, clave
+            FROM cartelera_categorias
+        """).fetchall()
+    }
+
+    peliculas_sin_relacion = cursor.execute("""
+        SELECT id, categoria
+        FROM cartelera
+        WHERE categoria_id IS NULL
+          AND categoria IS NOT NULL
+          AND TRIM(categoria) != ''
+    """).fetchall()
+
+    asociaciones_cartelera = []
+    for pelicula in peliculas_sin_relacion:
+        categoria_id = categorias_por_clave.get(
+            _normalizar_clave_categoria_cartelera(pelicula["categoria"])
+        )
+        if categoria_id is not None:
+            asociaciones_cartelera.append((categoria_id, pelicula["id"]))
+
+    cursor.executemany("""
+        UPDATE cartelera
+        SET categoria_id = ?
+        WHERE id = ?
+          AND categoria_id IS NULL
+    """, asociaciones_cartelera)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS cartelera_plataformas (
@@ -1217,7 +1312,25 @@ def obtener_promociones():
     cursor = conn.cursor()
 
     cursor.execute("""
-        SELECT id, imagen, activa
+        CREATE TABLE IF NOT EXISTS promociones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            imagen TEXT NOT NULL,
+            imagen_desktop TEXT,
+            activa INTEGER DEFAULT 1,
+            orden INTEGER DEFAULT 999
+        )
+    """)
+
+    columnas = {
+        fila[1]
+        for fila in cursor.execute("PRAGMA table_info(promociones)").fetchall()
+    }
+    if "imagen_desktop" not in columnas:
+        cursor.execute("ALTER TABLE promociones ADD COLUMN imagen_desktop TEXT")
+        conn.commit()
+
+    cursor.execute("""
+        SELECT id, imagen, activa, imagen_desktop
         FROM promociones
         ORDER BY orden ASC, id DESC
     """)
@@ -1250,6 +1363,264 @@ def obtener_categorias():
     return categorias
 
 
+def obtener_categorias_cartelera(solo_activas=False):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    consulta = """
+        SELECT
+            id,
+            nombre,
+            clave,
+            activa,
+            orden,
+            fecha_creacion,
+            fecha_actualizacion
+        FROM cartelera_categorias
+    """
+    if solo_activas:
+        consulta += " WHERE activa = 1"
+    consulta += " ORDER BY orden ASC, id ASC"
+
+    cursor.execute(consulta)
+    categorias = [dict(fila) for fila in cursor.fetchall()]
+    conn.close()
+    return categorias
+
+
+def obtener_categoria_cartelera_por_id(categoria_id):
+    conn = conectar()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT
+            id,
+            nombre,
+            clave,
+            activa,
+            orden,
+            fecha_creacion,
+            fecha_actualizacion
+        FROM cartelera_categorias
+        WHERE id = ?
+    """, (categoria_id,))
+    fila = cursor.fetchone()
+    conn.close()
+    return dict(fila) if fila else None
+
+
+def obtener_categoria_cartelera_por_clave(clave):
+    clave_normalizada = _normalizar_clave_categoria_cartelera(clave)
+    conn = conectar()
+    cursor = conn.cursor()
+    filas = cursor.execute("""
+        SELECT
+            id,
+            nombre,
+            clave,
+            activa,
+            orden,
+            fecha_creacion,
+            fecha_actualizacion
+        FROM cartelera_categorias
+    """).fetchall()
+    conn.close()
+
+    for fila in filas:
+        if _normalizar_clave_categoria_cartelera(fila["clave"]) == clave_normalizada:
+            return dict(fila)
+    return None
+
+
+def obtener_categorias_cartelera_con_conteo():
+    conn = conectar()
+    filas = conn.execute("""
+        SELECT
+            cc.id,
+            cc.nombre,
+            cc.clave,
+            cc.activa,
+            cc.orden,
+            cc.fecha_creacion,
+            cc.fecha_actualizacion,
+            COUNT(c.id) AS cantidad_peliculas
+        FROM cartelera_categorias AS cc
+        LEFT JOIN cartelera AS c ON c.categoria_id = cc.id
+        GROUP BY cc.id
+        ORDER BY cc.orden ASC, cc.id ASC
+    """).fetchall()
+    conn.close()
+    return [dict(fila) for fila in filas]
+
+
+def _clave_desde_nombre_categoria_cartelera(nombre):
+    clave = _normalizar_clave_categoria_cartelera(nombre)
+    clave = re.sub(r"[^a-z0-9]+", " ", clave).strip()
+    return " ".join(clave.split())
+
+
+def _validar_nombre_categoria_cartelera(nombre):
+    nombre = " ".join(str(nombre or "").strip().split())
+    if not nombre:
+        raise ValueError("Debes escribir un nombre.")
+    if len(nombre) > 80:
+        raise ValueError("El nombre no puede superar 80 caracteres.")
+    clave = _clave_desde_nombre_categoria_cartelera(nombre)
+    if not clave:
+        raise ValueError("El nombre debe contener letras o números.")
+    return nombre, clave
+
+
+def crear_categoria_cartelera(nombre):
+    nombre, clave = _validar_nombre_categoria_cartelera(nombre)
+    conn = conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute(
+            "SELECT 1 FROM cartelera_categorias WHERE clave = ?",
+            (clave,),
+        ).fetchone():
+            raise ValueError("Ya existe una categoría con la misma clave canónica.")
+        orden = conn.execute(
+            "SELECT COALESCE(MAX(orden), 0) + 1 FROM cartelera_categorias"
+        ).fetchone()[0]
+        cursor = conn.execute("""
+            INSERT INTO cartelera_categorias
+                (nombre, clave, activa, orden)
+            VALUES (?, ?, 1, ?)
+        """, (nombre, clave, orden))
+        categoria_id = cursor.lastrowid
+        conn.commit()
+        return obtener_categoria_cartelera_por_id(categoria_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def renombrar_categoria_cartelera(categoria_id, nombre):
+    nombre, _ = _validar_nombre_categoria_cartelera(nombre)
+    conn = conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        categoria = conn.execute(
+            "SELECT id, clave FROM cartelera_categorias WHERE id = ?",
+            (categoria_id,),
+        ).fetchone()
+        if not categoria:
+            raise LookupError("La categoría no existe.")
+        duplicada = conn.execute("""
+            SELECT 1 FROM cartelera_categorias
+            WHERE id != ? AND LOWER(TRIM(nombre)) = LOWER(TRIM(?))
+        """, (categoria_id, nombre)).fetchone()
+        if duplicada:
+            raise ValueError("Ya existe una categoría con ese nombre.")
+        conn.execute("""
+            UPDATE cartelera_categorias
+            SET nombre = ?, fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (nombre, categoria_id))
+        conn.execute("""
+            UPDATE cartelera SET categoria = ? WHERE categoria_id = ?
+        """, (nombre, categoria_id))
+        conn.commit()
+        return obtener_categoria_cartelera_por_id(categoria_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def establecer_categoria_cartelera_activa(categoria_id, activa):
+    if type(activa) is not bool:
+        raise ValueError("El estado debe ser verdadero o falso.")
+    conn = conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.execute("""
+            UPDATE cartelera_categorias
+            SET activa = ?, fecha_actualizacion = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (1 if activa else 0, categoria_id))
+        if cursor.rowcount != 1:
+            raise LookupError("La categoría no existe.")
+        conn.commit()
+        return obtener_categoria_cartelera_por_id(categoria_id)
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def reordenar_categorias_cartelera(orden_ids):
+    if not isinstance(orden_ids, list) or not orden_ids:
+        raise ValueError("Debes enviar el orden completo de categorías.")
+    if any(type(categoria_id) is not int or categoria_id <= 0 for categoria_id in orden_ids):
+        raise ValueError("El orden contiene IDs inválidos.")
+    if len(set(orden_ids)) != len(orden_ids):
+        raise ValueError("El orden contiene IDs duplicados.")
+    conn = conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        ids_reales = {
+            fila[0]
+            for fila in conn.execute("SELECT id FROM cartelera_categorias").fetchall()
+        }
+        if set(orden_ids) != ids_reales:
+            raise ValueError("La lista no coincide con las categorías actuales.")
+        for posicion, categoria_id in enumerate(orden_ids, start=1):
+            conn.execute("""
+                UPDATE cartelera_categorias
+                SET orden = ?, fecha_actualizacion = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (posicion, categoria_id))
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def eliminar_categoria_cartelera_si_vacia(categoria_id):
+    conn = conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        categoria = conn.execute(
+            "SELECT id, nombre FROM cartelera_categorias WHERE id = ?",
+            (categoria_id,),
+        ).fetchone()
+        if not categoria:
+            raise LookupError("La categoría no existe.")
+        cantidad = conn.execute(
+            "SELECT COUNT(*) FROM cartelera WHERE categoria_id = ?",
+            (categoria_id,),
+        ).fetchone()[0]
+        if cantidad:
+            raise RuntimeError(
+                f"No se puede eliminar: {cantidad} película"
+                f"{'s dependen' if cantidad != 1 else ' depende'} de esta categoría."
+            )
+        conn.execute("DELETE FROM cartelera_categorias WHERE id = ?", (categoria_id,))
+        categorias = conn.execute(
+            "SELECT id FROM cartelera_categorias ORDER BY orden ASC, id ASC"
+        ).fetchall()
+        for posicion, fila in enumerate(categorias, start=1):
+            conn.execute(
+                "UPDATE cartelera_categorias SET orden = ? WHERE id = ?",
+                (posicion, fila[0]),
+            )
+        conn.commit()
+        return categoria["nombre"]
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def obtener_cartelera():
 
     conn = conectar()
@@ -1263,6 +1634,9 @@ def obtener_cartelera():
             c.subtitulo,
             c.genero,
             c.categoria,
+            c.categoria_id,
+            cc.clave AS categoria_clave,
+            cc.activa AS categoria_activa,
             c.descripcion,
             c.anio,
             c.poster,
@@ -1280,6 +1654,9 @@ def obtener_cartelera():
             ) AS plataformas
 
         FROM cartelera AS c
+
+        LEFT JOIN cartelera_categorias AS cc
+            ON cc.id = c.categoria_id
 
         LEFT JOIN cartelera_plataformas AS cp
             ON cp.cartelera_id = c.id

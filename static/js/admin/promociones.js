@@ -9,8 +9,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const input =
         document.getElementById("promoInput");
 
+    const inputDesktop =
+        document.getElementById("promoInputDesktop");
+
     const preview =
         document.getElementById("promoPreviewGrande");
+
+    const previewDesktop =
+        document.getElementById("promoPreviewDesktop");
+
+    const desktopFallback =
+        document.getElementById("promoDesktopFallback");
+
+    const botonEliminarImagenMobile =
+        document.getElementById("btnEliminarImagenMobile");
+
+    const botonEliminarImagenDesktop =
+        document.getElementById("btnEliminarImagenDesktop");
 
     const placeholder =
         document.getElementById("promoPlaceholder");
@@ -32,6 +47,9 @@ let estadoPendiente = true;
     const botonEditarImagen =
         document.getElementById("btnEditarImagen");
 
+    const botonEditarImagenDesktop =
+        document.getElementById("btnEditarImagenDesktop");
+
     const botonPublicarSuperior =
         document.getElementById("btnPublicarPromo");
 
@@ -47,6 +65,12 @@ const promoFormId =
     const promoFormActiva =
     document.getElementById("promoFormActiva");
 
+const promoFormEliminarImagen =
+    document.getElementById("promoFormEliminarImagen");
+
+const promoFormEliminarImagenDesktop =
+    document.getElementById("promoFormEliminarImagenDesktop");
+
     const botonEliminarPanel =
     document.getElementById("btnEliminarPromo");
 
@@ -58,6 +82,15 @@ const promoEliminarId =
 
 let promocionSeleccionadaId = null;
 let modoEdicion = false;
+let imagenMobileGuardada = "";
+let imagenDesktopGuardada = "";
+let eliminarImagenMobile = false;
+let eliminarImagenDesktop = false;
+
+function habilitarPublicacion() {
+    if (botonPublicarSuperior) botonPublicarSuperior.disabled = false;
+    if (botonPublicarLateral) botonPublicarLateral.disabled = false;
+}
 
 
 /* ==========================================
@@ -73,11 +106,20 @@ let modoEdicion = false;
                 const ruta =
                     card.dataset.imagen;
 
+                const rutaDesktop =
+                    card.dataset.imagenDesktop;
+
                 const id =
                     card.dataset.id;
 
-                    promocionSeleccionadaId = id;
-modoEdicion = false;
+                promocionSeleccionadaId = id;
+                modoEdicion = false;
+                input.value = "";
+                if (inputDesktop) inputDesktop.value = "";
+                imagenMobileGuardada = ruta;
+                imagenDesktopGuardada = rutaDesktop;
+                eliminarImagenMobile = false;
+                eliminarImagenDesktop = false;
 
                 const activa =
                     card.dataset.activa === "1";
@@ -87,9 +129,18 @@ modoEdicion = false;
 
                 /* Mostrar imagen */
 
-                preview.src = ruta;
+                preview.src = ruta || "";
 
-                preview.style.display = "block";
+                preview.style.display = ruta ? "block" : "none";
+
+                if (previewDesktop) {
+                    previewDesktop.src = rutaDesktop || ruta || "";
+                    previewDesktop.style.display = (rutaDesktop || ruta) ? "block" : "none";
+                }
+
+                if (desktopFallback) {
+                    desktopFallback.hidden = Boolean(card.dataset.imagenDesktop);
+                }
 
                 placeholder.style.display = "none";
 
@@ -243,6 +294,17 @@ if (botonEditarImagen && input) {
 
 }
 
+if (botonEditarImagenDesktop && inputDesktop) {
+    botonEditarImagenDesktop.addEventListener("click", () => {
+        if (!promocionSeleccionadaId && !input?.files[0]) {
+            alert("Selecciona primero la imagen móvil de la nueva promoción.");
+            return;
+        }
+        modoEdicion = Boolean(promocionSeleccionadaId);
+        inputDesktop.click();
+    });
+}
+
 
     /* ==========================================
        SELECCIONAR IMAGEN NUEVA
@@ -288,6 +350,8 @@ if (botonEditarImagen && input) {
     preview.style.display =
         "block";
 
+    eliminarImagenMobile = false;
+
     placeholder.style.display =
         "none";
 
@@ -323,6 +387,72 @@ if (botonEditarImagen && input) {
 
         });
 
+    }
+
+    if (inputDesktop && previewDesktop && placeholder) {
+        inputDesktop.addEventListener("change", () => {
+            const archivo = inputDesktop.files[0];
+            if (!archivo) return;
+
+            const reader = new FileReader();
+            reader.onload = evento => {
+                previewDesktop.src = evento.target.result;
+                previewDesktop.style.display = "block";
+                eliminarImagenDesktop = false;
+                if (desktopFallback) desktopFallback.hidden = true;
+                placeholder.style.display = "none";
+
+                if (botonPublicarSuperior) botonPublicarSuperior.disabled = false;
+                if (botonPublicarLateral) botonPublicarLateral.disabled = false;
+
+                if (tituloSeleccionada) {
+                    tituloSeleccionada.textContent = promocionSeleccionadaId
+                        ? `Editando promoción ${promocionSeleccionadaId}`
+                        : "Nueva promoción";
+                }
+            };
+            reader.readAsDataURL(archivo);
+        });
+    }
+
+    if (botonEliminarImagenMobile) {
+        botonEliminarImagenMobile.addEventListener("click", () => {
+            if (input?.files[0]) {
+                input.value = "";
+                preview.src = imagenMobileGuardada || "";
+                preview.style.display = imagenMobileGuardada ? "block" : "none";
+                eliminarImagenMobile = false;
+                habilitarPublicacion();
+                return;
+            }
+
+            if (!promocionSeleccionadaId || !imagenMobileGuardada) return;
+            eliminarImagenMobile = true;
+            preview.removeAttribute("src");
+            preview.style.display = "none";
+            habilitarPublicacion();
+        });
+    }
+
+    if (botonEliminarImagenDesktop) {
+        botonEliminarImagenDesktop.addEventListener("click", () => {
+            if (inputDesktop?.files[0]) {
+                inputDesktop.value = "";
+                previewDesktop.src = imagenDesktopGuardada || imagenMobileGuardada || "";
+                previewDesktop.style.display = (imagenDesktopGuardada || imagenMobileGuardada) ? "block" : "none";
+                if (desktopFallback) desktopFallback.hidden = Boolean(imagenDesktopGuardada);
+                eliminarImagenDesktop = false;
+                habilitarPublicacion();
+                return;
+            }
+
+            if (!promocionSeleccionadaId || !imagenDesktopGuardada) return;
+            eliminarImagenDesktop = true;
+            previewDesktop.src = imagenMobileGuardada || "";
+            previewDesktop.style.display = imagenMobileGuardada ? "block" : "none";
+            if (desktopFallback) desktopFallback.hidden = false;
+            habilitarPublicacion();
+        });
     }
 
 
@@ -598,6 +728,9 @@ function publicarPromocion() {
     const archivo =
         input.files[0];
 
+    const archivoDesktop =
+        inputDesktop?.files[0];
+
     if (!promoForm) return;
 
 
@@ -645,19 +778,19 @@ function publicarPromocion() {
 
     }
 
+    if (promoFormEliminarImagen) {
+        promoFormEliminarImagen.value = eliminarImagenMobile ? "1" : "";
+    }
+
+    if (promoFormEliminarImagenDesktop) {
+        promoFormEliminarImagenDesktop.value = eliminarImagenDesktop ? "1" : "";
+    }
+
 
     /* QUITAR IMAGEN ANTERIOR DEL FORMULARIO */
 
-    const imagenAnterior =
-        promoForm.querySelector(
-            'input[name="imagen"]'
-        );
-
-    if (imagenAnterior) {
-
-        imagenAnterior.remove();
-
-    }
+    promoForm.querySelectorAll('input[name="imagen"], input[name="imagen_desktop"]')
+        .forEach(imagenAnterior => imagenAnterior.remove());
 
 
     /* AGREGAR IMAGEN SOLO SI HAY UNA NUEVA */
@@ -682,6 +815,16 @@ function publicarPromocion() {
             inputImagen
         );
 
+    }
+
+    if (archivoDesktop) {
+        const inputImagenDesktop = document.createElement("input");
+        inputImagenDesktop.type = "file";
+        inputImagenDesktop.name = "imagen_desktop";
+        const transferenciaDesktop = new DataTransfer();
+        transferenciaDesktop.items.add(archivoDesktop);
+        inputImagenDesktop.files = transferenciaDesktop.files;
+        promoForm.appendChild(inputImagenDesktop);
     }
 
 

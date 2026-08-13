@@ -108,11 +108,23 @@
 
         <div class="promo-preview-box">
 
-            <img
-                id="promoPreviewGrande"
-                src=""
-                alt="Vista previa"
-                style="display:none;">
+            <div class="promo-variantes-preview">
+                <figure class="promo-variante promo-variante-mobile">
+                    <figcaption>Imagen móvil</figcaption>
+                    <div class="promo-variante-lienzo">
+                        <button type="button" class="promo-variante-eliminar" id="btnEliminarImagenMobile" aria-label="Eliminar imagen móvil" title="Eliminar imagen móvil">🗑️</button>
+                        <img id="promoPreviewGrande" src="" alt="Vista previa móvil" style="display:none;">
+                    </div>
+                </figure>
+                <figure class="promo-variante promo-variante-desktop">
+                    <figcaption>Imagen escritorio</figcaption>
+                    <div class="promo-variante-lienzo">
+                        <button type="button" class="promo-variante-eliminar" id="btnEliminarImagenDesktop" aria-label="Eliminar imagen escritorio" title="Eliminar imagen escritorio">🗑️</button>
+                        <img id="promoPreviewDesktop" src="" alt="Vista previa escritorio" style="display:none;">
+                    </div>
+                    <small id="promoDesktopFallback">Usará la imagen móvil mientras no cargues una específica.</small>
+                </figure>
+            </div>
 
             
 
@@ -143,7 +155,13 @@
 <input
     type="file"
     id="promoInput"
-    accept="image/*"
+    accept="image/png,image/jpeg,image/webp"
+    hidden>
+
+<input
+    type="file"
+    id="promoInputDesktop"
+    accept="image/png,image/jpeg,image/webp"
     hidden>
 
 
@@ -163,6 +181,9 @@
     name="activa"
     id="promoFormActiva"
     value="on">
+
+    <input type="hidden" name="eliminar_imagen" id="promoFormEliminarImagen" value="">
+    <input type="hidden" name="eliminar_imagen_desktop" id="promoFormEliminarImagenDesktop" value="">
 
 </form>
 
@@ -234,7 +255,16 @@
                 class="promo-panel-btn editar"
                 id="btnEditarImagen">
 
-                ✏️ Editar imagen
+                ✏️ Cambiar imagen móvil
+
+            </button>
+
+            <button
+                type="button"
+                class="promo-panel-btn editar"
+                id="btnEditarImagenDesktop">
+
+                🖥️ Cambiar imagen escritorio
 
             </button>
 
@@ -278,13 +308,20 @@
     draggable="true"
     data-id="{{ promo[0] }}"
     data-activa="{{ promo[2] }}"
-    data-imagen="{{ url_for('static', filename='img/promociones/' + promo[1]) }}">
+    data-imagen="{% if promo[1] %}{{ url_for('static', filename='img/promociones/' + promo[1]) }}{% endif %}"
+    data-imagen-desktop="{% if promo[3] %}{{ url_for('static', filename='img/promociones/' + promo[3]) }}{% endif %}">
 
     <div class="promo-thumb-wrap">
 
+    {% if promo[1] or promo[3] %}
     <img
-        src="{{ url_for('static', filename='img/promociones/' + promo[1]) }}"
+        src="{{ url_for('static', filename='img/promociones/' + (promo[1] or promo[3])) }}"
         class="promo-thumb">
+    {% endif %}
+
+    <span class="promo-variantes" title="Variantes visuales disponibles">
+        {% if promo[1] and promo[3] %}Móvil + Escritorio{% elif promo[1] %}Móvil · Desktop usa fallback{% elif promo[3] %}Escritorio · Móvil usa fallback{% else %}Sin imágenes{% endif %}
+    </span>
 
     <div class="promo-overlay">
 

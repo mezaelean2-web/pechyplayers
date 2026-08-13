@@ -1,0 +1,92 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Categorías de cartelera{% endblock %}
+
+{% block contenido %}
+<div class="cartelera-header categorias-cartelera-header">
+    <div>
+        <span class="cartelera-badge">CATEGORÍAS</span>
+        <h1>Organiza la cartelera</h1>
+        <p>Administra nombres, visibilidad y el orden que verán tus clientes.</p>
+    </div>
+    <button type="button" class="btn-cartelera" id="nuevaCategoriaCartelera">
+        <i data-lucide="plus"></i> Nueva categoría
+    </button>
+</div>
+
+<nav class="cartelera-tabs" aria-label="Secciones de cartelera">
+    <a class="cartelera-tab" href="/admin/cartelera">
+        <i data-lucide="film"></i> Películas
+    </a>
+    <a class="cartelera-tab active" href="/admin/cartelera/categorias" aria-current="page">
+        <i data-lucide="tags"></i> Categorías
+    </a>
+</nav>
+
+<section class="categorias-cartelera-panel" aria-labelledby="tituloListaCategorias">
+    <div class="categorias-cartelera-panel__header">
+        <div>
+            <span class="categorias-cartelera-eyebrow">ORDEN PÚBLICO</span>
+            <h2 id="tituloListaCategorias">Categorías disponibles</h2>
+        </div>
+        <p>Arrastra desde el handle para cambiar el orden.</p>
+    </div>
+
+    <div class="categorias-cartelera-lista" id="listaCategoriasCartelera">
+        {% for categoria in categorias_cartelera %}
+        <article
+            class="categoria-cartelera-fila{% if not categoria.activa %} is-inactive{% endif %}"
+            data-categoria-id="{{ categoria.id }}"
+            data-categoria-nombre="{{ categoria.nombre }}"
+        >
+            <button class="categoria-cartelera-handle" type="button" draggable="true" aria-label="Mover {{ categoria.nombre }}">
+                <i data-lucide="grip-vertical"></i>
+            </button>
+            <div class="categoria-cartelera-identidad">
+                <strong>{{ categoria.nombre }}</strong>
+                <span>Clave: {{ categoria.clave }}</span>
+            </div>
+            <div class="categoria-cartelera-conteo">
+                <strong>{{ categoria.cantidad_peliculas }}</strong>
+                <span>película{% if categoria.cantidad_peliculas != 1 %}s{% endif %}</span>
+            </div>
+            <label class="categoria-cartelera-switch">
+                <input type="checkbox" class="categoria-estado" {% if categoria.activa %}checked{% endif %}>
+                <span class="categoria-cartelera-switch__control" aria-hidden="true"></span>
+                <span class="categoria-cartelera-switch__label">{% if categoria.activa %}Activa{% else %}Inactiva{% endif %}</span>
+            </label>
+            <div class="categoria-cartelera-acciones">
+                <button type="button" class="categoria-accion categoria-editar"><i data-lucide="pencil"></i><span>Editar</span></button>
+                <button type="button" class="categoria-accion categoria-eliminar" data-cantidad="{{ categoria.cantidad_peliculas }}"><i data-lucide="trash-2"></i><span>Eliminar</span></button>
+            </div>
+        </article>
+        {% else %}
+        <div class="categorias-cartelera-vacio">Todavía no hay categorías.</div>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="categoria-cartelera-modal" id="modalCategoriaCartelera" aria-hidden="true">
+    <button class="categoria-cartelera-modal__overlay" type="button" data-cerrar-modal aria-label="Cerrar"></button>
+    <section class="categoria-cartelera-modal__panel" role="dialog" aria-modal="true" aria-labelledby="tituloModalCategoria">
+        <button class="categoria-cartelera-modal__cerrar" type="button" data-cerrar-modal aria-label="Cerrar"><i data-lucide="x"></i></button>
+        <span class="categorias-cartelera-eyebrow">CARTELERA</span>
+        <h2 id="tituloModalCategoria">Nueva categoría</h2>
+        <p>La clave se genera automáticamente y permanecerá estable.</p>
+        <form id="formCategoriaCartelera">
+            <label for="nombreCategoriaCartelera">Nombre</label>
+            <input id="nombreCategoriaCartelera" name="nombre" maxlength="80" autocomplete="off" required>
+            <div class="categoria-cartelera-modal__acciones">
+                <button type="button" class="categoria-modal-cancelar" data-cerrar-modal>Cancelar</button>
+                <button type="submit" class="btn-cartelera" id="guardarCategoriaCartelera">Guardar</button>
+            </div>
+        </form>
+    </section>
+</div>
+
+<div class="categoria-cartelera-toast" id="mensajeCategoriaCartelera" role="status" aria-live="polite"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/admin/cartelera_categorias.js') }}"></script>
+{% endblock %}

@@ -26,6 +26,15 @@
 
 </div>
 
+<nav class="cartelera-tabs" aria-label="Secciones de cartelera">
+    <a class="cartelera-tab active" href="/admin/cartelera" aria-current="page">
+        <i data-lucide="film"></i> Películas
+    </a>
+    <a class="cartelera-tab" href="/admin/cartelera/categorias">
+        <i data-lucide="tags"></i> Categorías
+    </a>
+</nav>
+
 <div class="cartelera-grid">
 
     {% if peliculas %}
@@ -123,7 +132,7 @@
     data-tipo="{{ pelicula.tipo or 'Película' }}"
     data-titulo="{{ pelicula.titulo }}"
     data-genero="{{ pelicula.genero or '' }}"
-    data-categoria="{{ pelicula.categoria or '' }}"
+    data-categoria-id="{{ pelicula.categoria_id or '' }}"
     data-anio="{{ pelicula.anio or '' }}"
     data-descripcion="{{ pelicula.descripcion or '' }}"
     data-url="{{ pelicula.url or '' }}"
@@ -452,19 +461,19 @@
 
     <select
         id="categoriaPelicula"
-        name="categoria"
+        name="categoria_id"
+        required
     >
         <option value="">Selecciona...</option>
-        <option value="Acción">Acción</option>
-        <option value="Drama">Drama</option>
-        <option value="Comedia">Comedia</option>
-        <option value="Terror">Terror</option>
-        <option value="Ciencia ficción">Ciencia ficción</option>
-        <option value="Infantil">Infantil</option>
-        <option value="Romance">Romance</option>
-        <option value="Documentales">Documentales</option>
-        <option value="Series">Series</option>
-        <option value="Anime">Anime</option>
+        {% for categoria in categorias_cartelera %}
+            <option
+                value="{{ categoria.id }}"
+                data-activa="{{ 1 if categoria.activa else 0 }}"
+                {% if not categoria.activa %}disabled hidden{% endif %}
+            >
+                {{ categoria.nombre }}{% if not categoria.activa %} (inactiva){% endif %}
+            </option>
+        {% endfor %}
     </select>
 </div>
 
@@ -1116,6 +1125,14 @@ botonesVista.forEach(function (boton) {
 
     campoPeliculaId.value = "";
 
+    campoCategoria.querySelectorAll("option[data-activa='0']")
+        .forEach(function (opcion) {
+            opcion.disabled = true;
+            opcion.hidden = true;
+        });
+
+    campoCategoria.value = "";
+
     tituloModalCartelera.textContent =
         "Agregar película";
 
@@ -1287,8 +1304,18 @@ botonesEditarPelicula.forEach(function (boton) {
         campoGenero.value =
             boton.dataset.genero || "";
 
-        campoCategoria.value =
-            boton.dataset.categoria || "";
+        const categoriaIdActual =
+            boton.dataset.categoriaId || "";
+
+        campoCategoria.querySelectorAll("option[data-activa='0']")
+            .forEach(function (opcion) {
+                const esCategoriaActual =
+                    opcion.value === categoriaIdActual;
+                opcion.disabled = !esCategoriaActual;
+                opcion.hidden = !esCategoriaActual;
+            });
+
+        campoCategoria.value = categoriaIdActual;
 
         campoAnio.value =
             boton.dataset.anio || "";
