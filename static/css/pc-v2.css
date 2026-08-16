@@ -4519,27 +4519,13 @@ ANIMACIÓN FLOTANTE HERO
   .catalogo{
     position:relative;
     isolation:isolate;
-    overflow:hidden;
+    overflow:visible;
     border-block:1px solid color-mix(in srgb, var(--brand-accent) 16%, transparent);
-    background:
-      radial-gradient(ellipse 54% 38% at 14% 2%, color-mix(in srgb, var(--brand-accent) 10%, transparent), transparent 72%),
-      radial-gradient(ellipse 44% 34% at 88% 100%, color-mix(in srgb, var(--brand-primary) 8%, transparent), transparent 74%),
-      linear-gradient(180deg, color-mix(in srgb, var(--bg-primary) 95%, #111722), var(--bg-primary));
+    background:transparent;
   }
 
   .catalogo::before{
-    content:"";
-    position:absolute;
-    z-index:-1;
-    top:8%;
-    left:50%;
-    width:min(780px, 58vw);
-    aspect-ratio:2.4 / 1;
-    border:1px solid color-mix(in srgb, var(--brand-accent) 9%, transparent);
-    border-radius:50%;
-    opacity:.55;
-    transform:translateX(-50%) rotate(-5deg);
-    pointer-events:none;
+    content:none;
   }
 
   .catalogo > .top-section small{
@@ -4562,6 +4548,8 @@ ANIMACIÓN FLOTANTE HERO
   }
 
   #productosGrid .card{
+    --catalogo-float-duration:7.2s;
+    --catalogo-float-delay:-1.4s;
     isolation:isolate;
     border-color:color-mix(in srgb, var(--brand-accent) 13%, var(--border));
     border-radius:calc(var(--radius) * 1.15);
@@ -4570,6 +4558,18 @@ ANIMACIÓN FLOTANTE HERO
     box-shadow:0 22px 54px rgba(0,0,0,.32), inset 0 1px rgba(255,255,255,.035);
     transform:translateZ(0);
     transition:transform .48s cubic-bezier(.2,.75,.2,1), border-color .4s ease, box-shadow .48s ease;
+    animation:catalogo-card-flotante var(--catalogo-float-duration) cubic-bezier(.45,.05,.55,.95) var(--catalogo-float-delay) infinite alternate;
+    will-change:translate;
+  }
+
+  #productosGrid .card:nth-child(3n + 2){
+    --catalogo-float-duration:8.1s;
+    --catalogo-float-delay:-4.7s;
+  }
+
+  #productosGrid .card:nth-child(3n){
+    --catalogo-float-duration:6.7s;
+    --catalogo-float-delay:-6.2s;
   }
 
   #productosGrid .card::after{
@@ -4586,7 +4586,7 @@ ANIMACIÓN FLOTANTE HERO
   }
 
   #productosGrid .card:hover{
-    transform:translate3d(0,-7px,0);
+    transform:translate3d(0,-5px,16px) scale(1.008);
     border-color:color-mix(in srgb, var(--catalogo-color, var(--brand-accent)) 56%, var(--brand-accent));
     box-shadow:0 30px 72px rgba(0,0,0,.44), 0 0 30px color-mix(in srgb, var(--catalogo-color, var(--brand-primary)) 10%, transparent), inset 0 1px rgba(255,255,255,.055);
   }
@@ -4640,10 +4640,86 @@ ANIMACIÓN FLOTANTE HERO
     z-index:8;
   }
 
+  #productosGrid .plans{
+    flex:0 0 auto;
+    min-height:124px;
+    display:grid;
+    align-content:center;
+    grid-auto-rows:minmax(48px, auto);
+  }
+
+  #productosGrid .plan{
+    height:100%;
+  }
+
+  #productosGrid .plan:has(.plan-precio-promocional){
+    display:grid;
+    grid-template-columns:minmax(0, 1fr) auto;
+    grid-template-rows:auto auto;
+    column-gap:12px;
+    align-content:center;
+  }
+
+  #productosGrid .plan-precio-anterior{
+    grid-column:2;
+    grid-row:1;
+    color:color-mix(in srgb, var(--text-secondary) 72%, transparent) !important;
+    font-size:.68rem !important;
+    font-weight:650;
+    letter-spacing:.015em;
+    text-decoration:none !important;
+    line-height:1.05;
+  }
+
+  #productosGrid .plan-precio-anterior::before{
+    content:"Antes ";
+  }
+
+  #productosGrid .plan-precio-anterior > .precio-configurable{
+    text-decoration:line-through;
+    text-decoration-thickness:1px;
+  }
+
+  #productosGrid .plan-precio-promocional{
+    grid-column:2;
+    grid-row:2;
+    color:color-mix(in srgb, var(--brand-accent) 88%, white) !important;
+    font-size:0;
+    line-height:1.1;
+  }
+
+  #productosGrid .plan-precio-promocional > .precio-configurable{
+    font-size:1rem;
+  }
+
+  #productosGrid .plan:has(.plan-precio-promocional) > span:first-child{
+    grid-column:1;
+    grid-row:1 / 3;
+    align-self:center;
+  }
+
   #productosGrid .badge-destacado,
   #productosGrid .badge-oferta,
   #productosGrid .agotado-ribbon{
+    position:absolute;
     z-index:8;
+  }
+
+  #productosGrid .badge-oferta{
+    top:14px;
+    left:14px;
+    right:auto;
+    width:max-content;
+    max-width:calc(100% - 28px);
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:7px 13px;
+    border:1px solid color-mix(in srgb, var(--catalogo-color) 58%, white);
+    border-radius:999px;
+    white-space:nowrap;
+    line-height:1;
+    box-shadow:0 8px 22px color-mix(in srgb, var(--catalogo-color) 32%, transparent);
   }
 
   #productosGrid .card:has(.agotado-ribbon){
@@ -4659,6 +4735,16 @@ ANIMACIÓN FLOTANTE HERO
   }
 
   #productosGrid .buy{
+    box-sizing:border-box;
+    flex:0 0 56px;
+    min-height:56px;
+    height:56px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    margin-top:auto;
+    line-height:1.15;
+    text-align:center;
     transition:transform .25s ease, filter .25s ease, box-shadow .3s ease;
   }
 
@@ -4671,6 +4757,11 @@ ANIMACIÓN FLOTANTE HERO
     0%{ transform:scale(1.015) translate3d(-.35%,0,0); }
     100%{ transform:scale(1.035) translate3d(.35%,-.45%,0); }
   }
+
+  @keyframes catalogo-card-flotante{
+    0%{ translate:-2px 3px; }
+    100%{ translate:2px -9px; }
+  }
 }
 
 @media (min-width:769px) and (prefers-reduced-motion:reduce){
@@ -4680,6 +4771,8 @@ ANIMACIÓN FLOTANTE HERO
   #productosGrid .buy{
     animation:none !important;
     transition-duration:.01ms !important;
+    translate:none !important;
+    will-change:auto;
   }
 }
 

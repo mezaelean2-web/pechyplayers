@@ -1322,38 +1322,18 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
       <div class="plan">
         <span>{{ plan.plan }}</span>
         {% if plan.oferta_activa == 1 and plan.oferta_precio %}
-  <strong style="text-decoration: line-through; color:#777;"><span
+  <strong class="plan-precio-anterior" style="text-decoration: line-through; color:#777;"><span
   class="precio-configurable"
   data-precio="{{ plan.precio }}"
 >
   {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
 </span></strong>
-  <strong style="color:#ffd900;"><span
+  <strong class="plan-precio-promocional" style="color:#ffd900;"><span
   class="precio-configurable"
   data-precio="{{ plan.oferta_precio }}"
 >
   {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
 </span> 🔥</strong>
-{% else %}
-  {% if plan.oferta_activa == 1 and plan.oferta_precio %}
-  <div>
-    <strong style="text-decoration: line-through; color:#777; display:block;">
-      <span
-  class="precio-configurable"
-  data-precio="{{ plan.precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
-</span>
-    </strong>
-    <strong style="color:#ffd900; display:block;">
-      <span
-  class="precio-configurable"
-  data-precio="{{ plan.oferta_precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
-</span> 🔥
-    </strong>
-  </div>
 {% else %}
   <strong><span
   class="precio-configurable"
@@ -1361,7 +1341,6 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 >
   {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
 </span></strong>
-{% endif %}
 {% endif %}
       </div>
       {% endfor %}

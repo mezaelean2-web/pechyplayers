@@ -19,10 +19,8 @@ document.addEventListener("DOMContentLoaded", function () {
   }, 2500);
 }
 
-  if (!esMovil) return;
-
   /* ==========================
-     MODAL DE PRODUCTO
+     MODAL DE PRODUCTO COMPARTIDO
   ========================== */
   const modal = document.getElementById("productoModal");
   const cerrar = document.getElementById("cerrarProductoModal");
@@ -40,6 +38,7 @@ document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("modalRecomendacionesLista");
 
   let tarjetaActual = null;
+  const abridoresModal = new Map();
 
   function productoAgotado(card) {
   return Boolean(
@@ -69,7 +68,9 @@ function enviarAgotadoAWhatsApp(card) {
     }
   }
 
-  document.querySelectorAll(".producto-item").forEach(function (card) {
+  const tarjetasConModal = document.querySelectorAll(".producto-item");
+
+  tarjetasConModal.forEach(function (card) {
     const cover = card.querySelector(".cover");
     const boton = card.querySelector(".buy");
 
@@ -131,9 +132,9 @@ function enviarAgotadoAWhatsApp(card) {
       }
 
       const colorPlataforma =
-        getComputedStyle(card)
-          .getPropertyValue("--color-plataforma")
-          .trim() || "#ff2d2d";
+        getComputedStyle(card).getPropertyValue("--color-plataforma").trim() ||
+        getComputedStyle(card).getPropertyValue("--catalogo-color").trim() ||
+        "#ff2d2d";
 
       modal.style.setProperty("--modal-color", colorPlataforma);
 
@@ -202,15 +203,16 @@ function enviarAgotadoAWhatsApp(card) {
       return;
     }
 
-    const otraPortada =
-      otraCard.querySelector(".cover");
-
     contenido?.scrollTo({
       top: 0,
       behavior: "smooth"
     });
 
-    otraPortada?.click();
+    const abrirRecomendacion = abridoresModal.get(otraCard);
+
+    if (abrirRecomendacion) {
+      abrirRecomendacion();
+    }
   });
 
   modalRecomendacionesLista.appendChild(
@@ -235,16 +237,37 @@ if (
       document.body.classList.add("modal-abierto");
     }
 
-    cover?.addEventListener("click", abrirModalProducto);
+    abridoresModal.set(card, abrirModalProducto);
 
-    boton?.addEventListener("click", function (e) {
-      e.preventDefault();
-      abrirModalProducto();
-    });
+    if (esMovil) {
+      cover?.addEventListener("click", abrirModalProducto);
+    }
+
+    if (esMovil || card.closest("#productosGrid")) {
+      boton?.addEventListener("click", function (e) {
+        if (!esMovil && boton.classList.contains("buy-agotado")) return;
+
+        e.preventDefault();
+        abrirModalProducto();
+      });
+    }
   });
+
+  window.abrirProductoModalCompartido = function (card) {
+    const abrir = abridoresModal.get(card);
+    abrir?.();
+  };
 
   cerrar?.addEventListener("click", cerrarModal);
   fondo?.addEventListener("click", cerrarModal);
+
+  if (!esMovil) {
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && modal.classList.contains("abierto")) {
+        cerrarModal();
+      }
+    });
+  }
 
   modalCompartir?.addEventListener("click", async function () {
   if (!tarjetaActual) return;
@@ -317,9 +340,9 @@ if (
   });
 
   const color =
-    getComputedStyle(tarjetaActual)
-      .getPropertyValue("--color-plataforma")
-      .trim() || "#ff2d2d";
+    getComputedStyle(tarjetaActual).getPropertyValue("--color-plataforma").trim() ||
+    getComputedStyle(tarjetaActual).getPropertyValue("--catalogo-color").trim() ||
+    "#ff2d2d";
 
   const recordatorios = obtenerRecordatorios();
 
@@ -360,7 +383,7 @@ actualizarEstadoRecordatorios();
    Solo cierra estando arriba
 ========================== */
 
-if (contenido) {
+if (esMovil && contenido) {
   let inicioY = 0;
   let movimientoY = 0;
   let arrastrando = false;

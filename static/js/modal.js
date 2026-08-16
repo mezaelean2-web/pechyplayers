@@ -126,9 +126,6 @@
       `Ver ${nombreRecomendado} →`;
 
     boton.onclick = function () {
-      const portada =
-        tarjetaRecomendada.querySelector(".cover");
-
       const contenidoModal =
         document.querySelector(".producto-modal-contenido");
 
@@ -137,7 +134,11 @@
         behavior: "smooth"
       });
 
-      portada?.click();
+      if (typeof window.abrirProductoModalCompartido === "function") {
+        window.abrirProductoModalCompartido(tarjetaRecomendada);
+      } else {
+        tarjetaRecomendada.querySelector(".cover")?.click();
+      }
     };
   }
 
