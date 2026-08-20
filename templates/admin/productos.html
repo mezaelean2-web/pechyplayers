@@ -6,7 +6,9 @@
 <!--      AGREGAR PRODUCTO          -->
 <!-- ============================== -->
 
-<section class="admin-section" id="agregar">
+<details class="productos-admin-crear" id="agregar">
+
+    <summary class="productos-admin-crear__summary">Formulario para agregar producto</summary>
 
     <div class="section-heading">
 
@@ -145,7 +147,7 @@
 
     </div>
 
-</section>
+</details>
 
 
 <!-- ============================== -->
@@ -154,34 +156,245 @@
 
 <section class="admin-section" id="productos">
 
-    <div class="section-heading">
+    <div class="productos-admin-header">
 
-        <div>
-            <span class="section-label">PRODUCTOS</span>
-            <h2>Administrar productos</h2>
-            <p>Edita precios, ofertas, imágenes y visibilidad.</p>
+        <div class="productos-admin-header__copy">
+            <span class="productos-admin-eyebrow">CATÁLOGO</span>
+            <h1>Productos</h1>
+            <p>Administra tu catálogo, precios, ofertas y disponibilidad.</p>
         </div>
 
-        <span class="section-heading-icon">📺</span>
+        <button class="productos-admin-add" id="abrirAgregarProducto" type="button">
+            <span aria-hidden="true">+</span> Agregar producto
+        </button>
 
     </div>
 
-    <div class="product-search glass">
+    <div class="productos-admin-toolbar" aria-label="Herramientas del listado">
+        <label class="productos-admin-search" for="buscadorAdmin">
+            <span aria-hidden="true">🔎</span>
+            <input type="search" id="buscadorAdmin" placeholder="Buscar producto..." autocomplete="off">
+        </label>
 
-        <span>🔎</span>
+        <label class="productos-admin-filter">
+            <span>Categoría</span>
+            <select id="filtroCategoriaAdmin">
+                <option value="">Todas</option>
+                {% for categoria in categorias %}
+                    <option value="{{ categoria.nombre | lower }}">{{ categoria.nombre }}</option>
+                {% endfor %}
+            </select>
+        </label>
 
-        <input
-            type="text"
-            id="buscadorAdmin"
-            placeholder="Buscar producto..."
-            autocomplete="off"
-        >
+        <label class="productos-admin-filter">
+            <span>Estado</span>
+            <select id="filtroEstadoAdmin">
+                <option value="">Todos</option>
+                <option value="disponible">Disponibles</option>
+                <option value="agotado">Agotados</option>
+            </select>
+        </label>
 
+        <label class="productos-admin-filter">
+            <span>Característica</span>
+            <select id="filtroCaracteristicaAdmin">
+                <option value="">Todas</option>
+                <option value="oferta">Con oferta</option>
+                <option value="destacado">Más vendidos</option>
+                <option value="oculto">Ocultos</option>
+            </select>
+        </label>
+
+        <div class="productos-admin-toolbar__meta">
+            <strong id="contadorProductosAdmin">{{ productos | length }} productos</strong>
+            <span id="estadoOrdenProductosAdmin">Arrastra las tarjetas para ordenar</span>
+        </div>
     </div>
 
     <p id="resultadoBusquedaAdmin" role="status" aria-live="polite" hidden></p>
 
-    <div class="admin-products-list">
+    <div class="productos-admin-grid" id="productosAdminGrid">
+        {% for producto in productos %}
+            {% set oferta = namespace(activa=false) %}
+            {% for plan in producto.planes %}
+                {% if plan.oferta_activa == 1 and plan.oferta_precio %}
+                    {% set oferta.activa = true %}
+                {% endif %}
+            {% endfor %}
+
+            <article
+                class="productos-admin-card"
+                draggable="true"
+                tabindex="0"
+                data-producto="{{ producto.nombre }}"
+                data-nombre="{{ producto.nombre | lower }}"
+                data-categoria="{{ producto.categoria | lower }}"
+                data-estado="{{ producto.estado }}"
+                data-visible="{{ producto.visible }}"
+                data-destacado="{{ producto.destacado }}"
+                data-oferta="{{ 1 if oferta.activa else 0 }}"
+                data-precios='{{ producto.planes | map(attribute="precio") | list | tojson }}'
+                aria-label="{{ producto.nombre }}, {{ producto.planes | length }} planes"
+            >
+                <div class="productos-admin-card__media">
+                    <img src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}" alt="{{ producto.nombre }}" loading="lazy" decoding="async">
+                    <span class="productos-admin-card__drag" aria-hidden="true">⋮⋮</span>
+                </div>
+
+                <div class="productos-admin-card__body">
+                    <div class="productos-admin-card__heading">
+                        <div>
+                            <h2>{{ producto.nombre }}</h2>
+                            <p>{{ producto.categoria }}</p>
+                        </div>
+                        <button class="productos-admin-card__menu" type="button" data-legacy-producto="{{ producto.nombre }}" aria-label="Abrir controles actuales de {{ producto.nombre }}" title="Abrir controles actuales">⋮</button>
+                    </div>
+
+                    <div class="productos-admin-card__commercial">
+                        <span>{{ producto.planes | length }} {{ 'plan' if producto.planes | length == 1 else 'planes' }}</span>
+                        <strong class="productos-admin-card__price">Calculando precio…</strong>
+                    </div>
+
+                    <div class="productos-admin-card__badges">
+                        {% if producto.estado == 'disponible' %}
+                            <span class="productos-admin-badge productos-admin-badge--available">🟢 Disponible</span>
+                        {% else %}
+                            <span class="productos-admin-badge productos-admin-badge--soldout">🔴 Agotado</span>
+                        {% endif %}
+                        {% if oferta.activa %}<span class="productos-admin-badge productos-admin-badge--offer">🔥 Oferta</span>{% endif %}
+                        {% if producto.destacado == 1 %}<span class="productos-admin-badge productos-admin-badge--featured">⭐ Más vendido</span>{% endif %}
+                        {% if producto.visible != 1 %}<span class="productos-admin-badge productos-admin-badge--hidden">👁 Oculto</span>{% endif %}
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+
+    <div class="productos-admin-empty" id="productosAdminEmpty" hidden>
+        <span aria-hidden="true">🔎</span>
+        <strong>No encontramos productos</strong>
+        <p>Prueba limpiando la búsqueda o los filtros.</p>
+    </div>
+
+    <div class="producto-control-backdrop" id="productoControlBackdrop" hidden>
+        <section class="producto-control-modal" role="dialog" aria-modal="true" aria-labelledby="productoControlTitle-1" tabindex="-1">
+            {% for producto in productos %}
+                {% set producto_index = loop.index %}
+                {% set oferta = namespace(activa=false) %}
+                {% for plan in producto.planes %}
+                    {% if plan.oferta_activa == 1 and plan.oferta_precio %}{% set oferta.activa = true %}{% endif %}
+                {% endfor %}
+                <div class="producto-control" data-modal-producto="{{ producto.nombre }}" hidden>
+                    <header class="producto-control__header">
+                        <img src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}" alt="">
+                        <div class="producto-control__identity">
+                            <span>Centro de control</span>
+                            <h2 id="productoControlTitle-{{ producto_index }}">{{ producto.nombre }}</h2>
+                            <p>{{ producto.categoria }} · {{ producto.planes | length }} {{ 'plan' if producto.planes | length == 1 else 'planes' }}</p>
+                        </div>
+                        <div class="producto-control__badges" aria-label="Estado actual">
+                            <span class="is-{{ producto.estado }}">{{ 'Disponible' if producto.estado == 'disponible' else 'Agotado' }}</span>
+                            {% if oferta.activa %}<span class="is-offer">🔥 Oferta</span>{% endif %}
+                            {% if producto.destacado == 1 %}<span>⭐ Más vendido</span>{% endif %}
+                            <span>{{ 'Visible' if producto.visible == 1 else 'Oculto' }}</span>
+                        </div>
+                    </header>
+
+                    <div class="producto-control__body">
+                        <section class="producto-control-section">
+                            <div class="producto-control-section__title"><span>01</span><div><h3>Información general</h3><p>Identidad, imagen y ubicación en el catálogo.</p></div></div>
+                            <div class="producto-general-grid">
+                                <form action="/editar-producto" method="POST" enctype="multipart/form-data" class="producto-modal-form producto-info-form">
+                                    <input type="hidden" name="nombre_actual" value="{{ producto.nombre }}">
+                                    <div class="producto-image-editor">
+                                        <img id="modalPreview-{{ producto_index }}" src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}" alt="Imagen actual de {{ producto.nombre }}">
+                                        <label for="modalImagen-{{ producto_index }}"><span>↥</span><strong>Cambiar imagen</strong><small>Se conservarán las reglas actuales</small></label>
+                                        <input id="modalImagen-{{ producto_index }}" class="producto-modal-file" type="file" name="imagen" accept="image/*" onchange="previewImagen(this, 'modalPreview-{{ producto_index }}')">
+                                    </div>
+                                    <div class="producto-modal-field">
+                                        <label for="modalNombre-{{ producto_index }}">Nombre del producto</label>
+                                        <input id="modalNombre-{{ producto_index }}" type="text" name="nuevo_nombre" value="{{ producto.nombre }}" required>
+                                    </div>
+                                    <button class="producto-modal-save" type="submit">Guardar información</button>
+                                </form>
+                                <form action="/actualizar-categoria" method="POST" class="producto-modal-form producto-category-form">
+                                    <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+                                    <div class="producto-modal-field">
+                                        <label for="modalCategoria-{{ producto_index }}">Categoría</label>
+                                        <select id="modalCategoria-{{ producto_index }}" name="categoria" required>
+                                            {% for categoria in categorias %}<option value="{{ categoria.nombre }}" {% if producto.categoria == categoria.nombre %}selected{% endif %}>{{ categoria.nombre }}</option>{% endfor %}
+                                        </select>
+                                    </div>
+                                    <button class="producto-modal-save producto-modal-save--secondary" type="submit">Guardar categoría</button>
+                                </form>
+                            </div>
+                        </section>
+
+                        <section class="producto-control-section">
+                            <div class="producto-control-section__title"><span>02</span><div><h3>Estado del producto</h3><p>Controla cómo se presenta sin cambiar los contratos actuales.</p></div></div>
+                            <div class="producto-state-grid">
+                                <form action="/actualizar-estado" method="POST" class="producto-state-card">
+                                    <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+                                    <input id="modalDisponible-{{ producto_index }}" type="checkbox" name="disponible" {% if producto.estado == 'disponible' %}checked{% endif %}>
+                                    <label for="modalDisponible-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Disponibilidad</strong><small>{{ 'Disponible' if producto.estado == 'disponible' else 'Agotado' }}</small></span></label>
+                                    <button type="submit">Aplicar</button>
+                                </form>
+                                <form action="/actualizar-visible" method="POST" class="producto-state-card">
+                                    <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+                                    <input id="modalVisible-{{ producto_index }}" type="checkbox" name="visible" {% if producto.visible == 1 %}checked{% endif %}>
+                                    <label for="modalVisible-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Visibilidad</strong><small>{{ 'Visible' if producto.visible == 1 else 'Oculto' }}</small></span></label>
+                                    <button type="submit">Aplicar</button>
+                                </form>
+                                <form action="/actualizar-destacado" method="POST" class="producto-state-card">
+                                    <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+                                    <input id="modalDestacado-{{ producto_index }}" type="checkbox" name="destacado" {% if producto.destacado == 1 %}checked{% endif %}>
+                                    <label for="modalDestacado-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Más vendido</strong><small>{{ 'Destacado' if producto.destacado == 1 else 'Sin destacar' }}</small></span></label>
+                                    <button type="submit">Aplicar</button>
+                                </form>
+                            </div>
+                        </section>
+
+                        <section class="producto-control-section">
+                            <div class="producto-control-section__title"><span>03</span><div><h3>Planes y precios</h3><p>Cada plan conserva su identificador y guardado independiente.</p></div></div>
+                            <div class="producto-modal-plans">
+                                {% for plan in producto.planes %}
+                                    <article class="producto-modal-plan {% if plan.oferta_activa == 1 %}has-offer{% endif %}">
+                                        <header><div><span>PLAN</span><h4>💎 {{ plan.plan }}</h4></div>{% if plan.oferta_activa == 1 %}<strong>🔥 OFERTA ACTIVA</strong>{% endif %}</header>
+                                        <div class="producto-plan-forms">
+                                            <form action="/actualizar-precio" method="POST" class="producto-modal-form">
+                                                <input type="hidden" name="id" value="{{ plan.id }}">
+                                                <div class="producto-modal-field"><label for="modalPrecio-{{ plan.id }}">Precio normal</label><input id="modalPrecio-{{ plan.id }}" type="text" name="precio" value="{{ plan.precio }}" required></div>
+                                                <button class="producto-modal-save producto-modal-save--secondary" type="submit">Guardar precio</button>
+                                            </form>
+                                            <form action="/actualizar-oferta" method="POST" class="producto-modal-form producto-offer-form">
+                                                <input type="hidden" name="id" value="{{ plan.id }}">
+                                                <div class="producto-modal-field"><label for="modalOferta-{{ plan.id }}">Precio de oferta</label><input id="modalOferta-{{ plan.id }}" type="text" name="oferta_precio" value="{{ plan.oferta_precio or '' }}" placeholder="Ejemplo: 10 MIL"></div>
+                                                <input id="modalOfertaActiva-{{ plan.id }}" type="checkbox" name="oferta_activa" {% if plan.oferta_activa == 1 %}checked{% endif %}>
+                                                <label class="producto-offer-toggle" for="modalOfertaActiva-{{ plan.id }}"><span class="producto-switch"></span>Oferta activa</label>
+                                                <button class="producto-modal-save producto-modal-save--offer" type="submit">Guardar oferta</button>
+                                            </form>
+                                        </div>
+                                        <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')" class="producto-danger-form">
+                                            <input type="hidden" name="id" value="{{ plan.id }}"><button type="submit">Eliminar plan</button>
+                                        </form>
+                                    </article>
+                                {% endfor %}
+                            </div>
+                        </section>
+
+                        <section class="producto-control-section producto-actions-section">
+                            <div class="producto-control-section__title"><span>04</span><div><h3>Acciones del producto</h3><p>Operaciones adicionales claramente separadas.</p></div></div>
+                            <form action="/duplicar-producto" method="POST"><input type="hidden" name="nombre" value="{{ producto.nombre }}"><button class="producto-duplicate" type="submit">▣ Duplicar producto</button></form>
+                            <div class="producto-risk-note"><strong>Zona de riesgo</strong><p>La eliminación disponible actualmente se realiza por plan, dentro de cada tarjeta.</p></div>
+                        </section>
+                    </div>
+                </div>
+            {% endfor %}
+            <button class="producto-control__close" type="button" data-close-producto-modal aria-label="Cerrar editor">×</button>
+        </section>
+    </div>
+
+    <div class="admin-products-list productos-admin-legacy" id="productosAdminLegacy" hidden>
 
         {% if productos %}
 
