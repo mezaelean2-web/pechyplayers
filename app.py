@@ -2886,34 +2886,75 @@ def agregar_producto():
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
 
-    nombre = request.form["nombre"]
-    plan = request.form["plan"]
-    precio = request.form["precio"]
+    nombre = request.form.get("nombre", "").strip()
     categoria = request.form.get("categoria", "").strip()
-
     if not categoria:
-       categoria = "Sin categoría"
-    imagen_file = request.files["imagen"]
+        categoria = "Sin categoría"
 
-    filename = guardar_imagen_optimizada(imagen_file)
+    # Se conserva el contrato heredado (plan/precio) y se amplía para la
+    # creación inicial de los dos planes que ya modela la tabla productos.
+    planes = []
+    if "plan" in request.form or "precio" in request.form:
+        plan = request.form.get("plan", "").strip()
+        precio = request.form.get("precio", "").strip()
+        if plan and precio:
+            planes.append((plan, precio))
+    else:
+        if request.form.get("cuenta_completa_activa") == "on":
+            planes.append(("Cuenta completa", request.form.get("precio_cuenta_completa", "").strip()))
+        if request.form.get("perfil_activo") == "on":
+            planes.append(("Perfil", request.form.get("precio_perfil", "").strip()))
+
+    categorias_validas = {item["nombre"] for item in obtener_categorias()}
+    categorias_validas.add("Sin categoría")
+    precios_validos = all(precio and re.search(r"\d", precio) for _, precio in planes)
+    imagen_file = request.files.get("imagen")
+
+    if not nombre or len(nombre) > 120:
+        flash("Escribe un nombre de producto válido ❌")
+        return redirect("/admin/productos#productos")
+    if categoria not in categorias_validas:
+        flash("Categoría no válida ❌")
+        return redirect("/admin/productos#productos")
+    if not planes or not precios_validos:
+        flash("Activa al menos un plan con un precio válido ❌")
+        return redirect("/admin/productos#productos")
+    if not imagen_file or not imagen_file.filename:
+        flash("Selecciona una imagen válida ❌")
+        return redirect("/admin/productos#productos")
+    try:
+        formato_imagen = (Image.open(imagen_file.stream).format or "").upper()
+        imagen_file.stream.seek(0)
+    except Exception:
+        formato_imagen = ""
+    if formato_imagen not in {"JPEG", "PNG", "WEBP"}:
+        flash("La imagen no es válida. Usa JPG, PNG o WEBP ❌")
+        return redirect("/admin/productos#productos")
 
     conn = conectar()
-    cursor = conn.cursor()
-    cursor.execute("""
-    INSERT INTO productos
-    (nombre, imagen, plan, precio, categoria)
-    VALUES (?, ?, ?, ?, ?)
-""", (
-    nombre,
-    filename,
-    plan,
-    precio,
-    categoria
-))
-    conn.commit()
-    conn.close()
+    try:
+        cursor = conn.cursor()
+        if cursor.execute("SELECT 1 FROM productos WHERE lower(trim(nombre)) = lower(?) LIMIT 1", (nombre,)).fetchone():
+            flash("Ya existe un producto con ese nombre ❌")
+            return redirect("/admin/productos#productos")
+        try:
+            filename = guardar_imagen_optimizada(imagen_file)
+        except Exception:
+            flash("La imagen no es válida. Usa JPG, PNG o WEBP ❌")
+            return redirect("/admin/productos#productos")
+        cursor.executemany("""
+            INSERT INTO productos (nombre, imagen, plan, precio, categoria)
+            VALUES (?, ?, ?, ?, ?)
+        """, [(nombre, filename, plan, precio, categoria) for plan, precio in planes])
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        flash("No se pudo crear el producto ❌")
+        return redirect("/admin/productos#productos")
+    finally:
+        conn.close()
     
-    flash("Producto agregado correctamente ✅")
+    flash("Producto y planes creados correctamente ✅")
 
     return redirect("/admin/productos#productos")
 
