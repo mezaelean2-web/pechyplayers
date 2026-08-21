@@ -1,8 +1,9 @@
-{% extends "resellers/_base.html" %}
+{% extends "resellers/_dashboard_base.html" %}
 {% block title %}Mi cuenta{% endblock %}
+{% block section_title %}Mi cuenta{% endblock %}
 {% block content %}
 <section class="reseller-account-card">
-  <header><div><span class="reseller-auth-eyebrow">MI CUENTA</span><h1>{{ revendedor.nombre }}</h1><p>{{ revendedor.negocio or 'Revendedor independiente' }} · Estado {{ revendedor.estado }}</p></div><a href="/">Volver al catálogo</a></header>
+  <header><div><span class="reseller-auth-eyebrow">MI CUENTA</span><h1>{{ revendedor.nombre }}</h1><p>{{ revendedor.negocio or 'Revendedor independiente' }} · Estado {{ revendedor.estado }}</p></div><a href="/revendedores/productos">Ver productos</a></header>
   {% if error %}<div class="reseller-auth-message">{{ error }}</div>{% endif %}{% if exito %}<div class="reseller-auth-message is-success">{{ exito }}</div>{% endif %}
   <section class="reseller-wallet-readonly" id="recargar-saldo"><span>Saldo disponible</span><strong>{{ saldo_wallet_cop }}</strong><button type="button" id="open-recharge">Recargar saldo</button></section>
   <div class="reseller-account-grid">

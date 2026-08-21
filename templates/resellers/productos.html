@@ -1,0 +1,22 @@
+{% extends "resellers/_dashboard_base.html" %}
+{% block title %}Productos{% endblock %}
+{% block section_title %}Productos{% endblock %}
+{% block content %}
+<section class="reseller-catalog-hero">
+  <div><span class="reseller-kicker">CATÁLOGO RESELLER</span><h2>Productos disponibles</h2><p>Precios privados aplicables a tu cuenta. La compra se habilitará en una próxima fase.</p></div>
+  <div><span>Saldo disponible</span><strong>{{ resumen.saldo_cop }}</strong></div>
+</section>
+{% if categorias %}
+  {% for categoria, productos in categorias.items() %}<section class="reseller-catalog-section">
+    <header><div><span class="reseller-kicker">CATEGORÍA</span><h3>{{ categoria }}</h3></div><small>{{ productos|length }} producto{{ 's' if productos|length != 1 else '' }}</small></header>
+    <div class="reseller-product-grid">
+      {% for producto in productos %}<article class="reseller-product-card is-catalog">
+        <img src="{{ url_for('static', filename='img/platforms/' ~ producto.imagen) }}" alt="{{ producto.nombre }}" loading="lazy">
+        <div><span>Disponible</span><h4>{{ producto.nombre }}</h4><div class="reseller-plan-list">
+          {% for plan in producto.planes %}<div><span>{{ plan.plan }}</span><strong>{{ plan.precio_reseller_cop }}</strong></div>{% endfor %}
+        </div><button type="button" disabled>Comprar</button><small>Compra aún no habilitada</small></div>
+      </article>{% endfor %}
+    </div>
+  </section>{% endfor %}
+{% else %}<section class="reseller-panel reseller-empty-state"><h3>No hay productos disponibles</h3><p>Por ahora no tienes productos con precio reseller aplicable.</p></section>{% endif %}
+{% endblock %}

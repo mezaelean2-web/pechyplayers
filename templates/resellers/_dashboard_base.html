@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#070b12">
   <title>{% block title %}Panel reseller{% endblock %} · PECHY PLAYERS</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-dashboard.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-dashboard.css') }}?v=2">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-wallet.css') }}?v=2">
   {% block head %}{% endblock %}
 </head>
 <body class="reseller-app">
@@ -18,10 +20,10 @@
     </a>
     <nav class="reseller-primary-nav">
       <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
-      <a href="/"><span>▦</span>Productos</a>
-      <a href="/revendedores/cuenta#recargar-saldo"><span>＋</span>Recargar saldo</a>
-      <a href="/revendedores/cuenta#movimientos"><span>↕</span>Movimientos</a>
-      <a href="/revendedores/cuenta"><span>○</span>Mi cuenta</a>
+      <a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><span>▦</span>Productos</a>
+      <a href="/revendedores/recargar"><span>＋</span>Recargar saldo</a>
+      <a href="/revendedores/movimientos"><span>↕</span>Movimientos</a>
+      <a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><span>○</span>Mi cuenta</a>
     </nav>
     <div class="reseller-sidebar-footer">
       <a class="reseller-sidebar-balance" href="/revendedores/cuenta#recargar-saldo">
@@ -52,9 +54,10 @@
 
   <nav class="reseller-mobile-nav" aria-label="Navegación móvil">
     <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
-    <a href="/"><span>▦</span>Productos</a>
-    <a class="is-primary" href="/revendedores/cuenta#recargar-saldo"><span>＋</span>Recargar</a>
-    <a href="/revendedores/cuenta"><span>○</span>Cuenta</a>
+    <a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><span>▦</span>Productos</a>
+    <a class="is-primary" href="/revendedores/recargar"><span>＋</span>Recargar</a>
+    <a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><span>○</span>Cuenta</a>
   </nav>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

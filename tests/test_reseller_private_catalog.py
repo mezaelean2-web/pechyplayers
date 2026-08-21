@@ -1,0 +1,99 @@
+import os
+import sqlite3
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import app as app_module
+import database
+import resellers
+import wallets
+
+
+class ResellerPrivateCatalogTest(unittest.TestCase):
+    def setUp(self):
+        descriptor, self.db_path = tempfile.mkstemp(suffix=".db")
+        os.close(descriptor)
+        self.original_db = database.DB
+        database.DB = self.db_path
+        conn = sqlite3.connect(self.db_path)
+        conn.execute("""CREATE TABLE productos (
+            id INTEGER PRIMARY KEY, nombre TEXT NOT NULL, imagen TEXT DEFAULT 'netflix.jpg',
+            plan TEXT NOT NULL, precio TEXT NOT NULL, oferta_precio TEXT,
+            oferta_activa INTEGER DEFAULT 0, destacado INTEGER DEFAULT 0,
+            visible INTEGER DEFAULT 1, orden INTEGER DEFAULT 1,
+            categoria TEXT DEFAULT 'Streaming', orden_categoria INTEGER DEFAULT 1,
+            estado TEXT DEFAULT 'disponible')""")
+        conn.execute("""CREATE TABLE categorias (
+            id INTEGER PRIMARY KEY, nombre TEXT NOT NULL, icono TEXT DEFAULT '',
+            color TEXT DEFAULT '', visible INTEGER DEFAULT 1, orden INTEGER DEFAULT 1)""")
+        conn.execute("INSERT INTO categorias(nombre, visible) VALUES('Streaming', 1)")
+        conn.executemany("INSERT INTO productos(id,nombre,plan,precio) VALUES(?,?,?,?)", [
+            (1, "Netflix", "Perfil", "777777"), (2, "Netflix", "Cuenta", "888888"),
+            (3, "Sin precio", "Perfil", "999999")])
+        conn.commit(); conn.close()
+        resellers.inicializar_revendedores()
+        self.reseller_id = resellers.crear_revendedor("Propio", "propio@example.com", "3001234567", "Tienda", "ClaveSegura123")
+        self.otro_id = resellers.crear_revendedor("Otro", "otro@example.com", "3007654321", "Otra", "ClaveSegura123")
+        app_module.app.config.update(TESTING=True, SECRET_KEY="catalog-test")
+        self.client = app_module.app.test_client()
+
+    def tearDown(self):
+        database.DB = self.original_db
+        os.remove(self.db_path)
+
+    def autenticar(self, reseller_id=None):
+        revendedor = resellers.obtener_revendedor(reseller_id or self.reseller_id)
+        with self.client.session_transaction() as session:
+            session["reseller_id"] = revendedor["id"]
+            session["reseller_auth_version"] = revendedor["auth_version"]
+
+    def test_anonimo_y_bloqueado_no_acceden(self):
+        self.assertEqual(self.client.get("/revendedores/productos").status_code, 302)
+        self.autenticar()
+        resellers.cambiar_estado_revendedor(self.reseller_id, "bloqueado")
+        respuesta = self.client.get("/revendedores/productos")
+        self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers["Location"].endswith("/revendedores/login"))
+
+    def test_solo_precio_reseller_sin_fallback_publico_y_aislado(self):
+        resellers.guardar_precio_personalizado(self.reseller_id, 1, 11000)
+        resellers.guardar_precio_personalizado(self.otro_id, 1, 22000)
+        self.autenticar()
+        html = self.client.get("/revendedores/productos").get_data(as_text=True)
+        self.assertIn("Netflix", html)
+        self.assertIn("$11.000 COP", html)
+        self.assertNotIn("$22.000 COP", html)
+        for publico in ("777777", "888888", "999999", "Sin precio"):
+            self.assertNotIn(publico, html)
+
+    def test_visibilidad_categoria_disponibilidad_y_planes_validos(self):
+        resellers.guardar_precio_general(1, 11000)
+        resellers.guardar_precio_general(2, 18000)
+        productos = [
+            {"nombre": "Visible", "imagen": "netflix.jpg", "visible": 1, "estado": "disponible", "categoria": "Streaming", "planes": [{"id": 1, "plan": "Perfil", "precio": "777777"}, {"id": 3, "plan": "Sin precio", "precio": "999999"}]},
+            {"nombre": "Oculto", "visible": 0, "estado": "disponible", "categoria": "Streaming", "planes": [{"id": 2, "plan": "P", "precio": "1"}]},
+            {"nombre": "Agotado", "visible": 1, "estado": "agotado", "categoria": "Streaming", "planes": [{"id": 2, "plan": "P", "precio": "1"}]},
+            {"nombre": "Categoria oculta", "visible": 1, "estado": "disponible", "categoria": "Oculta", "planes": [{"id": 2, "plan": "P", "precio": "1"}]},
+        ]
+        self.autenticar()
+        with patch.object(app_module, "obtener_productos", return_value=productos), patch.object(app_module, "obtener_categorias", return_value=[{"nombre": "Streaming", "visible": 1}, {"nombre": "Oculta", "visible": 0}]):
+            html = self.client.get("/revendedores/productos").get_data(as_text=True)
+        self.assertIn("Visible", html)
+        self.assertIn("Perfil", html)
+        for excluido in ("Sin precio", "Oculto", "Agotado", "Categoria oculta"):
+            self.assertNotIn(excluido, html)
+
+    def test_catalogo_es_solo_lectura_y_comprar_no_transacciona(self):
+        resellers.guardar_precio_general(1, 11000)
+        wallets.apply_wallet_transaction(self.reseller_id, "manual_credit", 40000, "Base")
+        saldo_antes = wallets.obtener_saldo(self.reseller_id)
+        self.autenticar()
+        html = self.client.get("/revendedores/productos").get_data(as_text=True)
+        self.assertIn('type="button" disabled', html)
+        self.assertIn("Compra aún no habilitada", html)
+        self.assertEqual(wallets.obtener_saldo(self.reseller_id), saldo_antes)
+
+
+if __name__ == "__main__":
+    unittest.main()

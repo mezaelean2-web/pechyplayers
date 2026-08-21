@@ -8,7 +8,17 @@
     <h2>Hola, {{ revendedor.nombre.split()[0] }}</h2>
     <p>{% if revendedor.negocio %}Todo listo para gestionar {{ revendedor.negocio }}.{% else %}Todo listo para gestionar tu negocio.{% endif %}</p>
   </div>
-  <a href="/">Ver catálogo reseller <span>→</span></a>
+  <a href="/revendedores/productos">Ver todos los productos <span>→</span></a>
+</section>
+
+<section class="reseller-panel reseller-featured">
+  <header><div><span class="reseller-kicker">CATÁLOGO PRIVADO</span><h3>Productos para ti</h3></div><a href="/revendedores/productos">Ver todos los productos</a></header>
+  {% if productos_destacados %}<div class="reseller-product-grid">
+    {% for producto in productos_destacados %}<article class="reseller-product-card">
+      <img src="{{ url_for('static', filename='img/platforms/' ~ producto.imagen) }}" alt="{{ producto.nombre }}" loading="lazy">
+      <div><span>{{ producto.categoria }}</span><h4>{{ producto.nombre }}</h4><small>Desde</small><strong>{{ producto.precio_desde_cop }}</strong><a href="/revendedores/productos">Ver producto</a></div>
+    </article>{% endfor %}
+  </div>{% else %}<div class="reseller-empty-state"><h4>No hay productos habilitados por ahora</h4><p>El catálogo mostrará productos cuando tengan un precio reseller aplicable.</p></div>{% endif %}
 </section>
 
 <section class="reseller-dashboard-grid" aria-label="Resumen de cuenta">
@@ -52,11 +62,10 @@
 
   <aside class="reseller-panel reseller-shortcuts">
     <header><div><span class="reseller-kicker">ATAJOS</span><h3>Accesos rápidos</h3></div></header>
-    <a href="/"><span>▦</span><div><strong>Productos</strong><small>Consulta tu catálogo y precios</small></div><b>›</b></a>
-    <a href="/revendedores/cuenta#recargar-saldo"><span>＋</span><div><strong>Recargar saldo</strong><small>Continúa con el flujo seguro actual</small></div><b>›</b></a>
-    <a href="/revendedores/cuenta#movimientos"><span>↕</span><div><strong>Movimientos</strong><small>Revisa la actividad de tu wallet</small></div><b>›</b></a>
+    <a href="/revendedores/productos"><span>▦</span><div><strong>Productos</strong><small>Consulta tu catálogo y precios</small></div><b>›</b></a>
+    <a href="/revendedores/recargar"><span>＋</span><div><strong>Recargar saldo</strong><small>Continúa con el flujo seguro actual</small></div><b>›</b></a>
+    <a href="/revendedores/movimientos"><span>↕</span><div><strong>Movimientos</strong><small>Revisa la actividad de tu wallet</small></div><b>›</b></a>
     <a href="/revendedores/cuenta"><span>○</span><div><strong>Mi cuenta</strong><small>Actualiza tus datos y seguridad</small></div><b>›</b></a>
-    <p class="reseller-coming-soon">Compras desde el panel <span>Próximamente</span></p>
   </aside>
 </section>
 {% endblock %}

@@ -217,8 +217,20 @@ class ResellerDashboardTest(unittest.TestCase):
             "ticket promedio", "facturación", "productos entregados"
         ):
             self.assertNotIn(metrica, html)
-        self.assertIn("compras desde el panel", html)
-        self.assertIn("próximamente", html)
+        self.assertNotIn("compras desde el panel", html)
+
+    def test_navegacion_y_destacados_permanecen_en_panel_privado(self):
+        self.insertar_planes(1)
+        resellers.guardar_precio_general(1, 11000)
+        self.autenticar()
+        html = self.respuesta_dashboard(
+            [self.producto(1, "Netflix", 1)],
+            [{"nombre": "Streaming", "visible": 1}],
+        ).get_data(as_text=True)
+        self.assertIn('href="/revendedores/productos"', html)
+        self.assertIn("Productos para ti", html)
+        self.assertIn("$11.000 COP", html)
+        self.assertNotIn('href="/">Ver cat', html)
 
 
 if __name__ == "__main__":

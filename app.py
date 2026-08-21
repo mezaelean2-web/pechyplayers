@@ -401,25 +401,48 @@ def _login_reseller_limitado(correo):
     return len(intentos) >= _LOGIN_RESELLER_MAX_INTENTOS, clave
 
 
-def _productos_disponibles_dashboard(revendedor_id):
+def _catalogo_reseller(revendedor_id):
+    """Construye el catálogo privado usando solo precios reseller aplicables."""
     categorias_visibles = {
         categoria["nombre"]
         for categoria in obtener_categorias()
         if categoria["visible"] == 1
     }
-    productos = [
+    candidatos = [
         producto for producto in obtener_productos()
         if producto.get("visible", 1) == 1
+        and (producto.get("estado") or "disponible").strip().lower() == "disponible"
         and (producto.get("categoria") or "Sin categoría").strip().lower() != "sin categoría"
         and (producto.get("categoria") or "Sin categoría") in categorias_visibles
     ]
-    plan_ids = [plan["id"] for producto in productos for plan in producto["planes"]]
+    plan_ids = [plan["id"] for producto in candidatos for plan in producto["planes"]]
     precios = resellers.resolver_precios_revendedor(revendedor_id, plan_ids)
-    return sum(
-        1 for producto in productos
-        if any(precios.get(plan["id"], {}).get("precio") is not None
-               for plan in producto["planes"])
-    )
+    catalogo = []
+    for producto in candidatos:
+        planes = []
+        for plan in producto["planes"]:
+            precio = precios.get(plan["id"], {})
+            if precio.get("precio") is None:
+                continue
+            variante = dict(plan)
+            variante["precio_reseller"] = precio
+            variante["precio_reseller_cop"] = wallets.formato_cop(precio["precio"])
+            planes.append(variante)
+        if planes:
+            item = dict(producto)
+            item["imagen"] = item.get("imagen") or "producto.jpg"
+            item["planes"] = planes
+            item["precio_desde"] = min(plan["precio_reseller"]["precio"] for plan in planes)
+            item["precio_desde_cop"] = wallets.formato_cop(item["precio_desde"])
+            catalogo.append(item)
+    return catalogo
+
+
+def _resumen_privado_reseller(revendedor_id):
+    resumen = wallets.obtener_resumen_dashboard(revendedor_id)
+    resumen["saldo_cop"] = wallets.formato_cop(resumen["saldo"])
+    resumen["total_recargado_cop"] = wallets.formato_cop(resumen["total_recargado"])
+    return resumen
 
 
 @app.route("/revendedores")
@@ -428,17 +451,52 @@ def dashboard_revendedor():
     if not revendedor:
         session.setdefault("reseller_auth_error", "sesion")
         return redirect("/revendedores/login")
-    resumen = wallets.obtener_resumen_dashboard(revendedor["id"])
-    resumen["saldo_cop"] = wallets.formato_cop(resumen["saldo"])
-    resumen["total_recargado_cop"] = wallets.formato_cop(resumen["total_recargado"])
-    resumen["productos_disponibles"] = _productos_disponibles_dashboard(revendedor["id"])
+    resumen = _resumen_privado_reseller(revendedor["id"])
+    catalogo = _catalogo_reseller(revendedor["id"])
+    resumen["productos_disponibles"] = len(catalogo)
     return render_template(
         "resellers/dashboard.html",
         revendedor=revendedor,
         resumen=resumen,
+        productos_destacados=catalogo[:4],
         csrf_token=_csrf_reseller_token(),
         seccion_activa="inicio",
     )
+
+
+@app.route("/revendedores/productos")
+def productos_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    resumen = _resumen_privado_reseller(revendedor["id"])
+    productos = _catalogo_reseller(revendedor["id"])
+    resumen["productos_disponibles"] = len(productos)
+    categorias = OrderedDict()
+    for producto in productos:
+        categorias.setdefault(producto["categoria"], []).append(producto)
+    return render_template(
+        "resellers/productos.html", revendedor=revendedor, resumen=resumen,
+        categorias=categorias, csrf_token=_csrf_reseller_token(),
+        seccion_activa="productos",
+    )
+
+
+@app.route("/revendedores/recargar")
+def recargar_revendedor():
+    if not _revendedor_sesion_actual():
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    return redirect("/revendedores/cuenta#recargar-saldo")
+
+
+@app.route("/revendedores/movimientos")
+def movimientos_revendedor():
+    if not _revendedor_sesion_actual():
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    return redirect("/revendedores/cuenta#movimientos")
 
 
 @app.route("/revendedores/registro", methods=["GET", "POST"])
@@ -552,11 +610,13 @@ def cuenta_revendedor():
                 error = str(exc)
             revendedor = _revendedor_sesion_actual()
     saldo_wallet = wallets.obtener_saldo(revendedor["id"])
+    resumen = _resumen_privado_reseller(revendedor["id"])
     return render_template(
         "resellers/cuenta.html", revendedor=revendedor, error=error,
         exito=exito, csrf_token=_csrf_reseller_token(),
         saldo_wallet=saldo_wallet, saldo_wallet_cop=wallets.formato_cop(saldo_wallet),
-        movimientos=bold_recharges.recent_movements(revendedor["id"])
+        movimientos=bold_recharges.recent_movements(revendedor["id"]),
+        resumen=resumen, seccion_activa="cuenta"
     )
 
 
