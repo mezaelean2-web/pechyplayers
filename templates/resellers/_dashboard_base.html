@@ -1,63 +1,13 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#070b12">
+<!DOCTYPE html><html lang="es"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#070b10">
   <title>{% block title %}Panel reseller{% endblock %} · PECHY PLAYERS</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-dashboard.css') }}?v=2">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-wallet.css') }}?v=2">
-  {% block head %}{% endblock %}
-</head>
-<body class="reseller-app">
-  <input class="reseller-drawer-toggle" type="checkbox" id="reseller-drawer" aria-hidden="true">
-  <label class="reseller-drawer-backdrop" for="reseller-drawer" aria-label="Cerrar menú"></label>
-  <aside class="reseller-sidebar" aria-label="Navegación principal">
-    <a class="reseller-brand" href="/revendedores">
-      <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="">
-      <span><strong>PECHY</strong> PLAYERS<small>ESPACIO RESELLER</small></span>
-    </a>
-    <nav class="reseller-primary-nav">
-      <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
-      <a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><span>▦</span>Productos</a>
-      <a href="/revendedores/recargar"><span>＋</span>Recargar saldo</a>
-      <a href="/revendedores/movimientos"><span>↕</span>Movimientos</a>
-      <a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><span>○</span>Mi cuenta</a>
-    </nav>
-    <div class="reseller-sidebar-footer">
-      <a class="reseller-sidebar-balance" href="/revendedores/cuenta#recargar-saldo">
-        <span>Saldo disponible</span><strong>{{ resumen.saldo_cop }}</strong>
-      </a>
-      <div class="reseller-sidebar-user">
-        <span class="reseller-avatar">{{ revendedor.nombre[:1]|upper }}</span>
-        <span><strong>{{ revendedor.nombre }}</strong><small>{{ revendedor.correo }}</small></span>
-      </div>
-      <form action="/revendedores/logout" method="POST">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-        <button type="submit">Cerrar sesión</button>
-      </form>
-    </div>
-  </aside>
-
-  <div class="reseller-app-frame">
-    <header class="reseller-topbar">
-      <label class="reseller-menu-button" for="reseller-drawer" aria-label="Abrir menú">☰</label>
-      <div><span>Panel reseller</span><h1>{% block section_title %}Inicio{% endblock %}</h1></div>
-      <div class="reseller-top-actions">
-        <a class="reseller-top-balance" href="/revendedores/cuenta#recargar-saldo"><span>Saldo</span><strong>{{ resumen.saldo_cop }}</strong></a>
-        <a class="reseller-account-link" href="/revendedores/cuenta" aria-label="Mi cuenta">{{ revendedor.nombre[:1]|upper }}</a>
-      </div>
-    </header>
-    <main class="reseller-main">{% block content %}{% endblock %}</main>
-  </div>
-
-  <nav class="reseller-mobile-nav" aria-label="Navegación móvil">
-    <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
-    <a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><span>▦</span>Productos</a>
-    <a class="is-primary" href="/revendedores/recargar"><span>＋</span>Recargar</a>
-    <a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><span>○</span>Cuenta</a>
-  </nav>
-  {% block scripts %}{% endblock %}
-</body>
-</html>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin/base.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/admin/sidebar.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1"><link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-wallet.css') }}?v=2"><link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-dashboard.css') }}?v=4">{% block head %}{% endblock %}
+</head><body class="reseller-app">
+<input class="reseller-drawer-toggle" type="checkbox" id="reseller-drawer" aria-hidden="true"><label class="reseller-drawer-backdrop" for="reseller-drawer" aria-label="Cerrar menú"></label>
+<div class="reseller-layout"><aside class="reseller-sidebar" aria-label="Navegación principal">
+  <a class="reseller-brand" href="/revendedores"><img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="PECHY PLAYERS"><div><strong>PECHY</strong><b>PLAYERS</b><small>ESPACIO RESELLER</small></div></a>
+  <nav class="reseller-primary-nav"><a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><i data-lucide="house"></i><span>Inicio</span></a><a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><i data-lucide="package"></i><span>Productos</span></a><a href="/revendedores/recargar"><i data-lucide="circle-dollar-sign"></i><span>Recargar saldo</span></a><a href="/revendedores/movimientos"><i data-lucide="arrow-left-right"></i><span>Movimientos</span></a><a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><i data-lucide="user-round"></i><span>Mi cuenta</span></a></nav>
+  <div class="reseller-sidebar-footer"><div class="reseller-sidebar-user"><span class="reseller-avatar">{{ revendedor.nombre[:1]|upper }}</span><div><strong>{{ revendedor.nombre }}</strong><small>{{ revendedor.correo }}</small><em><i data-lucide="circle-check"></i>Cuenta {{ revendedor.estado }}</em></div></div><div class="reseller-sidebar-balance"><span>SALDO DISPONIBLE</span><strong>{{ resumen.saldo_cop }}</strong><a href="/revendedores/recargar"><i data-lucide="circle-dollar-sign"></i>Recargar saldo</a></div><form action="/revendedores/logout" method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="reseller-logout" type="submit"><i data-lucide="log-out"></i>Cerrar sesión</button></form></div>
+</aside><main class="reseller-app-frame"><header class="reseller-topbar"><label class="reseller-menu-button" for="reseller-drawer" aria-label="Abrir menú"><i data-lucide="menu"></i></label><div class="reseller-topbar-title"><span>TU ESPACIO RESELLER</span><h1>{% block section_title %}Inicio{% endblock %}</h1></div><div class="reseller-top-actions"><div class="reseller-top-balance"><i data-lucide="wallet-cards"></i><span>Saldo disponible<strong>{{ resumen.saldo_cop }}</strong></span><a href="/revendedores/recargar">Recargar saldo</a></div><a class="reseller-account-link" href="/revendedores/cuenta" aria-label="Mi cuenta">{{ revendedor.nombre[:1]|upper }}</a></div></header><div class="reseller-main">{% block content %}{% endblock %}</div></main></div>
+<nav class="reseller-mobile-nav" aria-label="Navegación móvil"><a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><i data-lucide="house"></i><span>Inicio</span></a><a class="{{ 'is-active' if seccion_activa == 'productos' else '' }}" href="/revendedores/productos"><i data-lucide="package"></i><span>Productos</span></a><a class="is-primary" href="/revendedores/recargar"><i data-lucide="plus"></i><span>Recargar</span></a><a class="{{ 'is-active' if seccion_activa == 'cuenta' else '' }}" href="/revendedores/cuenta"><i data-lucide="user-round"></i><span>Cuenta</span></a></nav>
+<script src="https://unpkg.com/lucide@latest"></script><script>if(window.lucide){lucide.createIcons()}</script>{% block scripts %}{% endblock %}</body></html>

@@ -1,71 +1,20 @@
 {% extends "resellers/_dashboard_base.html" %}
 {% block title %}Inicio{% endblock %}
-{% block section_title %}Inicio{% endblock %}
+{% block section_title %}Hola, {{ revendedor.nombre.split()[0] }} <span aria-hidden="true">👋</span>{% endblock %}
 {% block content %}
-<section class="reseller-welcome">
-  <div>
-    <span class="reseller-kicker">TU ESPACIO DE TRABAJO</span>
-    <h2>Hola, {{ revendedor.nombre.split()[0] }}</h2>
-    <p>{% if revendedor.negocio %}Todo listo para gestionar {{ revendedor.negocio }}.{% else %}Todo listo para gestionar tu negocio.{% endif %}</p>
-  </div>
-  <a href="/revendedores/productos">Ver todos los productos <span>→</span></a>
+{% set movimientos = resumen.movimientos %}{% set ultimo = movimientos[0] if movimientos else none %}{% set tipos_ingreso = ['manual_credit', 'recharge', 'refund'] %}
+<section class="reseller-metrics" aria-label="Resumen de cuenta">
+  <article class="home-metric-card"><span class="home-icon is-red"><i data-lucide="package-open"></i></span><div><span>Productos disponibles</span><strong>{{ resumen.productos_disponibles }}</strong><small>Con precio reseller aplicable</small></div></article>
+  <article class="home-metric-card"><span class="home-icon is-gold"><i data-lucide="trending-up"></i></span><div><span>Total recargado</span><strong>{{ resumen.total_recargado_cop }}</strong><small>Recargas acreditadas</small></div></article>
+  <article class="home-metric-card home-last-movement"><span class="home-icon is-purple"><i data-lucide="arrow-left-right"></i></span>{% if ultimo %}{% set ingreso = ultimo.tipo in tipos_ingreso %}<div><span>Último movimiento</span><strong class="{{ 'money-positive' if ingreso else 'money-negative' }}">{{ '+' if ingreso else '-' }} ${{ '{:,.0f}'.format(ultimo.monto).replace(',', '.') }} COP</strong><small>{{ 'Ingreso' if ingreso else 'Salida' }} <b>•</b> {{ ultimo.created_at[:10].split('-')|reverse|join('/') }}</small></div><a href="/revendedores/movimientos" aria-label="Ver movimientos"><i data-lucide="chevron-right"></i></a>{% else %}<div><span>Último movimiento</span><strong class="is-empty">Sin movimientos</strong><small>Tu actividad aparecerá aquí</small></div>{% endif %}</article>
+  <article class="home-metric-card"><span class="home-icon is-green"><i data-lucide="circle-check"></i></span><div><span>Estado de cuenta</span><strong class="money-positive">{{ revendedor.estado|capitalize }}</strong><small>Sesión reseller protegida</small></div></article>
 </section>
-
-<section class="reseller-panel reseller-featured">
-  <header><div><span class="reseller-kicker">CATÁLOGO PRIVADO</span><h3>Productos para ti</h3></div><a href="/revendedores/productos">Ver todos los productos</a></header>
-  {% if productos_destacados %}<div class="reseller-product-grid">
-    {% for producto in productos_destacados %}<article class="reseller-product-card">
-      <img src="{{ url_for('static', filename='img/platforms/' ~ producto.imagen) }}" alt="{{ producto.nombre }}" loading="lazy">
-      <div><span>{{ producto.categoria }}</span><h4>{{ producto.nombre }}</h4><small>Desde</small><strong>{{ producto.precio_desde_cop }}</strong><a href="/revendedores/productos">Ver producto</a></div>
-    </article>{% endfor %}
-  </div>{% else %}<div class="reseller-empty-state"><h4>No hay productos habilitados por ahora</h4><p>El catálogo mostrará productos cuando tengan un precio reseller aplicable.</p></div>{% endif %}
+<section class="reseller-home-row is-upper">
+  <article class="home-panel reseller-products-panel"><header class="home-panel-heading"><h2><i data-lucide="package"></i>Productos para ti</h2><span class="private-badge"><i data-lucide="lock-keyhole"></i>Catálogo privado</span></header>{% if productos_destacados %}<div class="home-product-list">{% for producto in productos_destacados %}<article class="home-product"><img src="{{ url_for('static', filename='img/platforms/' ~ producto.imagen) }}" alt="{{ producto.nombre }}" loading="lazy"><div class="home-product-info"><span>{{ producto.categoria }}</span><h3>{{ producto.nombre }}</h3><div class="home-plan-list">{% for plan in producto.planes %}<div><span>{{ plan.plan }}</span><strong>{{ plan.precio_reseller_cop }}</strong></div>{% endfor %}</div><a href="/revendedores/productos">Ver producto <i data-lucide="square-arrow-out-up-right"></i></a></div></article>{% endfor %}</div>{% else %}<div class="reseller-empty-state"><i data-lucide="package-open"></i><h3>No hay productos habilitados por ahora</h3><p>El catálogo mostrará productos cuando tengan un precio reseller aplicable.</p></div>{% endif %}</article>
+  <aside class="home-panel reseller-quick-actions"><header class="home-panel-heading"><h2><i data-lucide="zap"></i>Acciones rápidas</h2></header><div class="quick-actions-grid"><a href="/revendedores/productos"><span class="home-icon is-red"><i data-lucide="package"></i></span><div><strong>Ver productos</strong><small>Explora el catálogo</small></div></a><a href="/revendedores/recargar"><span class="home-icon is-red"><i data-lucide="circle-dollar-sign"></i></span><div><strong>Recargar saldo</strong><small>Agrega saldo a tu cuenta</small></div></a><a href="/revendedores/movimientos"><span class="home-icon is-red"><i data-lucide="arrow-left-right"></i></span><div><strong>Ver movimientos</strong><small>Consulta tu actividad</small></div></a><a href="/revendedores/cuenta"><span class="home-icon is-red"><i data-lucide="user-round"></i></span><div><strong>Mi cuenta</strong><small>Gestiona tu información</small></div></a></div></aside>
 </section>
-
-<section class="reseller-dashboard-grid" aria-label="Resumen de cuenta">
-  <article class="reseller-balance-card">
-    <div class="reseller-card-heading"><span>Saldo disponible</span><span class="reseller-status-dot">Cuenta activa</span></div>
-    <strong>{{ resumen.saldo_cop }}</strong>
-    <p>Disponible para las funciones habilitadas en tu cuenta.</p>
-    <div class="reseller-card-actions">
-      <a class="is-primary" href="/revendedores/cuenta#recargar-saldo">Recargar saldo</a>
-      <a href="/revendedores/cuenta#movimientos">Ver movimientos</a>
-    </div>
-  </article>
-  <article class="reseller-metric-card">
-    <span class="reseller-metric-icon">▦</span>
-    <div><span>Productos disponibles</span><strong>{{ resumen.productos_disponibles }}</strong><small>Con precio reseller aplicable</small></div>
-  </article>
-  <article class="reseller-metric-card">
-    <span class="reseller-metric-icon is-green">↗</span>
-    <div><span>Total recargado</span><strong>{{ resumen.total_recargado_cop }}</strong><small>Recargas acreditadas en tu wallet</small></div>
-  </article>
-</section>
-
-<section class="reseller-content-grid">
-  <article class="reseller-panel" id="movimientos">
-    <header><div><span class="reseller-kicker">ACTIVIDAD</span><h3>Movimientos recientes</h3></div><a href="/revendedores/cuenta#movimientos">Ver todos</a></header>
-    {% if resumen.movimientos %}
-    <div class="reseller-movement-list">
-      {% for item in resumen.movimientos %}
-      {% set credito = item.tipo in ['manual_credit', 'recharge', 'refund'] %}
-      <div class="reseller-movement-row">
-        <span class="reseller-movement-kind {{ 'is-credit' if credito else 'is-debit' }}">{{ '＋' if credito else '−' }}</span>
-        <div><strong>{{ 'Recarga Bold' if item.provider == 'bold' else item.descripcion }}</strong><small>{{ item.created_at[:10] }}{% if item.referencia %} · {{ item.referencia }}{% endif %}</small></div>
-        <span class="reseller-movement-amount {{ 'is-credit' if credito else 'is-debit' }}">{{ '+' if credito else '-' }}${{ '{:,.0f}'.format(item.monto).replace(',', '.') }}</span>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="reseller-empty-state"><span>↕</span><h4>Aún no tienes movimientos</h4><p>Cuando recargues saldo o se aplique un ajuste, aparecerá aquí.</p></div>
-    {% endif %}
-  </article>
-
-  <aside class="reseller-panel reseller-shortcuts">
-    <header><div><span class="reseller-kicker">ATAJOS</span><h3>Accesos rápidos</h3></div></header>
-    <a href="/revendedores/productos"><span>▦</span><div><strong>Productos</strong><small>Consulta tu catálogo y precios</small></div><b>›</b></a>
-    <a href="/revendedores/recargar"><span>＋</span><div><strong>Recargar saldo</strong><small>Continúa con el flujo seguro actual</small></div><b>›</b></a>
-    <a href="/revendedores/movimientos"><span>↕</span><div><strong>Movimientos</strong><small>Revisa la actividad de tu wallet</small></div><b>›</b></a>
-    <a href="/revendedores/cuenta"><span>○</span><div><strong>Mi cuenta</strong><small>Actualiza tus datos y seguridad</small></div><b>›</b></a>
-  </aside>
+<section class="reseller-home-row is-lower">
+  <article class="home-panel recent-activity"><header class="home-panel-heading"><h2><i data-lucide="history"></i>Actividad reciente</h2><a href="/revendedores/movimientos">Ver todos</a></header>{% if movimientos %}<div class="home-movement-list">{% for item in movimientos %}{% set ingreso = item.tipo in tipos_ingreso %}<div class="home-movement"><span class="movement-icon {{ 'is-credit' if ingreso else 'is-debit' }}"><i data-lucide="{{ 'arrow-down-left' if ingreso else 'arrow-up-right' }}"></i></span><div><strong>{{ 'Recarga Bold' if item.provider == 'bold' else item.descripcion }}</strong><small>{% if item.referencia %}{{ item.referencia }}{% else %}Movimiento de wallet{% endif %}</small></div><div class="movement-value"><strong class="{{ 'money-positive' if ingreso else 'money-negative' }}">{{ '+' if ingreso else '-' }} ${{ '{:,.0f}'.format(item.monto).replace(',', '.') }} COP</strong><small>{{ item.created_at[:16].replace('-', '/').replace('T', ' ') }}</small></div></div>{% endfor %}</div>{% else %}<div class="reseller-empty-state"><i data-lucide="receipt-text"></i><h3>Aún no tienes movimientos</h3><p>Las recargas y ajustes de tu cuenta aparecerán aquí.</p></div>{% endif %}</article>
+  <aside class="home-panel reseller-growth-panel"><div><span class="home-icon is-gold"><i data-lucide="crown"></i></span><h2>Revende y gana</h2><p>Ofrece productos digitales de calidad y haz crecer tu negocio.</p></div><div class="growth-chart" aria-hidden="true"><span></span><span></span><span></span><span></span><svg viewBox="0 0 210 150"><defs><linearGradient id="growthLine" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#ff202c"/><stop offset="1" stop-color="#ff713c"/></linearGradient><marker id="growthArrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 10 5 0 10z" fill="#ff713c"/></marker></defs><path d="M12 132 C62 119 87 91 112 58 S159 34 190 10" fill="none" stroke="url(#growthLine)" stroke-width="4" marker-end="url(#growthArrow)"/></svg></div></aside>
 </section>
 {% endblock %}

@@ -1,0 +1,8 @@
+<div class="reseller-product-drawer" id="resellerProductDrawer" aria-hidden="true">
+  <button class="reseller-product-drawer__backdrop" type="button" data-reseller-drawer-close aria-label="Cerrar menú"></button>
+  <aside class="reseller-product-drawer__panel" aria-label="Navegación reseller">
+    <header><a href="/revendedores"><img src="{{ url_for('static', filename='img/logo.jpg') }}" alt=""><span><strong>PECHY</strong> PLAYERS<small>ESPACIO RESELLER</small></span></a><button type="button" data-reseller-drawer-close aria-label="Cerrar menú">×</button></header>
+    <nav><a href="/revendedores">⌂ <span>Inicio</span></a><a class="is-active" href="/revendedores/productos">▦ <span>Productos</span></a><a href="/revendedores/recargar">＋ <span>Recargar saldo</span></a><a href="/revendedores/movimientos">↕ <span>Movimientos</span></a><a href="/revendedores/cuenta">○ <span>Mi cuenta</span></a></nav>
+    <footer><div class="reseller-product-drawer__user"><b>{{ revendedor_actual.nombre[:1]|upper }}</b><span><strong>{{ revendedor_actual.nombre }}</strong><small>{{ revendedor_actual.correo }}</small></span></div><a class="reseller-product-drawer__balance" href="/revendedores/recargar"><span>Saldo disponible</span><strong>{{ revendedor_actual.saldo_wallet_cop }}</strong></a><form action="/revendedores/logout" method="POST"><input type="hidden" name="csrf_token" value="{{ session.get('csrf_reseller', '') }}"><button type="submit">Cerrar sesión</button></form></footer>
+  </aside>
+</div>

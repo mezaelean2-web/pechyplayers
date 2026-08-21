@@ -231,6 +231,8 @@ def inicio():
         for producto in obtener_productos()
         if producto.get("visible", 1) == 1
     ]
+    for producto in productos:
+        producto["imagen"] = producto.get("imagen") or "producto.jpg"
 
     categorias_db = obtener_categorias()
 
@@ -239,6 +241,14 @@ def inicio():
         for categoria in categorias_db
         if categoria["visible"] == 1
     }
+
+    if revendedor_actual and request.path == "/revendedores/productos":
+        productos = [
+            producto for producto in productos
+            if (producto.get("categoria") or "Sin categoría") in categorias_visibles
+            and (producto.get("categoria") or "Sin categoría").strip().lower()
+                != "sin categoría"
+        ]
 
     productos_por_categoria = {}
 
@@ -289,6 +299,11 @@ def inicio():
                 plan["precio_reseller"] = precios_reseller.get(
                     plan["id"],
                     {"precio": None, "origen": "sin_precio_reseller", "precio_base": None}
+                )
+                precio_privado = plan["precio_reseller"].get("precio")
+                plan["precio_reseller_cop"] = (
+                    wallets.formato_cop(precio_privado)
+                    if precio_privado is not None else None
                 )
 
     peliculas = [
@@ -401,8 +416,8 @@ def _login_reseller_limitado(correo):
     return len(intentos) >= _LOGIN_RESELLER_MAX_INTENTOS, clave
 
 
-def _catalogo_reseller(revendedor_id):
-    """Construye el catálogo privado usando solo precios reseller aplicables."""
+def _catalogo_reseller(revendedor_id, incluir_sin_precio=False):
+    """Construye el catálogo privado sin usar el precio público como respaldo."""
     categorias_visibles = {
         categoria["nombre"]
         for categoria in obtener_categorias()
@@ -411,7 +426,8 @@ def _catalogo_reseller(revendedor_id):
     candidatos = [
         producto for producto in obtener_productos()
         if producto.get("visible", 1) == 1
-        and (producto.get("estado") or "disponible").strip().lower() == "disponible"
+        and (incluir_sin_precio or
+             (producto.get("estado") or "disponible").strip().lower() == "disponible")
         and (producto.get("categoria") or "Sin categoría").strip().lower() != "sin categoría"
         and (producto.get("categoria") or "Sin categoría") in categorias_visibles
     ]
@@ -422,18 +438,26 @@ def _catalogo_reseller(revendedor_id):
         planes = []
         for plan in producto["planes"]:
             precio = precios.get(plan["id"], {})
-            if precio.get("precio") is None:
+            if precio.get("precio") is None and not incluir_sin_precio:
                 continue
             variante = dict(plan)
-            variante["precio_reseller"] = precio
-            variante["precio_reseller_cop"] = wallets.formato_cop(precio["precio"])
+            variante["precio_reseller"] = precio or {
+                "precio": None, "origen": "sin_precio_reseller", "precio_base": None
+            }
+            variante["precio_reseller_cop"] = (
+                wallets.formato_cop(precio["precio"])
+                if precio.get("precio") is not None else None
+            )
             planes.append(variante)
         if planes:
             item = dict(producto)
             item["imagen"] = item.get("imagen") or "producto.jpg"
             item["planes"] = planes
-            item["precio_desde"] = min(plan["precio_reseller"]["precio"] for plan in planes)
-            item["precio_desde_cop"] = wallets.formato_cop(item["precio_desde"])
+            importes = [plan["precio_reseller"]["precio"] for plan in planes
+                        if plan["precio_reseller"].get("precio") is not None]
+            item["precio_desde"] = min(importes) if importes else None
+            item["precio_desde_cop"] = (wallets.formato_cop(item["precio_desde"])
+                                         if item["precio_desde"] is not None else None)
             catalogo.append(item)
     return catalogo
 
@@ -470,17 +494,10 @@ def productos_revendedor():
     if not revendedor:
         session.setdefault("reseller_auth_error", "sesion")
         return redirect("/revendedores/login")
-    resumen = _resumen_privado_reseller(revendedor["id"])
-    productos = _catalogo_reseller(revendedor["id"])
-    resumen["productos_disponibles"] = len(productos)
-    categorias = OrderedDict()
-    for producto in productos:
-        categorias.setdefault(producto["categoria"], []).append(producto)
-    return render_template(
-        "resellers/productos.html", revendedor=revendedor, resumen=resumen,
-        categorias=categorias, csrf_token=_csrf_reseller_token(),
-        seccion_activa="productos",
-    )
+    # Esta ruta reutiliza literalmente la vista, datos y assets públicos.
+    # ``inicio`` ya cambia los precios al detectar la sesión reseller.
+    _csrf_reseller_token()
+    return inicio()
 
 
 @app.route("/revendedores/recargar")

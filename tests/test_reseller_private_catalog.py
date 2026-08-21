@@ -36,9 +36,18 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
         self.reseller_id = resellers.crear_revendedor("Propio", "propio@example.com", "3001234567", "Tienda", "ClaveSegura123")
         self.otro_id = resellers.crear_revendedor("Otro", "otro@example.com", "3007654321", "Otra", "ClaveSegura123")
         app_module.app.config.update(TESTING=True, SECRET_KEY="catalog-test")
+        self.merchandising_patches = [
+            patch.object(app_module, "obtener_promociones", return_value=[]),
+            patch.object(app_module, "obtener_cartelera", return_value=[]),
+            patch.object(app_module, "obtener_categorias_cartelera", return_value=[]),
+        ]
+        for item in self.merchandising_patches:
+            item.start()
         self.client = app_module.app.test_client()
 
     def tearDown(self):
+        for item in reversed(self.merchandising_patches):
+            item.stop()
         database.DB = self.original_db
         os.remove(self.db_path)
 
@@ -64,8 +73,10 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
         self.assertIn("Netflix", html)
         self.assertIn("$11.000 COP", html)
         self.assertNotIn("$22.000 COP", html)
-        for publico in ("777777", "888888", "999999", "Sin precio"):
+        for publico in ("777777", "888888", "999999"):
             self.assertNotIn(publico, html)
+        self.assertIn("Sin precio", html)
+        self.assertIn("Precio por configurar", html)
 
     def test_visibilidad_categoria_disponibilidad_y_planes_validos(self):
         resellers.guardar_precio_general(1, 11000)
@@ -81,7 +92,9 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
             html = self.client.get("/revendedores/productos").get_data(as_text=True)
         self.assertIn("Visible", html)
         self.assertIn("Perfil", html)
-        for excluido in ("Sin precio", "Oculto", "Agotado", "Categoria oculta"):
+        self.assertIn("Sin precio", html)
+        self.assertIn("Agotado", html)
+        for excluido in ("Oculto", "Categoria oculta"):
             self.assertNotIn(excluido, html)
 
     def test_catalogo_es_solo_lectura_y_comprar_no_transacciona(self):
@@ -91,7 +104,7 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
         self.autenticar()
         html = self.client.get("/revendedores/productos").get_data(as_text=True)
         self.assertIn('type="button" disabled', html)
-        self.assertIn("Compra aún no habilitada", html)
+        self.assertIn("Compra próximamente", html)
         self.assertEqual(wallets.obtener_saldo(self.reseller_id), saldo_antes)
 
 

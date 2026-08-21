@@ -55,6 +55,8 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cartelera-lobby.css') }}?v=999">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
+{% set es_catalogo_reseller = request.path == '/revendedores/productos' and revendedor_actual %}
+{% if es_catalogo_reseller %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-products.css') }}?v=3">{% endif %}
 
 <style>
 
@@ -669,7 +671,9 @@
 </style>
 
 </head>
-<body>
+<body class="{{ 'catalogo-contexto-reseller' if es_catalogo_reseller else '' }}" data-catalog-context="{{ 'reseller' if es_catalogo_reseller else 'publico' }}">
+
+{% if es_catalogo_reseller %}{% include "resellers/_product_drawer.html" %}{% endif %}
 
 {% if config.modulos.sistema.mantenimiento or config.modulos.sistema.aviso_global %}
 <div role="status" style="position:relative;z-index:9999;padding:10px 16px;text-align:center;color:var(--text-primary);border-bottom:1px solid var(--border);background:color-mix(in srgb,var(--brand-primary) 24%,var(--bg-secondary));font:700 .82rem/1.3 system-ui">
@@ -737,6 +741,7 @@
 {% endif %}
 
 <nav class="nav">
+  {% if es_catalogo_reseller %}<button class="reseller-catalog-menu" type="button" data-reseller-drawer-open aria-controls="resellerProductDrawer" aria-expanded="false" aria-label="Abrir menú reseller">☰</button>{% endif %}
   <div class="brand">
     <img src="{{ url_for('static', filename='img/logo.jpg') }}">
     <span>
@@ -770,9 +775,9 @@
       <small>{{ 'OFERTA PARA TI' if reseller.origen == 'oferta_personalizada' else 'TU PRECIO RESELLER' }}</small>
       {% if reseller.precio is not none %}
         {% if reseller.origen == 'oferta_personalizada' and reseller.precio_base %}<del><span class="precio-configurable" data-precio="{{ reseller.precio_base }}">{{ config.get("moneda_simbolo", "$") }}{{ reseller.precio_base }}</span></del>{% endif %}
-        <strong><span class="precio-configurable" data-precio="{{ reseller.precio }}">{{ config.get("moneda_simbolo", "$") }}{{ reseller.precio }}</span></strong>
+        <strong><span class="precio-configurable" data-precio="{{ reseller.precio }}">{{ plan.precio_reseller_cop }}</span></strong>
       {% else %}
-        <span>Precio reseller no disponible</span>
+        <span>Precio por configurar</span>
       {% endif %}
     </div>
   {% elif plan.oferta_activa == 1 and plan.oferta_precio %}
@@ -1174,7 +1179,7 @@
     data-categoria="{{ pelicula.categoria }}"
     data-poster="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }}"
     
-    {% if pelicula.banner %}
+{% if pelicula.banner %}
 data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.banner) }}"
 {% else %}
 data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }}"
@@ -1360,6 +1365,12 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
     🔔 Avisarme cuando esté disponible
   </a>
 
+{% elif es_catalogo_reseller %}
+
+  <button class="buy reseller-buy-disabled" type="button" disabled aria-disabled="true">
+    Compra próximamente
+  </button>
+
 {% else %}
 
   <a
@@ -1498,6 +1509,12 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
     href="https://wa.me/{{ config.whatsapp }}?text=Hola%20Pechy,%20avísame%20cuando%20vuelva%20a%20estar%20disponible%20{{ producto.nombre }}">
     🔔 Avisarme cuando esté disponible
   </a>
+
+{% elif es_catalogo_reseller %}
+
+  <button class="buy reseller-buy-disabled" type="button" disabled aria-disabled="true">
+    Compra próximamente
+  </button>
 
 {% else %}
 
@@ -1725,6 +1742,11 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
   </p>
 </section>
 
+      {% if es_catalogo_reseller %}
+      <button id="modalProductoComprar" class="modal-producto-comprar reseller-buy-disabled" type="button" disabled>
+        Compra reseller próximamente
+      </button>
+      {% else %}
       <a
         id="modalProductoComprar"
         class="modal-producto-comprar"
@@ -1732,6 +1754,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
         target="_blank">
         💬 Comprar por WhatsApp
       </a>
+      {% endif %}
 
       <button
   id="modalProductoCompartir"
@@ -1928,6 +1951,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
+{% if es_catalogo_reseller %}<script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=3"></script>{% endif %}
 
 <script>
 
