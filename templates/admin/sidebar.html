@@ -50,6 +50,18 @@
 
     <div class="sidebar-group-title">INVENTARIO</div>
 
+<a href="/admin/revendedores"
+   class="sidebar-link {% if request.path.startswith('/admin/revendedores') %}active{% endif %}">
+    <i data-lucide="users-round" class="sidebar-icon"></i>
+    <span>Revendedores</span>
+</a>
+
+<a href="/admin/saldos"
+   class="sidebar-link {% if request.path.startswith('/admin/saldos') %}active{% endif %}">
+    <i data-lucide="wallet-cards" class="sidebar-icon"></i>
+    <span>Saldos</span>
+</a>
+
 <a href="/admin/nube-cuentas"
    class="sidebar-link {% if request.path == '/admin/nube-cuentas' %}active{% endif %}">
     <i data-lucide="cloud" class="sidebar-icon"></i>

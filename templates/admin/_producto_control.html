@@ -1,0 +1,100 @@
+{% set producto_index = producto.planes[0].id %}
+{% set oferta = namespace(activa=false) %}
+{% for plan in producto.planes %}{% if plan.oferta_activa == 1 and plan.oferta_precio %}{% set oferta.activa = true %}{% endif %}{% endfor %}
+<div class="producto-control" data-modal-producto="{{ producto.nombre }}">
+    <header class="producto-control__header">
+        <img src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}" alt="">
+        <div class="producto-control__identity">
+            <span>Centro de control</span>
+            <h2 id="productoControlTitle-{{ producto_index }}">{{ producto.nombre }}</h2>
+            <p>{{ producto.categoria }} · {{ producto.planes | length }} {{ 'plan' if producto.planes | length == 1 else 'planes' }}</p>
+        </div>
+        <div class="producto-control__badges" aria-label="Estado actual">
+            <span class="is-{{ producto.estado }}">{{ 'Disponible' if producto.estado == 'disponible' else 'Agotado' }}</span>
+            {% if oferta.activa %}<span class="is-offer">🔥 Oferta</span>{% endif %}
+            {% if producto.destacado == 1 %}<span>⭐ Más vendido</span>{% endif %}
+            <span>{{ 'Visible' if producto.visible == 1 else 'Oculto' }}</span>
+        </div>
+    </header>
+
+    <div class="producto-control__body">
+        <section class="producto-control-section">
+            <div class="producto-control-section__title"><span>01</span><div><h3>Información general</h3><p>Identidad, imagen y ubicación en el catálogo.</p></div></div>
+            <div class="producto-general-grid">
+                <form action="/editar-producto" method="POST" enctype="multipart/form-data" class="producto-modal-form producto-info-form">
+                    <input type="hidden" name="nombre_actual" value="{{ producto.nombre }}">
+                    <div class="producto-image-editor">
+                        <img id="modalPreview-{{ producto_index }}" src="{{ url_for('static', filename='img/platforms/' + producto.imagen) }}" alt="Imagen actual de {{ producto.nombre }}">
+                        <label for="modalImagen-{{ producto_index }}"><span aria-hidden="true">📷</span><strong>Cambiar imagen</strong><small>Toca para seleccionar una nueva portada</small></label>
+                        <input id="modalImagen-{{ producto_index }}" class="producto-modal-file" type="file" name="imagen" accept="image/*" onchange="previewImagen(this, 'modalPreview-{{ producto_index }}')">
+                    </div>
+                    <div class="producto-modal-field"><label for="modalNombre-{{ producto_index }}">Nombre del producto</label><input id="modalNombre-{{ producto_index }}" type="text" name="nuevo_nombre" value="{{ producto.nombre }}" required></div>
+                    <button class="producto-modal-save" type="submit">Guardar información</button>
+                </form>
+                <form action="/actualizar-categoria" method="POST" class="producto-modal-form producto-category-form">
+                    <input type="hidden" name="nombre" value="{{ producto.nombre }}">
+                    <div class="producto-modal-field"><label for="modalCategoria-{{ producto_index }}">Categoría</label><select id="modalCategoria-{{ producto_index }}" name="categoria" required>{% for categoria in categorias %}<option value="{{ categoria.nombre }}" {% if producto.categoria == categoria.nombre %}selected{% endif %}>{{ categoria.nombre }}</option>{% endfor %}</select></div>
+                    <button class="producto-modal-save producto-modal-save--secondary" type="submit">Guardar categoría</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="producto-control-section">
+            <div class="producto-control-section__title"><span>02</span><div><h3>Estado del producto</h3><p>Controla cómo se presenta sin cambiar los contratos actuales.</p></div></div>
+            <div class="producto-state-grid">
+                <form action="/actualizar-estado" method="POST" class="producto-state-card producto-state-card--availability" data-state-control data-on-label="Disponible" data-off-label="Agotado">
+                    <input type="hidden" name="nombre" value="{{ producto.nombre }}"><input id="modalDisponible-{{ producto_index }}" type="checkbox" name="disponible" {% if producto.estado == 'disponible' %}checked{% endif %}>
+                    <label for="modalDisponible-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Disponibilidad</strong><small class="producto-state-current"><i aria-hidden="true"></i><span>{{ 'Disponible' if producto.estado == 'disponible' else 'Agotado' }}</span></small></span></label><span class="producto-state-pending" hidden>Cambio pendiente</span><button type="submit">Aplicar</button>
+                </form>
+                <form action="/actualizar-visible" method="POST" class="producto-state-card producto-state-card--visibility" data-state-control data-on-label="Visible" data-off-label="Oculto">
+                    <input type="hidden" name="nombre" value="{{ producto.nombre }}"><input id="modalVisible-{{ producto_index }}" type="checkbox" name="visible" {% if producto.visible == 1 %}checked{% endif %}>
+                    <label for="modalVisible-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Visibilidad</strong><small class="producto-state-current"><i aria-hidden="true"></i><span>{{ 'Visible' if producto.visible == 1 else 'Oculto' }}</span></small></span></label><span class="producto-state-pending" hidden>Cambio pendiente</span><button type="submit">Aplicar</button>
+                </form>
+                <form action="/actualizar-destacado" method="POST" class="producto-state-card producto-state-card--featured" data-state-control data-on-label="Destacado" data-off-label="Sin destacar">
+                    <input type="hidden" name="nombre" value="{{ producto.nombre }}"><input id="modalDestacado-{{ producto_index }}" type="checkbox" name="destacado" {% if producto.destacado == 1 %}checked{% endif %}>
+                    <label for="modalDestacado-{{ producto_index }}"><span class="producto-switch"></span><span><strong>Más vendido</strong><small class="producto-state-current"><i aria-hidden="true"></i><span>{{ 'Destacado' if producto.destacado == 1 else 'Sin destacar' }}</span></small></span></label><span class="producto-state-pending" hidden>Cambio pendiente</span><button type="submit">Aplicar</button>
+                </form>
+            </div>
+        </section>
+
+        <section class="producto-control-section">
+            <div class="producto-control-section__title"><span>03</span><div><h3>Planes y precios</h3><p>Cada plan conserva su identificador y guardado independiente.</p></div></div>
+            <div class="producto-modal-plans">
+                {% for plan in producto.planes %}
+                    <article class="producto-modal-plan {% if plan.oferta_activa == 1 %}has-offer{% endif %}" data-plan-card>
+                        <header><div><span>PLAN</span><h4>💎 {{ plan.plan }}</h4></div><strong class="producto-offer-badge" {% if plan.oferta_activa != 1 %}hidden{% endif %}>🔥 OFERTA ACTIVA</strong></header>
+                        <div class="producto-plan-forms">
+                            <form action="/actualizar-precio" method="POST" class="producto-modal-form"><input type="hidden" name="id" value="{{ plan.id }}"><div class="producto-modal-field"><label for="modalPrecio-{{ plan.id }}">Precio normal</label><input id="modalPrecio-{{ plan.id }}" type="text" name="precio" value="{{ plan.precio }}" required></div><button class="producto-modal-save producto-modal-save--secondary" type="submit">Guardar precio</button></form>
+                            <form action="/actualizar-oferta" method="POST" class="producto-modal-form producto-offer-form" data-offer-control><input type="hidden" name="id" value="{{ plan.id }}"><div class="producto-modal-field"><label for="modalOferta-{{ plan.id }}">Precio de oferta</label><input id="modalOferta-{{ plan.id }}" type="text" name="oferta_precio" value="{{ plan.oferta_precio or '' }}" placeholder="Ejemplo: 10 MIL"></div><input id="modalOfertaActiva-{{ plan.id }}" type="checkbox" name="oferta_activa" {% if plan.oferta_activa == 1 %}checked{% endif %}><label class="producto-offer-toggle" for="modalOfertaActiva-{{ plan.id }}"><span class="producto-switch"></span>Oferta activa</label><button class="producto-modal-save producto-modal-save--offer" type="submit">Guardar oferta</button></form>
+                        </div>
+                        <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')" class="producto-danger-form"><input type="hidden" name="id" value="{{ plan.id }}"><button type="submit">Eliminar plan</button></form>
+                    </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="producto-control-section producto-reseller-section">
+            <div class="producto-control-section__title"><span>04</span><div><h3>Precios para revendedores</h3><p>Precio general compartido. Los precios personalizados conservan su prioridad.</p></div></div>
+            <div class="producto-reseller-plans">
+                {% for plan in producto.planes %}
+                <article class="producto-reseller-plan" data-reseller-price-card>
+                    <header><div><small>PLAN</small><h4>{{ plan.plan }}</h4></div><span>Publico actual: <strong>${{ plan.precio }}</strong></span></header>
+                    <p data-reseller-status>{% if plan.precio_reseller_general %}Precio reseller configurado{% else %}Sin precio reseller configurado{% endif %}</p>
+                    <form data-reseller-price-form data-plan-id="{{ plan.id }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <div class="producto-modal-field"><label for="resellerPrecio-{{ plan.id }}">Precio reseller general</label><input id="resellerPrecio-{{ plan.id }}" name="precio_reseller_general" inputmode="numeric" value="{{ plan.precio_reseller_general or '' }}" placeholder="Ejemplo: 38.000" required></div>
+                        <button class="producto-modal-save" type="submit">Guardar precio reseller</button>
+                        <small data-reseller-feedback aria-live="polite"></small>
+                    </form>
+                </article>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="producto-control-section producto-actions-section">
+            <div class="producto-control-section__title"><span>05</span><div><h3>Acciones del producto</h3><p>Operaciones adicionales claramente separadas.</p></div></div>
+            <form action="/duplicar-producto" method="POST"><input type="hidden" name="nombre" value="{{ producto.nombre }}"><button class="producto-duplicate" type="submit">▣ Duplicar producto</button></form>
+            <div class="producto-risk-note"><strong>Zona de riesgo</strong><p>La eliminación disponible actualmente se realiza por plan, dentro de cada tarjeta.</p></div>
+        </section>
+    </div>
+</div>

@@ -28,8 +28,11 @@ document.addEventListener("DOMContentLoaded", function () {
   const contenido = modal?.querySelector(".producto-modal-contenido");
 
   const modalImagen = document.getElementById("modalProductoImagen");
+  const modalImagenFondo = document.getElementById("modalProductoImagenFondo");
   const modalNombre = document.getElementById("modalProductoNombre");
   const modalTopNombre = document.getElementById("modalProductoTopNombre");
+  const modalCategoria = document.getElementById("modalProductoCategoria");
+  const modalEstado = modal?.querySelector(".modal-topbar > span");
   const modalPlanes = document.getElementById("modalProductoPlanes");
   const modalComprar = document.getElementById("modalProductoComprar");
   const modalCompartir = document.getElementById("modalProductoCompartir");
@@ -38,7 +41,9 @@ document.addEventListener("DOMContentLoaded", function () {
   document.getElementById("modalRecomendacionesLista");
 
   let tarjetaActual = null;
+  let cambioProductoId = 0;
   const abridoresModal = new Map();
+  const tarjetasPorNombre = new Map();
 
   function productoAgotado(card) {
   return Boolean(
@@ -59,8 +64,10 @@ function enviarAgotadoAWhatsApp(card) {
   if (!modal) return;
 
   function cerrarModal() {
+    cambioProductoId += 1;
     modal.classList.remove("abierto");
     document.body.classList.remove("modal-abierto");
+    contenido?.classList.remove("is-switching");
 
     if (contenido) {
       contenido.style.transform = "";
@@ -74,11 +81,21 @@ function enviarAgotadoAWhatsApp(card) {
     const cover = card.querySelector(".cover");
     const boton = card.querySelector(".buy");
 
-    function abrirModalProducto() {
-      if (productoAgotado(card)) {
+    function abrirModalProducto(opciones = {}) {
+      const navegacionInterna = opciones.navegacionInterna === true;
+
+      if (productoAgotado(card) && !navegacionInterna) {
   enviarAgotadoAWhatsApp(card);
   return;
 }
+      const solicitudActual = ++cambioProductoId;
+      const cambiandoProducto = modal.classList.contains("abierto");
+
+      if (cambiandoProducto) {
+        contenido?.classList.add("is-switching");
+        contenido?.scrollTo({ top: 0, behavior: "auto" });
+      }
+
         tarjetaActual = card;
       const nombre =
         card.querySelector(".cover-overlay h3")?.textContent.trim() || "";
@@ -95,6 +112,14 @@ function enviarAgotadoAWhatsApp(card) {
 
       if (modalTopNombre) {
         modalTopNombre.textContent = nombre;
+      }
+
+      if (modalCategoria) {
+        modalCategoria.textContent = card.dataset.categoria || "PECHY PLAYERS PREMIUM";
+      }
+
+      if (modalEstado) {
+        modalEstado.textContent = "â— ACTIVO";
       }
 
       if (modalFavorito) {
@@ -114,6 +139,11 @@ function enviarAgotadoAWhatsApp(card) {
 
       if (modalImagen) {
         modalImagen.src = imagen;
+        modalImagen.alt = nombre;
+      }
+
+      if (modalImagenFondo) {
+        modalImagenFondo.src = imagen;
       }
 
       if (modalComprar) {
@@ -141,11 +171,17 @@ function enviarAgotadoAWhatsApp(card) {
       if (modalRecomendacionesLista) {
   modalRecomendacionesLista.innerHTML = "";
 
-  const otrasTarjetas = [
-    ...document.querySelectorAll(".producto-item")
-  ].filter(function (otraCard) {
-    return otraCard !== card;
+  const nombreActual = card.dataset.nombre || nombre.toLowerCase();
+  const productosUnicos = new Map();
+
+  document.querySelectorAll(".producto-item").forEach(function (otraCard) {
+    const clave = otraCard.dataset.nombre || "";
+    if (clave && clave !== nombreActual && !productosUnicos.has(clave)) {
+      productosUnicos.set(clave, otraCard);
+    }
   });
+
+  const otrasTarjetas = [...productosUnicos.values()];
 
   otrasTarjetas.slice(0, 6).forEach(function (otraCard) {
   const otroNombre =
@@ -163,6 +199,7 @@ function enviarAgotadoAWhatsApp(card) {
     document.createElement("button");
 
   recomendacion.type = "button";
+  recomendacion.dataset.modalProducto = otraCard.dataset.nombre || "";
 
   recomendacion.className =
     estaAgotado
@@ -197,24 +234,6 @@ function enviarAgotadoAWhatsApp(card) {
     </div>
   `;
 
-  recomendacion.addEventListener("click", function () {
-    if (estaAgotado) {
-      enviarAgotadoAWhatsApp(otraCard);
-      return;
-    }
-
-    contenido?.scrollTo({
-      top: 0,
-      behavior: "smooth"
-    });
-
-    const abrirRecomendacion = abridoresModal.get(otraCard);
-
-    if (abrirRecomendacion) {
-      abrirRecomendacion();
-    }
-  });
-
   modalRecomendacionesLista.appendChild(
     recomendacion
   );
@@ -235,28 +254,67 @@ if (
 
       modal.classList.add("abierto");
       document.body.classList.add("modal-abierto");
+
+      const finalizarCambio = function () {
+        if (solicitudActual !== cambioProductoId) return;
+        contenido?.classList.remove("is-switching");
+      };
+
+      if (!cambiandoProducto || modalImagen?.complete) {
+        requestAnimationFrame(finalizarCambio);
+      } else {
+        modalImagen?.addEventListener("load", finalizarCambio, { once: true });
+        modalImagen?.addEventListener("error", finalizarCambio, { once: true });
+      }
     }
 
     abridoresModal.set(card, abrirModalProducto);
+
+    const claveProducto = card.dataset.nombre || "";
+    if (claveProducto && !tarjetasPorNombre.has(claveProducto)) {
+      tarjetasPorNombre.set(claveProducto, card);
+    }
 
     if (esMovil) {
       cover?.addEventListener("click", abrirModalProducto);
     }
 
-    if (esMovil || card.closest("#productosGrid")) {
-      boton?.addEventListener("click", function (e) {
-        if (!esMovil && boton.classList.contains("buy-agotado")) return;
+    boton?.addEventListener("click", function (e) {
+      if (boton.classList.contains("buy-agotado")) return;
 
-        e.preventDefault();
-        abrirModalProducto();
-      });
-    }
+      e.preventDefault();
+      abrirModalProducto();
+    });
   });
 
   window.abrirProductoModalCompartido = function (card) {
-    const abrir = abridoresModal.get(card);
+    const clave = card?.dataset.nombre || "";
+    const tarjetaRegistrada = tarjetasPorNombre.get(clave) || card;
+    const abrir = abridoresModal.get(tarjetaRegistrada);
     abrir?.();
   };
+
+  modal.addEventListener("click", function (evento) {
+    const accion = evento.target.closest("[data-modal-producto]");
+    if (!accion || !modal.contains(accion)) return;
+
+    evento.preventDefault();
+    evento.stopPropagation();
+
+    const claveProducto = accion.dataset.modalProducto || "";
+    const tarjeta = tarjetasPorNombre.get(claveProducto);
+    const abrir = abridoresModal.get(tarjeta);
+
+    if (!tarjeta || !abrir) {
+      console.warn(
+        "No se pudo resolver la navegación interna del modal:",
+        claveProducto
+      );
+      return;
+    }
+
+    abrir({ navegacionInterna: true });
+  });
 
   cerrar?.addEventListener("click", cerrarModal);
   fondo?.addEventListener("click", cerrarModal);

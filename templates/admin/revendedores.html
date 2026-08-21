@@ -1,0 +1,66 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Revendedores · PECHY ADMIN{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/revendedores.css') }}?v=1">{% endblock %}
+
+{% block contenido %}
+<section class="resellers-page" data-csrf-token="{{ csrf_token }}">
+  <header class="resellers-header">
+    <div><span>USUARIOS COMERCIALES</span><h1>Revendedores</h1><p>Gestiona usuarios, acceso, precios y actividad.</p></div>
+    <button class="resellers-primary" id="resellerCreateOpen" type="button"><span>+</span> Crear revendedor</button>
+  </header>
+
+  <div class="resellers-stats">
+    <article><span>Total revendedores</span><strong>{{ resumen.total }}</strong><i data-lucide="users"></i></article>
+    <article><span>Activos</span><strong>{{ resumen.activos }}</strong><i data-lucide="badge-check"></i></article>
+    <article><span>Bloqueados</span><strong>{{ resumen.bloqueados }}</strong><i data-lucide="shield-ban"></i></article>
+    <article><span>Nuevos · 30 días</span><strong>{{ resumen.nuevos }}</strong><i data-lucide="sparkles"></i></article>
+  </div>
+
+  <div class="resellers-toolbar">
+    <label><i data-lucide="search"></i><input id="resellerSearch" type="search" placeholder="Buscar nombre, correo o teléfono…" autocomplete="off"></label>
+    <div class="resellers-filters" role="group" aria-label="Filtrar por estado">
+      <button type="button" class="is-active" data-reseller-filter="">Todos</button>
+      <button type="button" data-reseller-filter="activo">Activos</button>
+      <button type="button" data-reseller-filter="bloqueado">Bloqueados</button>
+    </div>
+    <span id="resellerCount">{{ revendedores|length }} revendedores</span>
+  </div>
+
+  <div class="resellers-grid" id="resellersGrid">
+    {% for reseller in revendedores %}
+    <article class="reseller-card" tabindex="0" data-reseller-id="{{ reseller.id }}" data-status="{{ reseller.estado }}" data-search="{{ (reseller.nombre ~ ' ' ~ reseller.negocio ~ ' ' ~ reseller.correo ~ ' ' ~ reseller.telefono)|lower }}">
+      <div class="reseller-avatar">{{ reseller.nombre[:1]|upper }}{{ (reseller.nombre.split()[1][:1]|upper) if reseller.nombre.split()|length > 1 else '' }}</div>
+      <div class="reseller-card-copy"><div><h2>{{ reseller.nombre }}</h2><span class="reseller-status is-{{ reseller.estado }}">{{ reseller.estado|capitalize }}</span></div><p>{{ reseller.negocio or 'Revendedor independiente' }}</p><small>{{ reseller.correo }}</small><small>{{ reseller.telefono or 'Sin teléfono registrado' }}</small></div>
+      <footer><span>Registro {{ reseller.fecha_registro[:10] }}</span><i data-lucide="chevron-right"></i></footer>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="resellers-empty" id="resellersEmpty" {% if revendedores %}hidden{% endif %}><i data-lucide="users"></i><strong>No hay revendedores para mostrar</strong><p>Crea el primero o ajusta los filtros.</p></div>
+
+  <div class="reseller-modal-backdrop" id="resellerControlBackdrop" hidden>
+    <section class="reseller-control-modal" role="dialog" aria-modal="true" aria-label="Centro de Control del revendedor" tabindex="-1">
+      <button class="reseller-modal-close" type="button" data-reseller-close aria-label="Cerrar">×</button>
+      <div id="resellerControlContent"></div>
+    </section>
+  </div>
+
+  <div class="reseller-modal-backdrop" id="resellerCreateBackdrop" hidden>
+    <section class="reseller-create-modal" role="dialog" aria-modal="true" aria-labelledby="resellerCreateTitle" tabindex="-1">
+      <button class="reseller-modal-close" type="button" data-reseller-create-close aria-label="Cerrar">×</button>
+      <header><span>NUEVA CUENTA</span><h2 id="resellerCreateTitle">Crear revendedor</h2><p>La contraseña inicial se guardará de forma segura y nunca podrá consultarse.</p></header>
+      <form id="resellerCreateForm">
+        <label>Nombre completo<input name="nombre" maxlength="120" required></label>
+        <label>Negocio <small>Opcional</small><input name="negocio" maxlength="120"></label>
+        <label>Correo<input name="correo" type="email" maxlength="254" autocomplete="off" required></label>
+        <label>WhatsApp / teléfono<input name="telefono" type="tel" maxlength="21" autocomplete="off"></label>
+        <label class="is-wide">Contraseña inicial<input name="password" type="password" minlength="10" autocomplete="new-password" required><small>Mínimo 10 caracteres, con letras y números.</small></label>
+        <p class="reseller-form-message" role="alert" hidden></p>
+        <footer><button type="button" data-reseller-create-close>Cancelar</button><button class="resellers-primary" type="submit">Crear revendedor</button></footer>
+      </form>
+    </section>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/revendedores.js') }}?v=2"></script>{% endblock %}

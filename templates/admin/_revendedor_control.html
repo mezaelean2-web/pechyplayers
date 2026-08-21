@@ -1,0 +1,51 @@
+<div class="reseller-control" data-reseller-id="{{ revendedor.id }}" data-csrf-token="{{ csrf_token }}">
+  <header class="reseller-control-header"><div class="reseller-avatar is-large">{{ revendedor.nombre[:1]|upper }}</div><div><span>CENTRO DE CONTROL</span><h2>{{ revendedor.nombre }}</h2><p>{{ revendedor.negocio or 'Revendedor independiente' }} · Registro {{ revendedor.fecha_registro[:10] }}</p></div><span class="reseller-status is-{{ revendedor.estado }}">{{ revendedor.estado|capitalize }}</span></header>
+
+  <nav class="reseller-control-tabs" aria-label="Secciones"><button class="is-active" type="button" data-reseller-tab="general">Información</button><button type="button" data-reseller-tab="security">Seguridad</button><button type="button" data-reseller-tab="prices">Precios personalizados</button><button type="button" data-reseller-tab="activity">Actividad</button></nav>
+
+  <section data-reseller-panel="general">
+    <div class="reseller-section-title"><span>01</span><div><h3>Información general</h3><p>Datos comerciales y de contacto del usuario.</p></div></div>
+    <form class="reseller-form" data-reseller-general>
+      <label>Nombre<input name="nombre" value="{{ revendedor.nombre }}" maxlength="120" required></label>
+      <label>Negocio<input name="negocio" value="{{ revendedor.negocio }}" maxlength="120"></label>
+      <label>Correo<input name="correo" type="email" value="{{ revendedor.correo }}" maxlength="254" required></label>
+      <label>WhatsApp / teléfono<input name="telefono" value="{{ revendedor.telefono }}" maxlength="21"></label>
+      <p class="reseller-form-message" role="alert" hidden></p><footer><button class="resellers-primary" type="submit">Guardar cambios</button></footer>
+    </form>
+  </section>
+
+  <section data-reseller-panel="security" hidden>
+    <div class="reseller-section-title"><span>02</span><div><h3>Seguridad y acceso</h3><p>La contraseña actual nunca se muestra.</p></div></div>
+    <div class="reseller-security-card"><div><strong>Estado de acceso</strong><p>{{ 'El acceso futuro está habilitado.' if revendedor.estado == 'activo' else 'El acceso está bloqueado.' }}</p></div><button type="button" class="reseller-state-action is-{{ 'danger' if revendedor.estado == 'activo' else 'success' }}" data-reseller-state="{{ 'bloqueado' if revendedor.estado == 'activo' else 'activo' }}">{{ 'Bloquear revendedor' if revendedor.estado == 'activo' else 'Desbloquear revendedor' }}</button></div>
+    <form class="reseller-form reseller-password-form" data-reseller-password><label class="is-wide">Nueva contraseña<input name="password" type="password" minlength="10" autocomplete="new-password" required><small>Mínimo 10 caracteres, con letras y números.</small></label><p class="reseller-form-message" role="alert" hidden></p><footer><button class="resellers-primary" type="submit">Restablecer contraseña</button></footer></form>
+    <p class="reseller-dependency"><i data-lucide="shield-check"></i><span><strong>Sesiones reseller protegidas</strong>Bloquear la cuenta o cambiar su contraseña invalida las sesiones anteriores en su siguiente solicitud.</span></p>
+  </section>
+
+  <section data-reseller-panel="prices" hidden>
+    <div class="reseller-section-title"><span>03</span><div><h3>Precios personalizados</h3><p>Sólo se almacenan excepciones. Si falta precio general, el plan no tendrá precio reseller.</p></div></div>
+    <label class="reseller-price-search"><i data-lucide="search"></i><input type="search" data-reseller-price-search placeholder="Buscar producto o plan…" autocomplete="off"></label>
+    <div class="reseller-prices">
+      {% for item in planes %}
+      <article class="reseller-price-card" data-plan-id="{{ item.plan_id }}" data-price-search="{{ (item.producto ~ ' ' ~ item.plan)|lower }}">
+        <header><div><h4>{{ item.producto }}</h4><span>{{ item.plan }}</span></div><span class="price-mode {{ 'is-custom' if item.override_id else '' }}">{{ 'Precio personalizado' if item.override_id else 'Usando precio reseller general' }}</span></header>
+        <div class="reseller-price-fields">
+          <label>Precio reseller general<input name="precio_general" inputmode="numeric" value="{{ item.precio_general or '' }}" placeholder="Sin configurar"></label>
+          <label>Precio para este revendedor<input name="precio_personalizado" inputmode="numeric" value="{{ item.precio_personalizado or '' }}" placeholder="Usar general"></label>
+          <label class="price-offer-toggle"><input name="oferta_activa" type="checkbox" {% if item.oferta_activa %}checked{% endif %}><span>Oferta personalizada</span></label>
+          <label>Precio de oferta<input name="oferta_precio" inputmode="numeric" value="{{ item.oferta_precio or '' }}" placeholder="Opcional"></label>
+          <label>Inicio<input name="oferta_inicio" type="date" value="{{ item.oferta_inicio or '' }}"></label>
+          <label>Fin<input name="oferta_fin" type="date" value="{{ item.oferta_fin or '' }}"></label>
+        </div>
+        <p class="reseller-form-message" role="alert" hidden></p>
+        <footer><button type="button" data-save-general>Guardar general</button><button type="button" class="resellers-primary" data-save-custom>Personalizar</button>{% if item.override_id %}<button type="button" class="reseller-reset-price" data-reset-custom>Restablecer precio general</button>{% endif %}</footer>
+      </article>
+      {% else %}<p class="reseller-dependency">No existen planes disponibles.</p>{% endfor %}
+    </div>
+    <p class="reseller-price-search-empty" data-reseller-price-search-empty hidden>No encontramos productos o planes con esa búsqueda.</p>
+  </section>
+
+  <section data-reseller-panel="activity" hidden>
+    <div class="reseller-section-title"><span>04</span><div><h3>Actividad administrativa</h3><p>Eventos de acceso, datos y precios; sin movimientos financieros.</p></div></div>
+    <div class="reseller-activity">{% for event in actividad %}<article><i data-lucide="activity"></i><div><strong>{{ event.descripcion }}</strong><span>{{ event.actor }} · {{ event.fecha }}</span></div></article>{% else %}<p>Sin actividad registrada.</p>{% endfor %}</div>
+  </section>
+</div>

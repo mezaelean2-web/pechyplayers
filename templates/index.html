@@ -49,11 +49,12 @@
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/recordatorios.css') }}">
 
-<link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/modal.css') }}?v=2">
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/pc-v2.css') }}">
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cartelera-lobby.css') }}?v=999">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
 
 <style>
 
@@ -755,8 +756,32 @@
     WhatsApp
 
 </a>
+    {% if revendedor_actual %}
+    <a class="reseller-nav-account" href="/revendedores/cuenta"><span>Hola, {{ revendedor_actual.nombre.split()[0] }}</span><small>Saldo: {{ revendedor_actual.saldo_wallet_cop }}</small><small>Revendedor · Mi cuenta</small></a>
+    <form class="reseller-nav-logout" action="/revendedores/logout" method="POST"><input type="hidden" name="csrf_token" value="{{ session.get('csrf_reseller', '') }}"><button type="submit">Salir</button></form>
+    {% endif %}
   </div>
 </nav>
+
+{% macro precio_visible(plan) -%}
+  {% if revendedor_actual %}
+    {% set reseller = plan.precio_reseller %}
+    <div class="reseller-plan-price {{ 'is-unavailable' if reseller.precio is none else '' }}">
+      <small>{{ 'OFERTA PARA TI' if reseller.origen == 'oferta_personalizada' else 'TU PRECIO RESELLER' }}</small>
+      {% if reseller.precio is not none %}
+        {% if reseller.origen == 'oferta_personalizada' and reseller.precio_base %}<del><span class="precio-configurable" data-precio="{{ reseller.precio_base }}">{{ config.get("moneda_simbolo", "$") }}{{ reseller.precio_base }}</span></del>{% endif %}
+        <strong><span class="precio-configurable" data-precio="{{ reseller.precio }}">{{ config.get("moneda_simbolo", "$") }}{{ reseller.precio }}</span></strong>
+      {% else %}
+        <span>Precio reseller no disponible</span>
+      {% endif %}
+    </div>
+  {% elif plan.oferta_activa == 1 and plan.oferta_precio %}
+    <strong class="plan-precio-anterior" style="text-decoration:line-through;color:#777;"><span class="precio-configurable" data-precio="{{ plan.precio }}">{{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}</span></strong>
+    <strong class="plan-precio-promocional" style="color:#ffd900;"><span class="precio-configurable" data-precio="{{ plan.oferta_precio }}">{{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}</span> 🔥</strong>
+  {% else %}
+    <strong><span class="precio-configurable" data-precio="{{ plan.precio }}">{{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}</span></strong>
+  {% endif %}
+{%- endmacro %}
 
 {% if config.get("inicio_hero_activo", "1") == "1" %}
 
@@ -1281,7 +1306,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
   <div class="grid" id="productosGrid">
   {% for producto in productos %}
-  <article class="card producto-item" data-nombre="{{ producto.nombre | lower }}">
+  <article class="card producto-item" data-nombre="{{ producto.nombre | lower }}" data-categoria="{{ producto.categoria or 'Sin categorÃ­a' }}">
 
 {% if producto.estado != "agotado" and producto.destacado == 1 %}
   <div class="badge-destacado">⭐ MÁS VENDIDO</div>
@@ -1321,27 +1346,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
       {% for plan in producto.planes %}
       <div class="plan">
         <span>{{ plan.plan }}</span>
-        {% if plan.oferta_activa == 1 and plan.oferta_precio %}
-  <strong class="plan-precio-anterior" style="text-decoration: line-through; color:#777;"><span
-  class="precio-configurable"
-  data-precio="{{ plan.precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
-</span></strong>
-  <strong class="plan-precio-promocional" style="color:#ffd900;"><span
-  class="precio-configurable"
-  data-precio="{{ plan.oferta_precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
-</span> 🔥</strong>
-{% else %}
-  <strong><span
-  class="precio-configurable"
-  data-precio="{{ plan.precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
-</span></strong>
-{% endif %}
+        {{ precio_visible(plan) }}
       </div>
       {% endfor %}
     </div>
@@ -1423,7 +1428,8 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
         <article
             class="card producto-item"
-            data-nombre="{{ producto.nombre|lower }}">
+            data-nombre="{{ producto.nombre|lower }}"
+            data-categoria="{{ producto.categoria or nombre_categoria }}">
 
             {% if producto.estado != "agotado" and producto.destacado == 1 %}
 <div class="badge-destacado">
@@ -1476,40 +1482,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
                     <span>{{ plan.plan }}</span>
 
-                    {% if plan.oferta_activa == 1 and plan.oferta_precio %}
-
-                        <div>
-
-                            <strong style="text-decoration:line-through;color:#777;display:block;">
-                                <span
-  class="precio-configurable"
-  data-precio="{{ plan.precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
-</span>
-                            </strong>
-
-                            <strong style="color:#ffd900;display:block;">
-                                <span
-  class="precio-configurable"
-  data-precio="{{ plan.oferta_precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.oferta_precio }}
-</span> 🔥
-                            </strong>
-
-                        </div>
-
-                    {% else %}
-
-                        <strong><span
-  class="precio-configurable"
-  data-precio="{{ plan.precio }}"
->
-  {{ config.get("moneda_simbolo", "$") }}{{ plan.precio }}
-</span></strong>
-
-                    {% endif %}
+                    {{ precio_visible(plan) }}
 
                 </div>
 
@@ -1675,15 +1648,18 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
   <span>● ACTIVO</span>
 </div>
 
-    <img
-      id="modalProductoImagen"
-      class="modal-producto-imagen"
-      src=""
-      alt="Plataforma">
+    <div class="modal-producto-media">
+      <img id="modalProductoImagenFondo" class="modal-producto-imagen-fondo" src="" alt="" aria-hidden="true">
+      <img
+        id="modalProductoImagen"
+        class="modal-producto-imagen"
+        src=""
+        alt="Plataforma">
+    </div>
 
     <div class="modal-producto-info">
 
-      <span class="modal-producto-etiqueta">
+      <span id="modalProductoCategoria" class="modal-producto-etiqueta">
         PECHY PLAYERS PREMIUM
       </span>
 
@@ -1943,11 +1919,11 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script defer src="{{ url_for('static', filename='js/toast.js') }}?v=2"></script>
 
 <script defer src="{{ url_for('static', filename='js/splash.js') }}?v=2"></script>
-<script defer src="{{ url_for('static', filename='js/mobile.js') }}?v=9"></script>
+<script defer src="{{ url_for('static', filename='js/mobile.js') }}?v=11"></script>
 
 <script defer src="{{ url_for('static', filename='js/mobile-carousel.js') }}?v=2"></script>
 <script defer src="{{ url_for('static', filename='js/categorias.js') }}?v=3"></script>
-<script defer src="{{ url_for('static', filename='js/modal.js') }}?v=2"></script>
+<script defer src="{{ url_for('static', filename='js/modal.js') }}?v=4"></script>
 <script defer src="{{ url_for('static', filename='js/pc-v2.js') }}?v=2"></script>
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>

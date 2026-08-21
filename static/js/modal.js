@@ -125,21 +125,8 @@
     boton.textContent =
       `Ver ${nombreRecomendado} →`;
 
-    boton.onclick = function () {
-      const contenidoModal =
-        document.querySelector(".producto-modal-contenido");
-
-      contenidoModal?.scrollTo({
-        top: 0,
-        behavior: "smooth"
-      });
-
-      if (typeof window.abrirProductoModalCompartido === "function") {
-        window.abrirProductoModalCompartido(tarjetaRecomendada);
-      } else {
-        tarjetaRecomendada.querySelector(".cover")?.click();
-      }
-    };
+    boton.dataset.modalProducto =
+      tarjetaRecomendada.dataset.nombre || "";
   }
 
   window.actualizarOfertaInteligente =

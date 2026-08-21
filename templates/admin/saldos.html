@@ -1,0 +1,29 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Saldos · PECHY ADMIN{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/saldos.css') }}?v=1">{% endblock %}
+{% block contenido %}
+<section class="wallet-page" data-csrf-token="{{ csrf_token }}">
+  <header class="wallet-header"><div><span>FINANZAS RESELLER</span><h1>Saldos</h1><p>Wallets internas y movimientos auditables en pesos colombianos.</p></div></header>
+  <div class="wallet-stats">
+    <article><span>Saldo total reseller</span><strong data-wallet-stat="total" data-value="{{ resumen.saldo_total }}">{{ formato_cop(resumen.saldo_total) }}</strong><i data-lucide="landmark"></i></article>
+    <article><span>Revendedores con saldo</span><strong data-wallet-stat="count" data-value="{{ resumen.con_saldo }}">{{ resumen.con_saldo }}</strong><i data-lucide="users"></i></article>
+    <article><span>Créditos manuales de hoy</span><strong data-wallet-stat="credits" data-value="{{ resumen.creditos_hoy }}">{{ formato_cop(resumen.creditos_hoy) }}</strong><i data-lucide="circle-plus"></i></article>
+    <article><span>Débitos manuales de hoy</span><strong data-wallet-stat="debits" data-value="{{ resumen.debitos_hoy }}">{{ formato_cop(resumen.debitos_hoy) }}</strong><i data-lucide="circle-minus"></i></article>
+  </div>
+  <div class="wallet-toolbar">
+    <label><i data-lucide="search"></i><input id="walletSearch" type="search" placeholder="Buscar nombre, negocio, correo o teléfono…" autocomplete="off"></label>
+    <div class="wallet-filters" role="group" aria-label="Filtrar saldos">
+      <button class="is-active" type="button" data-wallet-filter="all">Todos</button><button type="button" data-wallet-filter="with">Con saldo</button><button type="button" data-wallet-filter="without">Sin saldo</button><button type="button" data-wallet-filter="activo">Activos</button><button type="button" data-wallet-filter="bloqueado">Bloqueados</button>
+    </div><span id="walletCount">{{ saldos|length }} revendedores</span>
+  </div>
+  <div class="wallet-grid" id="walletGrid">
+    {% for item in saldos %}<article class="wallet-card" tabindex="0" data-reseller-id="{{ item.id }}" data-status="{{ item.estado }}" data-balance="{{ item.saldo }}" data-search="{{ (item.nombre ~ ' ' ~ item.negocio ~ ' ' ~ item.correo ~ ' ' ~ item.telefono)|lower }}">
+      <div class="wallet-avatar">{{ item.nombre[:1]|upper }}</div><div class="wallet-card-copy"><div><h2>{{ item.nombre }}</h2><span class="wallet-status is-{{ item.estado }}">{{ item.estado|capitalize }}</span></div><p>{{ item.negocio or 'Revendedor independiente' }}</p><small>{{ item.correo }}</small></div>
+      <footer><div><span>Saldo disponible</span><strong data-card-balance>{{ formato_cop(item.saldo) }}</strong></div><small data-card-updated>{{ ('Último movimiento ' ~ item.updated_at) if item.updated_at else 'Sin movimientos' }}</small></footer>
+    </article>{% endfor %}
+  </div>
+  <div class="wallet-empty" id="walletEmpty" {% if saldos %}hidden{% endif %}><i data-lucide="wallet"></i><strong>No hay revendedores para mostrar</strong><p>Ajusta la búsqueda o los filtros.</p></div>
+  <div class="wallet-backdrop" id="walletBackdrop" hidden><section class="wallet-modal" role="dialog" aria-modal="true" aria-label="Centro de Control de saldo" tabindex="-1"><button class="wallet-close" type="button" data-wallet-close aria-label="Cerrar">×</button><div id="walletControl"></div></section></div>
+</section>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/saldos.js') }}?v=1"></script>{% endblock %}

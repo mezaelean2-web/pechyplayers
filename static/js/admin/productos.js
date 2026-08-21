@@ -62,14 +62,15 @@ document.addEventListener("DOMContentLoaded", function () {
     const createError = document.getElementById("productoCreateError");
     const createImage = document.getElementById("nuevaImagen");
     const createPreview = document.getElementById("previewAgregar");
-    const legacy = document.getElementById("productosAdminLegacy");
     let productoArrastrado = null;
     let ordenAntesDeArrastrar = [];
     let huboArrastre = false;
     let ultimoDisparadorModal = null;
+    let solicitudProducto = null;
+    let productoSolicitado = null;
     const modalBackdrop = document.getElementById("productoControlBackdrop");
     const modal = modalBackdrop?.querySelector(".producto-control-modal");
-    const controlesModal = Array.from(modalBackdrop?.querySelectorAll("[data-modal-producto]") || []);
+    const modalContent = document.getElementById("productoControlContent");
 
     function normalizarPrecio(precio) {
         const digitos = String(precio || "").replace(/\D/g, "");
@@ -215,11 +216,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     createForm?.querySelectorAll("[data-create-plan]").forEach(function (tarjeta) {
         const activo = tarjeta.querySelector('input[type="checkbox"]');
-        const precio = tarjeta.querySelector('input[type="text"]');
+        const campos = Array.from(tarjeta.querySelectorAll('input[type="text"]'));
+        const precio = tarjeta.querySelector('input[name^="precio_"]:not([name^="precio_reseller_"])');
         if (!activo || !precio) return;
         activo.addEventListener("change", function () {
             tarjeta.classList.toggle("is-active", activo.checked);
-            precio.disabled = !activo.checked;
+            campos.forEach(function (campo) { campo.disabled = !activo.checked; });
             precio.required = activo.checked;
             if (createError) createError.hidden = true;
         });
@@ -230,7 +232,7 @@ document.addEventListener("DOMContentLoaded", function () {
             return tarjeta.querySelector('input[type="checkbox"]')?.checked;
         });
         const invalidos = activos.filter(function (tarjeta) {
-            return !/\d/.test(tarjeta.querySelector('input[type="text"]')?.value || "");
+            return !/\d/.test(tarjeta.querySelector('input[name^="precio_"]:not([name^="precio_reseller_"])')?.value || "");
         });
         if (!activos.length || invalidos.length) {
             evento.preventDefault();
@@ -252,50 +254,140 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function cerrarModal() {
         if (!modalBackdrop || modalBackdrop.hidden) return;
+        solicitudProducto?.abort();
+        solicitudProducto = null;
+        productoSolicitado = null;
         modalBackdrop.hidden = true;
         document.body.classList.remove("producto-modal-open");
-        controlesModal.forEach(function (control) { control.hidden = true; });
+        if (modalContent) modalContent.replaceChildren();
         ultimoDisparadorModal?.focus({ preventScroll: true });
     }
 
-    function abrirModal(tarjeta) {
-        if (!modalBackdrop || !modal || huboArrastre) return;
-        const control = controlesModal.find(function (item) {
-            return item.dataset.modalProducto === tarjeta.dataset.producto;
+    function mostrarCarga() {
+        if (!modalContent) return;
+        modal?.removeAttribute("aria-labelledby");
+        modalContent.innerHTML = '<div class="producto-control-status" role="status"><span class="producto-control-spinner" aria-hidden="true"></span><strong>Cargando producto…</strong></div>';
+    }
+
+    function mostrarError(tarjeta) {
+        if (!modalContent) return;
+        modalContent.innerHTML = '<div class="producto-control-status producto-control-status--error" role="alert"><strong>No pudimos cargar este producto.</strong><button type="button" data-retry-producto>Reintentar</button></div>';
+        modalContent.querySelector("[data-retry-producto]")?.addEventListener("click", function () {
+            cargarProducto(tarjeta);
+        }, { once: true });
+    }
+
+    function inicializarControlDinamico() {
+        if (!modalContent) return;
+        const titulo = modalContent.querySelector("h2");
+        if (titulo?.id) modal?.setAttribute("aria-labelledby", titulo.id);
+
+        modalContent.querySelectorAll("form").forEach(function (formulario) {
+            formulario.addEventListener("submit", function () {
+                const boton = formulario.querySelector('button[type="submit"]');
+                if (!boton) return;
+                boton.disabled = true;
+                boton.dataset.textoOriginal = boton.textContent;
+                boton.textContent = "Guardando…";
+            });
         });
-        if (!control) return;
-        controlesModal.forEach(function (item) { item.hidden = item !== control; });
-        const titulo = control.querySelector("h2");
-        modal.setAttribute("aria-labelledby", titulo.id);
+
+        modalContent.querySelectorAll("[data-state-control]").forEach(function (tarjeta) {
+            const switchEstado = tarjeta.querySelector('input[type="checkbox"]');
+            const estado = tarjeta.querySelector(".producto-state-current span");
+            const pendiente = tarjeta.querySelector(".producto-state-pending");
+            if (!switchEstado || !estado || !pendiente) return;
+            const valorInicial = switchEstado.checked;
+            switchEstado.addEventListener("change", function () {
+                const hayCambio = switchEstado.checked !== valorInicial;
+                estado.textContent = switchEstado.checked ? tarjeta.dataset.onLabel : tarjeta.dataset.offLabel;
+                tarjeta.classList.toggle("has-pending-change", hayCambio);
+                pendiente.hidden = !hayCambio;
+            });
+        });
+
+        modalContent.querySelectorAll("[data-offer-control]").forEach(function (oferta) {
+            const switchOferta = oferta.querySelector('input[name="oferta_activa"]');
+            const plan = oferta.closest("[data-plan-card]");
+            const badge = plan?.querySelector(".producto-offer-badge");
+            if (!switchOferta || !plan || !badge) return;
+            switchOferta.addEventListener("change", function () {
+                plan.classList.toggle("has-offer", switchOferta.checked);
+                badge.hidden = !switchOferta.checked;
+            });
+        });
+
+        modalContent.querySelectorAll("[data-reseller-price-form]").forEach(function (formulario) {
+            formulario.addEventListener("submit", async function (evento) {
+                evento.preventDefault();
+                const boton = formulario.querySelector('button[type="submit"]');
+                const campo = formulario.querySelector('[name="precio_reseller_general"]');
+                const feedback = formulario.querySelector("[data-reseller-feedback]");
+                const tarjeta = formulario.closest("[data-reseller-price-card]");
+                const precio = String(campo?.value || "").replace(/\D/g, "");
+                if (!precio) {
+                    if (feedback) feedback.textContent = "Escribe un importe valido.";
+                    if (boton) { boton.disabled = false; boton.textContent = boton.dataset.textoOriginal || "Guardar precio reseller"; }
+                    return;
+                }
+                try {
+                    const respuesta = await fetch(`/admin/revendedores/precios/generales/${encodeURIComponent(formulario.dataset.planId)}`, {
+                        method: "PUT",
+                        headers: {"Content-Type": "application/json", "X-CSRF-Token": formulario.querySelector('[name="csrf_token"]')?.value || ""},
+                        body: JSON.stringify({ precio: precio })
+                    });
+                    const datos = await respuesta.json().catch(function () { return {}; });
+                    if (!respuesta.ok) throw new Error(datos.mensaje || "No fue posible guardar el precio.");
+                    tarjeta?.classList.add("is-saved");
+                    const estado = tarjeta?.querySelector("[data-reseller-status]");
+                    if (estado) estado.textContent = "Precio reseller configurado";
+                    if (feedback) feedback.textContent = "Precio reseller guardado.";
+                } catch (error) {
+                    if (feedback) feedback.textContent = error.message;
+                } finally {
+                    if (boton) { boton.disabled = false; boton.textContent = boton.dataset.textoOriginal || "Guardar precio reseller"; }
+                }
+            });
+        });
+    }
+
+    async function cargarProducto(tarjeta) {
+        if (!modalContent || !tarjeta?.dataset.productoId) return;
+        solicitudProducto?.abort();
+        const controlador = new AbortController();
+        solicitudProducto = controlador;
+        productoSolicitado = tarjeta.dataset.productoId;
+        mostrarCarga();
+        try {
+            const respuesta = await fetch(`/admin/productos/${encodeURIComponent(productoSolicitado)}/control`, {
+                headers: { "X-Requested-With": "XMLHttpRequest" },
+                signal: controlador.signal
+            });
+            if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+            const html = await respuesta.text();
+            if (controlador.signal.aborted || productoSolicitado !== tarjeta.dataset.productoId) return;
+            modalContent.innerHTML = html;
+            inicializarControlDinamico();
+        } catch (error) {
+            if (error.name !== "AbortError" && productoSolicitado === tarjeta.dataset.productoId) mostrarError(tarjeta);
+        } finally {
+            if (solicitudProducto === controlador) solicitudProducto = null;
+        }
+    }
+
+    function abrirModal(tarjeta) {
+        if (!modalBackdrop || !modal || !modalContent || huboArrastre) return;
         ultimoDisparadorModal = tarjeta;
         modalBackdrop.hidden = false;
         document.body.classList.add("producto-modal-open");
         modal.scrollTop = 0;
         modal.focus({ preventScroll: true });
+        cargarProducto(tarjeta);
     }
 
     grid.addEventListener("click", function (evento) {
-        const boton = evento.target.closest("[data-legacy-producto]");
-        if (!boton) {
-            const tarjeta = evento.target.closest(".productos-admin-card");
-            if (tarjeta && !huboArrastre) abrirModal(tarjeta);
-            return;
-        }
-        if (!legacy) return;
-        evento.stopPropagation();
-
-        const nombre = boton.dataset.legacyProducto.toLocaleLowerCase("es");
-        const editor = Array.from(legacy.querySelectorAll(".admin-producto")).find(function (item) {
-            return (item.dataset.nombre || "").toLocaleLowerCase("es") === nombre;
-        });
-        if (!editor) return;
-
-        legacy.hidden = false;
-        legacy.querySelectorAll(".admin-producto").forEach(function (item) {
-            item.hidden = item !== editor;
-            item.open = item === editor;
-        });
-        editor.scrollIntoView({ behavior: "smooth", block: "start" });
+        const tarjeta = evento.target.closest(".productos-admin-card");
+        if (tarjeta && !huboArrastre) abrirModal(tarjeta);
     });
 
     grid.addEventListener("keydown", function (evento) {
@@ -325,43 +417,6 @@ document.addEventListener("DOMContentLoaded", function () {
         const ultimo = enfocables.at(-1);
         if (evento.shiftKey && document.activeElement === primero) { evento.preventDefault(); ultimo.focus(); }
         else if (!evento.shiftKey && document.activeElement === ultimo) { evento.preventDefault(); primero.focus(); }
-    });
-
-    modalBackdrop?.querySelectorAll("form").forEach(function (formulario) {
-        formulario.addEventListener("submit", function () {
-            const boton = formulario.querySelector('button[type="submit"]');
-            if (!boton) return;
-            boton.disabled = true;
-            boton.dataset.textoOriginal = boton.textContent;
-            boton.textContent = "Guardando…";
-        });
-    });
-
-    modalBackdrop?.querySelectorAll("[data-state-control]").forEach(function (tarjeta) {
-        const switchEstado = tarjeta.querySelector('input[type="checkbox"]');
-        const estado = tarjeta.querySelector(".producto-state-current span");
-        const pendiente = tarjeta.querySelector(".producto-state-pending");
-        if (!switchEstado || !estado || !pendiente) return;
-
-        const valorInicial = switchEstado.checked;
-        switchEstado.addEventListener("change", function () {
-            const hayCambio = switchEstado.checked !== valorInicial;
-            estado.textContent = switchEstado.checked ? tarjeta.dataset.onLabel : tarjeta.dataset.offLabel;
-            tarjeta.classList.toggle("has-pending-change", hayCambio);
-            pendiente.hidden = !hayCambio;
-        });
-    });
-
-    modalBackdrop?.querySelectorAll("[data-offer-control]").forEach(function (oferta) {
-        const switchOferta = oferta.querySelector('input[name="oferta_activa"]');
-        const plan = oferta.closest("[data-plan-card]");
-        const badge = plan?.querySelector(".producto-offer-badge");
-        if (!switchOferta || !plan || !badge) return;
-
-        switchOferta.addEventListener("change", function () {
-            plan.classList.toggle("has-offer", switchOferta.checked);
-            badge.hidden = !switchOferta.checked;
-        });
     });
 
     function obtenerTarjetaDestino(x, y) {
