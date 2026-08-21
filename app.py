@@ -401,6 +401,46 @@ def _login_reseller_limitado(correo):
     return len(intentos) >= _LOGIN_RESELLER_MAX_INTENTOS, clave
 
 
+def _productos_disponibles_dashboard(revendedor_id):
+    categorias_visibles = {
+        categoria["nombre"]
+        for categoria in obtener_categorias()
+        if categoria["visible"] == 1
+    }
+    productos = [
+        producto for producto in obtener_productos()
+        if producto.get("visible", 1) == 1
+        and (producto.get("categoria") or "Sin categoría").strip().lower() != "sin categoría"
+        and (producto.get("categoria") or "Sin categoría") in categorias_visibles
+    ]
+    plan_ids = [plan["id"] for producto in productos for plan in producto["planes"]]
+    precios = resellers.resolver_precios_revendedor(revendedor_id, plan_ids)
+    return sum(
+        1 for producto in productos
+        if any(precios.get(plan["id"], {}).get("precio") is not None
+               for plan in producto["planes"])
+    )
+
+
+@app.route("/revendedores")
+def dashboard_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    resumen = wallets.obtener_resumen_dashboard(revendedor["id"])
+    resumen["saldo_cop"] = wallets.formato_cop(resumen["saldo"])
+    resumen["total_recargado_cop"] = wallets.formato_cop(resumen["total_recargado"])
+    resumen["productos_disponibles"] = _productos_disponibles_dashboard(revendedor["id"])
+    return render_template(
+        "resellers/dashboard.html",
+        revendedor=revendedor,
+        resumen=resumen,
+        csrf_token=_csrf_reseller_token(),
+        seccion_activa="inicio",
+    )
+
+
 @app.route("/revendedores/registro", methods=["GET", "POST"])
 def registro_revendedor():
     resellers.inicializar_revendedores()
@@ -424,7 +464,7 @@ def registro_revendedor():
                 session["reseller_id"] = reseller_id
                 session["reseller_auth_version"] = revendedor["auth_version"]
                 session.permanent = True
-                return redirect("/")
+                return redirect("/revendedores")
             except ValueError as exc:
                 error = str(exc)
     return render_template("resellers/registro.html", error=error, csrf_token=_csrf_reseller_token())
@@ -459,7 +499,7 @@ def login_revendedor():
                     session["reseller_id"] = resultado["id"]
                     session["reseller_auth_version"] = resultado["auth_version"]
                     session.permanent = True
-                    return redirect("/")
+                    return redirect("/revendedores")
                 _intentos_login_reseller.setdefault(clave_limite, []).append(time.monotonic())
                 error = (
                     "Tu cuenta se encuentra temporalmente bloqueada."

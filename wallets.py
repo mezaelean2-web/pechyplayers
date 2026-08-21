@@ -168,6 +168,35 @@ def obtener_saldo(revendedor_id):
     return asegurar_wallet(revendedor_id)["saldo"]
 
 
+def obtener_resumen_dashboard(revendedor_id, limite_movimientos=5):
+    """Devuelve datos financieros de solo lectura para el dashboard privado."""
+    wallet = asegurar_wallet(revendedor_id)
+    limite = max(1, min(int(limite_movimientos), 10))
+    conn = _conectar()
+    try:
+        total_recargado = conn.execute(
+            """SELECT COALESCE(SUM(monto), 0)
+               FROM reseller_wallet_transactions
+               WHERE revendedor_id=? AND tipo='recharge'""",
+            (revendedor_id,)
+        ).fetchone()[0]
+        movimientos = conn.execute(
+            """SELECT tipo, monto, saldo_posterior, descripcion, provider,
+                      referencia, created_at
+               FROM reseller_wallet_transactions
+               WHERE revendedor_id=?
+               ORDER BY id DESC LIMIT ?""",
+            (revendedor_id, limite)
+        ).fetchall()
+        return {
+            "saldo": int(wallet["saldo"]),
+            "total_recargado": int(total_recargado or 0),
+            "movimientos": [dict(fila) for fila in movimientos],
+        }
+    finally:
+        conn.close()
+
+
 def listar_saldos():
     conn = _conectar()
     try:

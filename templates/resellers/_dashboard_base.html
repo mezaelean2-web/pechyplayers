@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#070b12">
+  <title>{% block title %}Panel reseller{% endblock %} · PECHY PLAYERS</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-dashboard.css') }}?v=1">
+  {% block head %}{% endblock %}
+</head>
+<body class="reseller-app">
+  <input class="reseller-drawer-toggle" type="checkbox" id="reseller-drawer" aria-hidden="true">
+  <label class="reseller-drawer-backdrop" for="reseller-drawer" aria-label="Cerrar menú"></label>
+  <aside class="reseller-sidebar" aria-label="Navegación principal">
+    <a class="reseller-brand" href="/revendedores">
+      <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="">
+      <span><strong>PECHY</strong> PLAYERS<small>ESPACIO RESELLER</small></span>
+    </a>
+    <nav class="reseller-primary-nav">
+      <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
+      <a href="/"><span>▦</span>Productos</a>
+      <a href="/revendedores/cuenta#recargar-saldo"><span>＋</span>Recargar saldo</a>
+      <a href="/revendedores/cuenta#movimientos"><span>↕</span>Movimientos</a>
+      <a href="/revendedores/cuenta"><span>○</span>Mi cuenta</a>
+    </nav>
+    <div class="reseller-sidebar-footer">
+      <a class="reseller-sidebar-balance" href="/revendedores/cuenta#recargar-saldo">
+        <span>Saldo disponible</span><strong>{{ resumen.saldo_cop }}</strong>
+      </a>
+      <div class="reseller-sidebar-user">
+        <span class="reseller-avatar">{{ revendedor.nombre[:1]|upper }}</span>
+        <span><strong>{{ revendedor.nombre }}</strong><small>{{ revendedor.correo }}</small></span>
+      </div>
+      <form action="/revendedores/logout" method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <button type="submit">Cerrar sesión</button>
+      </form>
+    </div>
+  </aside>
+
+  <div class="reseller-app-frame">
+    <header class="reseller-topbar">
+      <label class="reseller-menu-button" for="reseller-drawer" aria-label="Abrir menú">☰</label>
+      <div><span>Panel reseller</span><h1>{% block section_title %}Inicio{% endblock %}</h1></div>
+      <div class="reseller-top-actions">
+        <a class="reseller-top-balance" href="/revendedores/cuenta#recargar-saldo"><span>Saldo</span><strong>{{ resumen.saldo_cop }}</strong></a>
+        <a class="reseller-account-link" href="/revendedores/cuenta" aria-label="Mi cuenta">{{ revendedor.nombre[:1]|upper }}</a>
+      </div>
+    </header>
+    <main class="reseller-main">{% block content %}{% endblock %}</main>
+  </div>
+
+  <nav class="reseller-mobile-nav" aria-label="Navegación móvil">
+    <a class="{{ 'is-active' if seccion_activa == 'inicio' else '' }}" href="/revendedores"><span>⌂</span>Inicio</a>
+    <a href="/"><span>▦</span>Productos</a>
+    <a class="is-primary" href="/revendedores/cuenta#recargar-saldo"><span>＋</span>Recargar</a>
+    <a href="/revendedores/cuenta"><span>○</span>Cuenta</a>
+  </nav>
+</body>
+</html>
