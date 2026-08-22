@@ -108,8 +108,10 @@ class ResellerGlobalCartAssetsTest(unittest.TestCase):
         self.assertNotIn('data-cart-remove>Eliminar', self.script)
         for contract in (
             '.reseller-global-cart .reseller-cart-line footer{',
-            'align-items:center;margin-top:9px',
-            'white-space:nowrap',
+            'grid-template-columns:none;align-items:center',
+            'padding:9px 0 0',
+            'footer>button span{display:none}',
+            '.reseller-global-cart .reseller-cart-footer{display:block;width:100%;grid-template-columns:none;box-sizing:border-box;margin:0}',
             '.reseller-global-cart .reseller-cart-summary{display:block;width:100%;box-sizing:border-box;margin:0;text-align:center}',
             '.reseller-global-cart .reseller-cart-summary__inner{display:block;width:min(440px,100%);box-sizing:border-box;margin:0 auto;padding:0;border:0}',
             'grid-template-columns:minmax(0,1fr) auto',
@@ -117,6 +119,7 @@ class ResellerGlobalCartAssetsTest(unittest.TestCase):
             '@media(max-width:360px)',
         ):
             self.assertIn(contract, self.cart_css)
+        self.assertIn('data-cart-remove aria-label="Eliminar producto"', self.script)
         self.assertIn('class="reseller-cart-summary__inner"', self.partial)
 
 
