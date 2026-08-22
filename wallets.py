@@ -6,7 +6,7 @@ import database
 
 
 TIPOS_CREDITO = {"manual_credit", "recharge", "refund"}
-TIPOS_DEBITO = {"manual_debit", "purchase"}
+TIPOS_DEBITO = {"manual_debit", "purchase", "renewal", "recovery"}
 TIPOS_VALIDOS = TIPOS_CREDITO | TIPOS_DEBITO | {"adjustment"}
 
 

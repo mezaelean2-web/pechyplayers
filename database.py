@@ -5484,7 +5484,7 @@ def _limpiar_servicio_cortado_nube(cursor, servicio):
     return cursor.rowcount
 
 
-def cortar_servicios_nube(servicios_payload, motivo=""):
+def cortar_servicios_nube(servicios_payload, motivo="", actor_id=None):
     solicitados = {}
     for item in (servicios_payload or []):
         servicio_tipo = str(item.get("servicio_tipo") or "")
@@ -5537,6 +5537,15 @@ def cortar_servicios_nube(servicios_payload, motivo=""):
             snapshot = _snapshot_notificacion_servicio_nube(servicio)
             if _limpiar_servicio_cortado_nube(cursor, servicio) != 1:
                 raise RuntimeError("El servicio cambio durante el corte.")
+            # Import local para evitar el ciclo database <-> reseller_accounts.
+            import reseller_accounts
+            reseller_accounts.registrar_corte_purchase_reseller(
+                cursor=cursor,
+                cuenta_id=servicio["cuenta_id"],
+                perfil_id=(servicio["servicio_id"] if servicio["servicio_tipo"] == "perfil" else None),
+                motivo=motivo,
+                actor_id=actor_id,
+            )
             cursor.execute("""
                 UPDATE nube_notificacion_servicios
                 SET snapshot = ?, estado = 'cortado',

@@ -39,6 +39,7 @@ import database
 import resellers
 import wallets
 import bold_recharges
+import reseller_accounts
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -54,6 +55,7 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
+app.config.setdefault("RESELLER_PURCHASES_ENABLED", False)
 
 _intentos_login_reseller = {}
 _LOGIN_RESELLER_MAX_INTENTOS = 5
@@ -371,6 +373,20 @@ def _validar_csrf_reseller():
     return bool(recibido and esperado and secrets.compare_digest(recibido, esperado))
 
 
+def _csrf_admin_token():
+    token = session.get("csrf_admin")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_admin"] = token
+    return token
+
+
+def _validar_csrf_admin():
+    recibido = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
+    esperado = session.get("csrf_admin", "")
+    return bool(recibido and esperado and secrets.compare_digest(recibido, esperado))
+
+
 def _limpiar_sesion_reseller():
     session.pop("reseller_id", None)
     session.pop("reseller_auth_version", None)
@@ -469,6 +485,22 @@ def _resumen_privado_reseller(revendedor_id):
     return resumen
 
 
+def _resumen_billetera_reseller(revendedor_id):
+    resumen = _resumen_privado_reseller(revendedor_id)
+    _, _, movimientos = wallets.obtener_control_saldo(revendedor_id, limite=100)
+    salidas = [item for item in movimientos if item["tipo"] in wallets.TIPOS_DEBITO]
+    total_utilizado = sum(int(item["monto"]) for item in salidas)
+    resumen.update({
+        "movimientos": movimientos,
+        "cantidad_movimientos": len(movimientos),
+        "cantidad_recargas": sum(1 for item in movimientos if item["tipo"] == "recharge"),
+        "total_utilizado": total_utilizado,
+        "total_utilizado_cop": wallets.formato_cop(total_utilizado),
+        "cantidad_salidas": len(salidas),
+    })
+    return resumen
+
+
 @app.route("/revendedores")
 def dashboard_revendedor():
     revendedor = _revendedor_sesion_actual()
@@ -500,12 +532,233 @@ def productos_revendedor():
     return inicio()
 
 
+@app.get("/revendedores/productos/planes/<int:plan_id>/compra")
+def preview_compra_producto_revendedor(plan_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "codigo": "sesion_requerida", "mensaje": "Debes iniciar sesión."}), 401
+    try:
+        try:
+            periodos = int(request.args.get("cantidad_periodos", 1))
+            unidades = int(request.args.get("cantidad_unidades", 1))
+        except (TypeError, ValueError) as error:
+            raise reseller_accounts.ResellerPurchaseError(
+                "solicitud_invalida", "Las cantidades no son válidas.") from error
+        preview = reseller_accounts.previsualizar_compra_plan(
+            revendedor["id"], plan_id, periodos, unidades)
+    except reseller_accounts.ResellerPurchaseError as error:
+        estado = 404 if error.codigo == "plan_inexistente" else 400
+        return jsonify({"ok": False, "codigo": error.codigo, "mensaje": error.mensaje}), estado
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.post("/revendedores/productos/carrito/preview")
+def preview_carrito_producto_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "codigo": "sesion_requerida", "mensaje": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_reseller():
+        return jsonify({"ok": False, "codigo": "csrf_invalido", "mensaje": "Token CSRF no válido."}), 403
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) - {"lineas", "cart_intent_id"}:
+        return jsonify({"ok": False, "codigo": "payload_invalido",
+                        "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    try:
+        preview = reseller_accounts.previsualizar_carrito_reseller(
+            revendedor["id"], datos.get("lineas"), datos.get("cart_intent_id"))
+    except reseller_accounts.ResellerPurchaseError as error:
+        estado = 404 if error.codigo == "plan_inexistente" else 400
+        return jsonify({"ok": False, "codigo": error.codigo, "mensaje": error.mensaje}), estado
+    return jsonify({"ok": True, "preview": preview})
+
+
+@app.post("/revendedores/productos/planes/<int:plan_id>/comprar")
+def comprar_producto_revendedor_bloqueado(plan_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "codigo": "sesion_requerida", "mensaje": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_reseller():
+        return jsonify({"ok": False, "codigo": "csrf_invalido", "mensaje": "Token CSRF no válido."}), 403
+    datos = request.get_json(silent=True) or {}
+    permitidos = {"lineas", "cart_intent_id", "idempotency_key", "cantidad_periodos"}
+    if not isinstance(datos, dict) or set(datos) - permitidos:
+        return jsonify({"ok": False, "codigo": "payload_invalido",
+                        "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    # Guard de Fase 4A: deliberadamente no existe llamada al motor de compra.
+    # Incluso una activación accidental no alcanza el motor hasta que Fase 4B
+    # sustituya explícitamente este contrato seguro.
+    if app.config.get("RESELLER_PURCHASES_ENABLED"):
+        return jsonify({"ok": False, "codigo": "purchases_not_implemented",
+                        "mensaje": "Las compras reseller aún no están habilitadas."}), 503
+    return jsonify({"ok": False, "codigo": "purchases_disabled",
+                    "mensaje": "Las compras reseller estarán disponibles próximamente."}), 409
+
+
+@app.route("/revendedores/mis-cuentas")
+def mis_cuentas_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    estado, tipo, busqueda = (request.args.get("estado", "todas"),
+                              request.args.get("tipo", "todas"), request.args.get("q", ""))
+    return render_template(
+        "resellers/mis_cuentas.html", revendedor=revendedor,
+        cuentas=reseller_accounts.listar_mis_cuentas(revendedor["id"], estado, tipo, busqueda),
+        metricas=reseller_accounts.resumen_mis_cuentas(revendedor["id"]),
+        resumen=_resumen_privado_reseller(revendedor["id"]),
+        filtros={"estado": estado, "tipo": tipo, "q": busqueda},
+        csrf_token=_csrf_reseller_token(), seccion_activa="mis_cuentas")
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>")
+def detalle_mi_cuenta_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    detalle = reseller_accounts.obtener_detalle_mi_cuenta(purchase_id, revendedor["id"])
+    if not detalle:
+        return jsonify({"ok": False, "error": "Adquisición no encontrada."}), 404
+    return jsonify({"ok": True, "detalle": detalle})
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/credenciales")
+def credenciales_mi_cuenta_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    resultado = reseller_accounts.obtener_credenciales_autorizadas(purchase_id, revendedor["id"])
+    if resultado is None:
+        return jsonify({"ok": False, "error": "Adquisición no encontrada."}), 404
+    return jsonify({"ok": True, **resultado})
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/disponibilidad")
+def disponibilidad_mi_cuenta_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    resultado = reseller_accounts.consultar_disponibilidad_recuperacion(
+        revendedor["id"], purchase_id)
+    if resultado is None:
+        return jsonify({"ok": False, "error": "Adquisición no encontrada."}), 404
+    estado = 409 if resultado["code"] == "NOT_CUT" else 200
+    return jsonify({"ok": estado == 200, **resultado}), estado
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/recuperacion")
+def previsualizar_recuperacion_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    try:
+        cantidad = request.args.get("cantidad_periodos", "1")
+        if not str(cantidad).isdigit():
+            raise reseller_accounts.ResellerPurchaseError(
+                "cantidad_periodos_invalida", "La cantidad de períodos no es válida.")
+        resultado = reseller_accounts.previsualizar_recovery(
+            purchase_id, revendedor["id"], int(cantidad))
+        return jsonify({"ok": True, **resultado})
+    except reseller_accounts.ResellerPurchaseError as error:
+        return _respuesta_error_operacion_reseller(error)
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/recuperar", methods=["POST"])
+def recuperar_mi_cuenta_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_revendedores():
+        return jsonify({"ok": False, "error": "Solicitud de seguridad inválida."}), 403
+    datos = request.get_json(silent=True) or {}
+    try:
+        cantidad = datos.get("cantidad_periodos")
+        if isinstance(cantidad, bool) or not isinstance(cantidad, int):
+            raise reseller_accounts.ResellerPurchaseError(
+                "cantidad_periodos_invalida", "La cantidad de períodos debe ser un entero.")
+        resultado = reseller_accounts.recuperar_purchase_reseller(
+            revendedor["id"], purchase_id, cantidad, datos.get("idempotency_key"))
+        return jsonify({"ok": True, "mensaje": "Servicio recuperado correctamente.",
+                        "precio_total_cop": wallets.formato_cop(resultado["precio_total"]),
+                        **resultado})
+    except reseller_accounts.ResellerPurchaseError as error:
+        return _respuesta_error_operacion_reseller(error)
+
+
+def _respuesta_error_operacion_reseller(error):
+    codigo = getattr(error, "codigo", "solicitud_invalida")
+    estado = 404 if codigo == "purchase_inexistente" else 409
+    if codigo in {"solicitud_invalida", "cantidad_periodos_invalida", "cantidad_periodos_excedida",
+                  "idempotencia_invalida"}:
+        estado = 400
+    return jsonify({"ok": False, "codigo": codigo, "error": str(error)}), estado
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/renovacion")
+def previsualizar_renovacion_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    try:
+        cantidad = int(request.args.get("cantidad_periodos", 1))
+        return jsonify({"ok": True, **reseller_accounts.previsualizar_renovacion(
+            purchase_id, revendedor["id"], cantidad)})
+    except (ValueError, TypeError, reseller_accounts.ResellerPurchaseError) as error:
+        if not isinstance(error, reseller_accounts.ResellerPurchaseError):
+            error = reseller_accounts.ResellerPurchaseError("cantidad_periodos_invalida", "La cantidad de períodos no es válida.")
+        return _respuesta_error_operacion_reseller(error)
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/renovar", methods=["POST"])
+def renovar_mi_cuenta_revendedor(purchase_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_revendedores():
+        return jsonify({"ok": False, "error": "Solicitud de seguridad inválida."}), 403
+    datos = request.get_json(silent=True) or {}
+    try:
+        cantidad = datos.get("cantidad_periodos")
+        if isinstance(cantidad, bool) or not isinstance(cantidad, int):
+            raise reseller_accounts.ResellerPurchaseError("cantidad_periodos_invalida", "La cantidad de períodos debe ser un entero.")
+        resultado = reseller_accounts.renovar_purchase_reseller(
+            revendedor["id"], purchase_id, cantidad, datos.get("idempotency_key"))
+        return jsonify({"ok": True, "mensaje": "Renovación realizada correctamente.", **resultado})
+    except reseller_accounts.ResellerPurchaseError as error:
+        return _respuesta_error_operacion_reseller(error)
+
+
+def _cambiar_no_renovar_http(purchase_id, marcado):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "error": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_revendedores():
+        return jsonify({"ok": False, "error": "Solicitud de seguridad inválida."}), 403
+    try:
+        resultado = reseller_accounts.cambiar_no_renovar(
+            purchase_id, revendedor["id"], marcado)
+        mensaje = "El servicio se marcÃ³ como No renovar." if marcado else "El servicio volverÃ¡ a estar disponible para renovar."
+        return jsonify({"mensaje": mensaje, **resultado})
+    except reseller_accounts.ResellerPurchaseError as error:
+        return _respuesta_error_operacion_reseller(error)
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/no-renovar", methods=["POST"])
+def no_renovar_mi_cuenta_revendedor(purchase_id):
+    return _cambiar_no_renovar_http(purchase_id, True)
+
+
+@app.route("/revendedores/mis-cuentas/<int:purchase_id>/seguir-renovando", methods=["POST"])
+def seguir_renovando_mi_cuenta_revendedor(purchase_id):
+    return _cambiar_no_renovar_http(purchase_id, False)
+
+
 @app.route("/revendedores/recargar")
 def recargar_revendedor():
     if not _revendedor_sesion_actual():
         session.setdefault("reseller_auth_error", "sesion")
         return redirect("/revendedores/login")
-    return redirect("/revendedores/cuenta#recargar-saldo")
+    return redirect("/revendedores/billetera#recargar")
 
 
 @app.route("/revendedores/movimientos")
@@ -513,7 +766,22 @@ def movimientos_revendedor():
     if not _revendedor_sesion_actual():
         session.setdefault("reseller_auth_error", "sesion")
         return redirect("/revendedores/login")
-    return redirect("/revendedores/cuenta#movimientos")
+    return redirect("/revendedores/billetera#movimientos")
+
+
+@app.route("/revendedores/billetera")
+def billetera_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    resumen = _resumen_billetera_reseller(revendedor["id"])
+    movimientos = resumen["movimientos"]
+    return render_template(
+        "resellers/billetera.html", revendedor=revendedor, resumen=resumen,
+        movimientos=movimientos, tipos_ingreso=wallets.TIPOS_CREDITO,
+        csrf_token=_csrf_reseller_token(), seccion_activa="billetera",
+    )
 
 
 @app.route("/revendedores/registro", methods=["GET", "POST"])
@@ -626,13 +894,10 @@ def cuenta_revendedor():
             except (ValueError, LookupError) as exc:
                 error = str(exc)
             revendedor = _revendedor_sesion_actual()
-    saldo_wallet = wallets.obtener_saldo(revendedor["id"])
-    resumen = _resumen_privado_reseller(revendedor["id"])
+    resumen = _resumen_billetera_reseller(revendedor["id"])
     return render_template(
         "resellers/cuenta.html", revendedor=revendedor, error=error,
         exito=exito, csrf_token=_csrf_reseller_token(),
-        saldo_wallet=saldo_wallet, saldo_wallet_cop=wallets.formato_cop(saldo_wallet),
-        movimientos=bold_recharges.recent_movements(revendedor["id"]),
         resumen=resumen, seccion_activa="cuenta"
     )
 
@@ -847,6 +1112,45 @@ def admin_productos():
         categorias=categorias,
         csrf_token=_csrf_revendedores_token()
     )
+
+
+@app.route("/admin/reglas-inventario-reseller")
+def admin_reglas_inventario_reseller():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    reseller_accounts.inicializar_esquema()
+    return render_template(
+        "admin/reglas_inventario_reseller.html",
+        reglas=reseller_accounts.listar_reglas_inventario_admin(),
+        plataformas=reseller_accounts.listar_plataformas_inventario(),
+        csrf_token=_csrf_revendedores_token(),
+    )
+
+
+@app.route("/admin/reglas-inventario-reseller/<int:plan_id>", methods=["POST"])
+def guardar_regla_inventario_reseller_admin(plan_id):
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_revendedores():
+        return _error_revendedores("Token CSRF no válido.", 403)
+    datos = request.get_json(silent=True) or request.form
+    plataformas = reseller_accounts.listar_plataformas_inventario()
+    plataforma = str(datos.get("plataforma") or "").strip()
+    plataforma_real = next((p for p in plataformas if p.casefold() == plataforma.casefold()), None)
+    if not plataforma_real:
+        return _error_revendedores("La plataforma no existe en el inventario.")
+    activo = datos.get("activo") in (True, 1, "1", "true", "on", "activo")
+    try:
+        regla = reseller_accounts.guardar_regla_inventario_plan(
+            plan_id, plataforma_real, datos.get("tipo_unidad"),
+            datos.get("duracion_dias"), activo,
+        )
+    except LookupError as error:
+        return _error_revendedores(error, 404)
+    except (TypeError, ValueError) as error:
+        return _error_revendedores(error)
+    registrar_historial(f"Regla reseller del plan #{plan_id} actualizada por {_actor_admin()}")
+    return jsonify({"ok": True, "regla": regla})
 
 
 def _obtener_producto_por_plan(id_plan):
@@ -1749,7 +2053,7 @@ def marcar_nube_notificacion_route():
 def admin_nube_cortes():
     if not session.get("admin"):
         return redirect("/pechy-panel-seguro")
-    return render_template("admin/nube_cortes.html")
+    return render_template("admin/nube_cortes.html", csrf_token=_csrf_admin_token())
 
 
 @app.route("/admin/nube-cortes/datos", methods=["GET"])
@@ -1763,10 +2067,13 @@ def datos_nube_cortes_route():
 def cortar_nube_cortes_route():
     if not session.get("admin"):
         return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    if not _validar_csrf_admin():
+        return jsonify({"ok": False, "mensaje": "Solicitud de seguridad inválida."}), 403
     datos = request.get_json(silent=True) or {}
     resultado = database.cortar_servicios_nube(
         datos.get("servicios") or [],
-        datos.get("motivo", "")
+        datos.get("motivo", ""),
+        actor_id=session.get("admin_id")
     )
     return jsonify(resultado), (200 if resultado.get("ok") else 409)
 

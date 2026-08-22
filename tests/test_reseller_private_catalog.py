@@ -78,6 +78,42 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
         self.assertIn("Sin precio", html)
         self.assertIn("Precio por configurar", html)
 
+    def test_cliente_publico_conserva_precio_y_apertura_actuales(self):
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("777777", html)
+        self.assertIn("888888", html)
+        self.assertIn('class="buy"', html)
+        self.assertIn("✨ Ver planes", html)
+        self.assertIn('id="productoModal"', html)
+        self.assertIn('id="modalProductoComprar"', html)
+        self.assertNotIn("Precio por configurar", html)
+        self.assertNotIn("data-reseller-global-cart", html)
+        self.assertNotIn("js/reseller-cart.js", html)
+
+    def test_reseller_abre_modal_publico_con_precios_privados(self):
+        resellers.guardar_precio_personalizado(self.reseller_id, 1, 11000)
+        self.autenticar()
+        html = self.client.get("/revendedores/productos").get_data(as_text=True)
+
+        self.assertIn('<button class="buy" type="button">', html)
+        self.assertIn("✨ Ver planes", html)
+        self.assertIn('id="productoModal"', html)
+        self.assertIn("$11.000 COP", html)
+        self.assertIn("Precio por configurar", html)
+        for publico in ("777777", "888888", "999999"):
+            self.assertNotIn(publico, html)
+
+        self.assertIn(
+            'id="modalProductoComprar" class="modal-producto-comprar reseller-buy-disabled" type="button" disabled',
+            html,
+        )
+        self.assertIn('data-reseller-plan-id="1" data-reseller-price-ready="true"', html)
+        self.assertIn('data-reseller-plan-id="2" data-reseller-price-ready="false"', html)
+        self.assertIn("Compra reseller próximamente", html)
+        self.assertEqual(html.count("data-reseller-global-cart"), 1)
+        self.assertIn("js/reseller-cart.js", html)
+        self.assertNotIn("data-cart-total", html)
+
     def test_visibilidad_categoria_disponibilidad_y_planes_validos(self):
         resellers.guardar_precio_general(1, 11000)
         resellers.guardar_precio_general(2, 18000)
@@ -103,8 +139,13 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
         saldo_antes = wallets.obtener_saldo(self.reseller_id)
         self.autenticar()
         html = self.client.get("/revendedores/productos").get_data(as_text=True)
-        self.assertIn('type="button" disabled', html)
-        self.assertIn("Compra próximamente", html)
+        self.assertIn('<button class="buy" type="button">', html)
+        self.assertIn("✨ Ver planes", html)
+        self.assertIn(
+            'id="modalProductoComprar" class="modal-producto-comprar reseller-buy-disabled" type="button" disabled',
+            html,
+        )
+        self.assertIn("Compra reseller próximamente", html)
         self.assertEqual(wallets.obtener_saldo(self.reseller_id), saldo_antes)
 
 

@@ -2,7 +2,7 @@
 {% block title %}Cortes{% endblock %}
 {% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/nube_operativo.css') }}">{% endblock %}
 {% block contenido %}
-<main class="nube-op" id="cortesApp" aria-busy="true">
+<main class="nube-op" id="cortesApp" aria-busy="true" data-csrf-token="{{ csrf_token }}">
   <header class="nube-op-hero">
     <div class="nube-op-title"><span><i data-lucide="scissors"></i></span><div><small>INVENTARIO / CICLO DE VENCIMIENTOS</small><h1>CORTES</h1><p>Servicios notificados pendientes de liberar</p></div></div>
     <button class="nube-op-btn" id="cortesActualizar" type="button"><i data-lucide="refresh-cw"></i><span>Actualizar</span></button>

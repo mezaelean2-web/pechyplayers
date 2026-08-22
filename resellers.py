@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from werkzeug.security import check_password_hash, generate_password_hash
 
 import database
+import reseller_accounts
 
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -20,6 +21,25 @@ def _conectar():
 def inicializar_revendedores():
     conn = _conectar()
     try:
+        wallet_sql = conn.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='reseller_wallet_transactions'").fetchone()
+        if wallet_sql and "'recovery'" not in (wallet_sql[0] or ""):
+            conn.execute("PRAGMA foreign_keys=OFF")
+            conn.executescript("""
+                CREATE TABLE reseller_wallet_transactions_v3b (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, wallet_id INTEGER NOT NULL,
+                    revendedor_id INTEGER NOT NULL, tipo TEXT NOT NULL CHECK (tipo IN (
+                      'manual_credit','manual_debit','recharge','purchase','renewal','recovery','refund','adjustment')),
+                    monto INTEGER NOT NULL CHECK (monto > 0), saldo_anterior INTEGER NOT NULL CHECK (saldo_anterior >= 0),
+                    saldo_posterior INTEGER NOT NULL CHECK (saldo_posterior >= 0), referencia TEXT,
+                    descripcion TEXT NOT NULL, origen TEXT NOT NULL, actor TEXT, provider TEXT,
+                    external_reference TEXT, idempotency_key TEXT, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (wallet_id) REFERENCES reseller_wallets(id),
+                    FOREIGN KEY (revendedor_id) REFERENCES revendedores(id));
+                INSERT INTO reseller_wallet_transactions_v3b SELECT * FROM reseller_wallet_transactions;
+                DROP TABLE reseller_wallet_transactions;
+                ALTER TABLE reseller_wallet_transactions_v3b RENAME TO reseller_wallet_transactions;
+            """)
+            conn.execute("PRAGMA foreign_keys=ON")
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS revendedores (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +117,7 @@ def inicializar_revendedores():
                 revendedor_id INTEGER NOT NULL,
                 tipo TEXT NOT NULL CHECK (tipo IN (
                     'manual_credit', 'manual_debit', 'recharge',
-                    'purchase', 'refund', 'adjustment'
+                    'purchase', 'renewal', 'recovery', 'refund', 'adjustment'
                 )),
                 monto INTEGER NOT NULL CHECK (monto > 0),
                 saldo_anterior INTEGER NOT NULL CHECK (saldo_anterior >= 0),
@@ -128,6 +148,7 @@ def inicializar_revendedores():
             INSERT OR IGNORE INTO reseller_wallets (revendedor_id, saldo)
                 SELECT id, 0 FROM revendedores;
         """)
+        reseller_accounts.inicializar_esquema(cursor=conn.cursor())
         columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(revendedores)")}
         if "auth_version" not in columnas:
             conn.execute("ALTER TABLE revendedores ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 1")

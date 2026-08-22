@@ -56,7 +56,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cartelera-lobby.css') }}?v=999">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
 {% set es_catalogo_reseller = request.path == '/revendedores/productos' and revendedor_actual %}
-{% if es_catalogo_reseller %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-products.css') }}?v=3">{% endif %}
+{% if es_catalogo_reseller %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-products.css') }}?v=5"><link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-cart.css') }}?v=1">{% endif %}
 
 <style>
 
@@ -1349,7 +1349,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
     <div class="plans">
       {% for plan in producto.planes %}
-      <div class="plan">
+      <div class="plan"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
         <span>{{ plan.plan }}</span>
         {{ precio_visible(plan) }}
       </div>
@@ -1367,8 +1367,8 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
 {% elif es_catalogo_reseller %}
 
-  <button class="buy reseller-buy-disabled" type="button" disabled aria-disabled="true">
-    Compra próximamente
+  <button class="buy" type="button">
+    ✨ Ver planes
   </button>
 
 {% else %}
@@ -1489,7 +1489,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
                 {% for plan in producto.planes %}
 
-                <div class="plan">
+                <div class="plan"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
 
                     <span>{{ plan.plan }}</span>
 
@@ -1512,8 +1512,8 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
 {% elif es_catalogo_reseller %}
 
-  <button class="buy reseller-buy-disabled" type="button" disabled aria-disabled="true">
-    Compra próximamente
+  <button class="buy" type="button">
+    ✨ Ver planes
   </button>
 
 {% else %}
@@ -1951,7 +1951,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
-{% if es_catalogo_reseller %}<script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=3"></script>{% endif %}
+{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=1"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=5"></script>{% endif %}
 
 <script>
 

@@ -205,9 +205,14 @@ class ResellerDashboardTest(unittest.TestCase):
         html = self.respuesta_dashboard().get_data(as_text=True)
         self.assertIn('class="reseller-sidebar"', html)
         self.assertIn('class="reseller-mobile-nav"', html)
-        for etiqueta in ("Inicio", "Productos", "Recargar saldo", "Movimientos", "Mi cuenta"):
+        for etiqueta in ("Inicio", "Productos", "Billetera", "Mi cuenta"):
             self.assertIn(etiqueta, html)
+        self.assertNotIn('<span>Movimientos</span>', html)
+        self.assertNotIn('<span>Recargar saldo</span>', html)
         self.assertIn('action="/revendedores/logout" method="POST"', html)
+        self.assertIn('data-reseller-global-cart', html)
+        self.assertIn('js/reseller-cart.js', html)
+        self.assertIn('css/reseller-cart.css', html)
 
     def test_no_muestra_metricas_falsas_de_compras(self):
         self.autenticar()

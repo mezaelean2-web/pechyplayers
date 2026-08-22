@@ -1,0 +1,30 @@
+<div class="reseller-global-cart" data-reseller-global-cart>
+  <button class="reseller-cart-fab reseller-global-cart__fab" type="button" data-cart-open hidden
+          aria-label="Abrir carrito, 0 unidades" aria-haspopup="dialog">
+    <svg class="reseller-cart-fab__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M3 3h2l2.4 10.3a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 1.9-1.4L21 7H6"></path>
+      <circle cx="10" cy="20" r="1.25"></circle><circle cx="18" cy="20" r="1.25"></circle>
+    </svg>
+    <span data-cart-badge aria-hidden="true">0</span>
+  </button>
+  <div class="reseller-cart-shell" data-cart-shell hidden aria-hidden="true">
+    <button class="reseller-cart-scrim" type="button" data-cart-close aria-label="Cerrar carrito"></button>
+    <section class="reseller-cart" role="dialog" aria-modal="true" aria-labelledby="resellerCartTitle" tabindex="-1">
+      <header class="reseller-cart-header"><div><small>CARRITO RESELLER</small><h2 id="resellerCartTitle">Tu carrito</h2><p data-cart-heading-count></p></div><button type="button" data-cart-close aria-label="Cerrar carrito">&times;</button><p class="reseller-cart-security"><i data-lucide="shield-check" aria-hidden="true"></i> Preview seguro. Nada se debita ni se reserva.</p></header>
+      <div class="reseller-cart-body" data-cart-body>
+        <div class="reseller-cart-status" data-cart-status aria-live="polite"></div>
+        <div class="reseller-cart-lines" data-cart-lines></div>
+      </div>
+      <footer class="reseller-cart-footer"><section class="reseller-cart-summary" data-cart-summary hidden>
+        <div class="reseller-cart-summary__inner">
+          <h3>Resumen del pedido</h3><div class="reseller-cart-summary__total"><span data-cart-summary-count></span><strong data-cart-summary-total></strong></div>
+          <dl><div><dt>Saldo disponible</dt><dd data-cart-balance></dd></div><div><dt>Saldo estimado</dt><dd data-cart-after></dd></div></dl>
+          <a href="/revendedores/billetera#recargar" data-cart-recharge hidden>Recargar saldo</a>
+          <button type="button" data-cart-submit disabled>Comprar todo</button>
+          <p data-cart-feedback aria-live="polite">La compra real permanece deshabilitada en esta fase.</p>
+        </div>
+      </section></footer>
+    </section>
+  </div>
+  <script id="resellerCartConfig" type="application/json">{{ {"csrf_token": csrf_token|default(session.get('csrf_reseller', ''))}|tojson }}</script>
+</div>

@@ -2,6 +2,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from pathlib import Path
 
 import app as app_module
 import database
@@ -134,21 +135,88 @@ class WalletsResellerTest(unittest.TestCase):
         self.assertIn("Crédito manual", control)
         self.assertEqual(self.admin.post("/admin/saldos/9999/credito", json={"monto": 1000, "motivo": "X"}, headers=self.headers).status_code, 404)
 
-    def test_reseller_ve_saldo_solo_lectura_y_bloqueo_lo_conserva(self):
+    def test_reseller_ve_billetera_solo_lectura_y_bloqueo_lo_conserva(self):
         wallets.apply_wallet_transaction(self.reseller_id, "manual_credit", 50000, "Saldo visible")
         reseller = app_module.app.test_client()
         with reseller.session_transaction() as session:
             session["reseller_id"] = self.reseller_id
             session["reseller_auth_version"] = 1
+        billetera = reseller.get("/revendedores/billetera").get_data(as_text=True)
+        self.assertIn("Tu billetera", billetera)
+        self.assertIn("Saldo disponible", billetera)
+        self.assertIn("$50.000 COP", billetera)
+        self.assertIn("Saldo visible", billetera)
+        self.assertNotIn('class="reseller-sidebar-balance"', billetera)
+        self.assertIn('class="reseller-wallet-top-balance"', billetera)
+        self.assertLess(
+            billetera.index('class="reseller-wallet-top-balance"'),
+            billetera.index('class="reseller-account-link"'),
+        )
         cuenta = reseller.get("/revendedores/cuenta").get_data(as_text=True)
-        self.assertIn("Saldo disponible", cuenta)
-        self.assertIn("$50.000 COP", cuenta)
+        for texto in (
+            "PERFIL RESELLER", "RESUMEN DE CUENTA", "INFORMACIÓN PERSONAL",
+            "SEGURIDAD", "$50.000 COP", "$0 COP", "Movimientos registrados",
+            "Editar información", "Cambiar contraseña",
+        ):
+            self.assertIn(texto, cuenta)
+        self.assertNotIn('class="reseller-sidebar-balance"', cuenta)
+        self.assertIn('class="reseller-wallet-top-balance"', cuenta)
+        self.assertLess(
+            cuenta.index('class="reseller-wallet-top-balance"'),
+            cuenta.index('class="reseller-account-link"'),
+        )
+        self.assertNotIn("HISTORIAL DE MOVIMIENTOS", cuenta)
+        self.assertNotIn("RECARGAR SALDO", cuenta)
+        for funcion_inexistente in (
+            "Verificación en dos pasos", "Dispositivos activos",
+            "Actividad reciente", "Notificaciones", "Apariencia",
+        ):
+            self.assertNotIn(funcion_inexistente, cuenta)
         respuesta = reseller.post("/revendedores/cuenta", data={"accion": "wallet", "csrf_token": "incorrecto"})
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(wallets.obtener_saldo(self.reseller_id), 50000)
         resellers.cambiar_estado_revendedor(self.reseller_id, "bloqueado")
         self.assertEqual(wallets.obtener_saldo(self.reseller_id), 50000)
         self.assertEqual(len(self.movimientos()), 1)
+
+    def test_billetera_usa_metricas_movimientos_y_contrato_bold_reales(self):
+        wallets.apply_wallet_transaction(
+            self.reseller_id, "recharge", 60000, "Recarga aprobada",
+            referencia="REC-REAL", provider="bold",
+        )
+        wallets.apply_wallet_transaction(
+            self.reseller_id, "purchase", 25000, "Compra Netflix",
+            referencia="ORD-REAL",
+        )
+        reseller = app_module.app.test_client()
+        with reseller.session_transaction() as session:
+            session["reseller_id"] = self.reseller_id
+            session["reseller_auth_version"] = 1
+            session["csrf_reseller"] = "csrf-wallet-reseller"
+
+        respuesta = reseller.get("/revendedores/billetera")
+        self.assertEqual(respuesta.status_code, 200)
+        html = respuesta.get_data(as_text=True)
+        for texto in ("$35.000 COP", "$60.000 COP", "$25.000 COP", "REC-REAL", "ORD-REAL"):
+            self.assertIn(texto, html)
+        self.assertIn("1 recarga acreditada", html)
+        self.assertIn("1 salida registrada", html)
+        self.assertIn('id="recharge-amount"', html)
+        self.assertIn('id="start-bold"', html)
+        script = Path("static/js/reseller-recharge.js").read_text(encoding="utf-8")
+        self.assertIn("/revendedores/recargas", script)
+        self.assertIn("new window.BoldCheckout(result.checkout).open()", script)
+        self.assertEqual(len(self.movimientos()), 2)
+
+    def test_rutas_anteriores_redirigen_a_billetera(self):
+        reseller = app_module.app.test_client()
+        with reseller.session_transaction() as session:
+            session["reseller_id"] = self.reseller_id
+            session["reseller_auth_version"] = 1
+        recargar = reseller.get("/revendedores/recargar")
+        movimientos = reseller.get("/revendedores/movimientos")
+        self.assertTrue(recargar.headers["Location"].endswith("/revendedores/billetera#recargar"))
+        self.assertTrue(movimientos.headers["Location"].endswith("/revendedores/billetera#movimientos"))
 
     def test_historial_mas_reciente_primero_y_resumen_real(self):
         wallets.apply_wallet_transaction(self.reseller_id, "manual_credit", 50000, "Primero")

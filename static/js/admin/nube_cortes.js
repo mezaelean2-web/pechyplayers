@@ -310,7 +310,7 @@ document.addEventListener("DOMContentLoaded", () => {
             msg.textContent = "Procesando corte...";
         }
         try {
-            const r = await fetch("/admin/nube-cortes/cortar", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ servicios, motivo }) });
+            const r = await fetch("/admin/nube-cortes/cortar", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json", "X-CSRF-Token": app.dataset.csrfToken || "" }, body: JSON.stringify({ servicios, motivo }) });
             const data = await r.json();
             if (!r.ok || !data.ok) throw new Error(data.mensaje || "No se pudo completar el corte.");
             const cuentaIds = [...new Set(servicios.map(s => Number(s.cuenta_id)).filter(Boolean))];

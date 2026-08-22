@@ -157,6 +157,12 @@ function enviarAgotadoAWhatsApp(card) {
           const copia = document.createElement("div");
           copia.className = "modal-plan";
           copia.innerHTML = plan.innerHTML;
+          if (plan.dataset.resellerPlanId) {
+            copia.dataset.resellerPlanId = plan.dataset.resellerPlanId;
+            copia.dataset.resellerPriceReady = plan.dataset.resellerPriceReady || "false";
+            copia.tabIndex = 0;
+            copia.setAttribute("role", "button");
+          }
           modalPlanes.appendChild(copia);
         });
       }
