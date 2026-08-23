@@ -4,8 +4,42 @@ import re
 import sqlite3
 import unicodedata
 from collections import defaultdict
+from pathlib import Path
 
-DB = os.environ.get("PECHY_DB", "pechy.db")
+REAL_DB = Path(__file__).with_name("pechy.db").resolve()
+DB = os.environ.get("PECHY_DB") or str(REAL_DB)
+
+
+class UnsafeTestDatabaseError(RuntimeError):
+    """Impide que una ejecución de tests abra la base real para escritura."""
+
+
+def _variable_booleana(nombre):
+    return os.environ.get(nombre, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def testing_activo():
+    """El modo de tests es explícito; no se infiere de pytest/unittest ni de argv."""
+    return _variable_booleana("PECHY_TESTING")
+
+
+def _ruta_resuelta_db(ruta=None):
+    return Path(ruta if ruta is not None else DB).expanduser().resolve()
+
+
+def _proteger_base_real_en_tests(ruta=None):
+    ruta_resuelta = _ruta_resuelta_db(ruta)
+    if testing_activo():
+        ruta_configurada = os.environ.get("PECHY_DB", "").strip()
+        if not ruta_configurada:
+            raise UnsafeTestDatabaseError(
+                "PECHY_TESTING requiere PECHY_DB explícita; no existe fallback seguro."
+            )
+        if ruta_resuelta == REAL_DB:
+            raise UnsafeTestDatabaseError(
+                f"Modo test rechazó la apertura de la base real: {REAL_DB}"
+            )
+    return ruta_resuelta
 
 
 def _normalizar_clave_categoria_cartelera(valor):
@@ -18,7 +52,8 @@ def _normalizar_clave_categoria_cartelera(valor):
     return " ".join(texto_sin_acentos.split())
 
 def conectar():
-    conn = sqlite3.connect(DB)
+    ruta = _proteger_base_real_en_tests()
+    conn = sqlite3.connect(str(ruta))
     conn.row_factory = sqlite3.Row
 
     conn.execute("PRAGMA journal_mode=WAL")
@@ -27,6 +62,47 @@ def conectar():
     conn.execute("PRAGMA cache_size=-64000")
 
     return conn
+
+
+def politica_duracion_inventario(plataforma, modalidad, cursor=None):
+    """Indica si las reglas activas exigen clasificar fisicamente por duracion."""
+    plataforma = " ".join(str(plataforma or "").strip().split())
+    modalidad = str(modalidad or "cuenta_completa").strip().lower()
+    tipo_unidad = "perfil" if modalidad in {"perfil", "perfiles"} else "cuenta"
+    propia = cursor is None
+    conn = conectar() if propia else cursor.connection
+    cur = conn.cursor() if propia else cursor
+    try:
+        existe = cur.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='reseller_plan_inventory_rules'"
+        ).fetchone()
+        duraciones = [] if not existe or not plataforma else [
+            int(fila[0]) for fila in cur.execute("""
+                SELECT DISTINCT duracion_dias FROM reseller_plan_inventory_rules
+                WHERE activo=1 AND lower(trim(plataforma))=lower(trim(?))
+                  AND tipo_unidad=? ORDER BY duracion_dias
+            """, (plataforma, tipo_unidad)).fetchall()
+        ]
+        requiere = len(duraciones) > 1
+        return {"requiere_duracion_inventario": requiere,
+                "duraciones_disponibles": duraciones if requiere else []}
+    finally:
+        if propia:
+            conn.close()
+
+
+def validar_duracion_unidad_inventario(plataforma, modalidad, valor, cursor=None):
+    politica = politica_duracion_inventario(plataforma, modalidad, cursor=cursor)
+    if not politica["requiere_duracion_inventario"]:
+        return None
+    try:
+        duracion = int(valor) if valor not in (None, "") else None
+    except (TypeError, ValueError) as error:
+        raise ValueError("La duracion de inventario no es valida.") from error
+    if duracion not in politica["duraciones_disponibles"]:
+        permitidas = ", ".join(str(item) for item in politica["duraciones_disponibles"])
+        raise ValueError(f"Selecciona una duracion de inventario valida ({permitidas} dias).")
+    return duracion
 
 def obtener_config():
     conn = conectar()
@@ -1085,7 +1161,11 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
 
         "modalidad TEXT DEFAULT 'cuenta_completa'",
 
-        "cantidad_perfiles INTEGER DEFAULT 0"
+        "cantidad_perfiles INTEGER DEFAULT 0",
+
+        # Capacidad comercial de la unidad fisica. NULL conserva el inventario
+        # historico sin atribuirle una duracion que nunca fue registrada.
+        "duracion_unidad_dias INTEGER"
 
     ]:
 
@@ -3216,7 +3296,8 @@ def crear_cuenta_nube(
     plan_pago="",
     precio_plan_referencia=0,
     fecha_aplicacion_pin="",
-    pines_perfiles=None
+    pines_perfiles=None,
+    duracion_unidad_dias=None
 ):
 
     conn = conectar()
@@ -3315,6 +3396,14 @@ def crear_cuenta_nube(
     ):
 
         cantidad_perfiles = 0
+
+    try:
+        duracion_unidad_dias = validar_duracion_unidad_inventario(
+            plataforma, modalidad, duracion_unidad_dias, cursor=cursor
+        )
+    except ValueError:
+        conn.close()
+        raise
 
 
     if cantidad_perfiles < 0:
@@ -3462,12 +3551,13 @@ def crear_cuenta_nube(
             fecha_aplicacion_pin,
             dias_estimados_pin,
             fecha_proximo_pago
+            ,duracion_unidad_dias
 
         )
         VALUES (
             ?, ?, ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?, ?, ?
+            ?, ?, ?, ?, ?, ?, ?, ?
         )
         """,
         (
@@ -3492,7 +3582,8 @@ def crear_cuenta_nube(
             precio_plan_referencia,
             fecha_aplicacion_pin,
             dias_estimados_pin,
-            fecha_proximo_pago
+            fecha_proximo_pago,
+            duracion_unidad_dias
         )
     )
 
@@ -3717,7 +3808,8 @@ def crear_cuentas_nube_lote(
     credenciales,
     valor_pin=0,
     precio_plan_referencia=0,
-    fecha_aplicacion_pin=""
+    fecha_aplicacion_pin="",
+    duracion_unidad_dias=None
 ):
     conn = conectar()
     cursor = conn.cursor()
@@ -3743,6 +3835,14 @@ def crear_cuentas_nube_lote(
     if modalidad not in {"perfiles", "cuenta_completa"}:
         conn.close()
         return {"ok": False, "mensaje": "Modalidad inválida."}
+
+    try:
+        duracion_unidad_dias = validar_duracion_unidad_inventario(
+            plataforma, modalidad, duracion_unidad_dias, cursor=cursor
+        )
+    except ValueError as error:
+        conn.close()
+        return {"ok": False, "mensaje": str(error)}
 
     if modalidad == "perfiles" and not (1 <= cantidad_perfiles <= 10):
         conn.close()
@@ -3804,16 +3904,18 @@ def crear_cuentas_nube_lote(
                     plataforma, correo, contrasena, pin, tipo_cuenta,
                     estado, origen, modalidad, cantidad_perfiles, tipo_pago,
                     valor_pin, plan_pago, precio_plan_referencia,
-                    fecha_aplicacion_pin, dias_estimados_pin, fecha_proximo_pago
+                    fecha_aplicacion_pin, dias_estimados_pin, fecha_proximo_pago,
+                    duracion_unidad_dias
                 )
-                VALUES (?, ?, ?, ?, ?, 'disponible', 'carga_rapida', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, 'disponible', 'carga_rapida', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     plataforma, item["correo"], item.get("contrasena", ""), pin,
                     tipo_cuenta, modalidad,
                     cantidad_perfiles if modalidad == "perfiles" else 0,
                     tipo_pago, valor_pin, plan_pago, precio_plan_referencia,
-                    fecha_aplicacion_pin, dias_estimados_pin, fecha_proximo_pago
+                    fecha_aplicacion_pin, dias_estimados_pin, fecha_proximo_pago,
+                    duracion_unidad_dias
                 )
             )
             cuenta_id = cursor.lastrowid

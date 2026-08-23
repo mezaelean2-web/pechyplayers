@@ -1,6 +1,41 @@
 document.addEventListener(
     "DOMContentLoaded",
     () => {
+        const politicasDuracionInventario = (() => {
+            try {
+                return JSON.parse(document.getElementById("politicasDuracionInventario")?.textContent || "{}");
+            } catch (_) {
+                return {};
+            }
+        })();
+        const etiquetaDuracionInventario = dias => Number(dias) % 30 === 0
+            ? `${Number(dias) / 30} ${Number(dias) === 30 ? "mes" : "meses"}`
+            : `${dias} dias`;
+        const aplicarPoliticaDuracionInventario = (plataforma, modalidad, select) => {
+            if (!select) return;
+            const clave = `${String(plataforma || "").trim().toLowerCase()}|${modalidad}`;
+            const politica = politicasDuracionInventario[clave] || {};
+            const requiere = politica.requiere_duracion_inventario === true;
+            select.value = "";
+            select.replaceChildren(new Option("Seleccionar...", ""));
+            (politica.duraciones_disponibles || []).forEach(dias =>
+                select.add(new Option(etiquetaDuracionInventario(dias), String(dias)))
+            );
+            select.required = requiere;
+            select.disabled = !requiere;
+            select.closest("label").hidden = !requiere;
+        };
+        const plataformaNueva = document.getElementById("nubeNuevaPlataforma");
+        const duracionNueva = document.getElementById("nubeNuevaDuracion");
+        const tipoNueva = document.getElementById("nubeTipoCuenta");
+        const refrescarDuracionNueva = () => aplicarPoliticaDuracionInventario(
+            plataformaNueva?.value,
+            tipoNueva?.value === "perfil" ? "perfiles" : "cuenta_completa",
+            duracionNueva
+        );
+        plataformaNueva?.addEventListener("input", refrescarDuracionNueva);
+        tipoNueva?.addEventListener("change", refrescarDuracionNueva);
+        refrescarDuracionNueva();
         // CENTRO DE INVENTARIO: búsqueda y filtros locales combinables.
         const inventario = {
             busqueda: "", plataforma: "", tipo: "", estado: "", asignacion: "",
@@ -1742,6 +1777,15 @@ document.addEventListener(
 
         const modalCargaRapida = document.getElementById("modalCargaRapida");
         const formCargaRapida = document.getElementById("formCargaRapida");
+        const plataformaCargaRapida = document.getElementById("cargaRapidaPlataforma");
+        const modalidadCargaRapida = document.getElementById("cargaRapidaModalidad");
+        const duracionCargaRapida = document.getElementById("cargaRapidaDuracion");
+        const refrescarDuracionCargaRapida = () => aplicarPoliticaDuracionInventario(
+            plataformaCargaRapida?.value, modalidadCargaRapida?.value, duracionCargaRapida
+        );
+        plataformaCargaRapida?.addEventListener("change", refrescarDuracionCargaRapida);
+        modalidadCargaRapida?.addEventListener("change", refrescarDuracionCargaRapida);
+        refrescarDuracionCargaRapida();
         const previaCargaRapida = document.getElementById("cargaRapidaPrevia");
         const confirmarCargaRapida = document.getElementById("confirmarCargaRapida");
         const credencialesCargaRapida = document.getElementById("cargaRapidaCredenciales");
@@ -1916,6 +1960,7 @@ document.addEventListener(
                     body: JSON.stringify({
                         plataforma: document.getElementById("cargaRapidaPlataforma").value,
                         modalidad: document.getElementById("cargaRapidaModalidad").value,
+                        duracion_unidad_dias: duracionCargaRapida.required ? duracionCargaRapida.value : null,
                         tipo_pago: document.getElementById("cargaRapidaTipoPago").value,
                         cantidad_perfiles: document.getElementById("cargaRapidaCantidadPerfiles").value,
                         plan_pago: document.getElementById("cargaRapidaPlan").value,

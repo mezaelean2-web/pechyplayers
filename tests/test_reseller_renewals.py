@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import json
 import threading
 import unittest
@@ -48,6 +53,13 @@ class ResellerRenewalsTest(unittest.TestCase):
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM reseller_purchase_events WHERE purchase_id=? AND tipo='renewal'", (self.purchase_id,)).fetchone()[0], 1)
         conn.close()
 
+    def test_renovacion_sin_clasificacion_admite_duracion_fisica_null(self):
+        conn = database.conectar()
+        conn.execute("UPDATE nube_cuentas SET duracion_unidad_dias=NULL WHERE id=(SELECT cuenta_id FROM reseller_purchases WHERE id=?)", (self.purchase_id,))
+        conn.commit(); conn.close()
+        resultado = self._renovar("renovar-historica-null")
+        self.assertEqual(resultado["purchase_id"], self.purchase_id)
+
     def test_vencida_no_cortada_usa_ahora_como_base(self):
         conn = database.conectar()
         conn.execute("UPDATE reseller_purchases SET fecha_vencimiento='2026-08-10T10:00:00-05:00' WHERE id=?", (self.purchase_id,))
@@ -85,6 +97,8 @@ class ResellerRenewalsTest(unittest.TestCase):
 
     def test_no_renovar_es_determinista_no_toca_wallet_inventario_y_se_revierte(self):
         conn = database.conectar()
+        conn.execute("UPDATE reseller_purchases SET fecha_vencimiento='2020-01-01T00:00:00-05:00' WHERE id=?", (self.purchase_id,))
+        conn.commit()
         saldo = wallets.obtener_saldo(self.reseller)
         unidad = dict(conn.execute("SELECT * FROM nube_cuentas WHERE id=(SELECT cuenta_id FROM reseller_purchases WHERE id=?)", (self.purchase_id,)).fetchone())
         conn.close()
@@ -103,6 +117,9 @@ class ResellerRenewalsTest(unittest.TestCase):
         conn.close()
 
     def test_renovar_limpia_no_renovar_y_cortada_se_rechaza(self):
+        conn = database.conectar()
+        conn.execute("UPDATE reseller_purchases SET fecha_vencimiento='2020-01-01T00:00:00-05:00' WHERE id=?", (self.purchase_id,))
+        conn.commit(); conn.close()
         reseller_accounts.cambiar_no_renovar(self.purchase_id, self.reseller, True)
         self._renovar("renueva-marcada")
         conn = database.conectar()

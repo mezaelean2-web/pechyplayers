@@ -33,7 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     <p class="reseller-plan-config__status" data-plan-status>Validando precio e inventario actuales…</p>
     <div data-plan-content hidden><header><span data-plan-type></span><strong data-plan-unit-price></strong></header>
     <div class="reseller-plan-config__controls">
-      <label>Unidades <span><button type="button" data-plan-step="units" data-delta="-1" aria-label="Restar unidad">−</button><b data-plan-units>1</b><button type="button" data-plan-step="units" data-delta="1" aria-label="Sumar unidad">+</button></span></label>
+      <label>Unidades <span><button type="button" data-plan-step="units" data-delta="-1" aria-label="Restar unidad">−</button><input type="number" inputmode="numeric" min="1" max="100" step="1" value="1" data-plan-units aria-label="Cantidad de unidades"><button type="button" data-plan-step="units" data-delta="1" aria-label="Sumar unidad">+</button></span></label>
       <label>Períodos <span><button type="button" data-plan-step="periods" data-delta="-1" aria-label="Restar período">−</button><b data-plan-periods>1</b><button type="button" data-plan-step="periods" data-delta="1" aria-label="Sumar período">+</button></span></label>
     </div><div class="reseller-plan-config__total"><span>Duración <b data-plan-duration></b></span><span>Subtotal <strong data-plan-total></strong></span></div>
     <button class="reseller-plan-config__submit" type="button" data-plan-submit>Agregar al carrito</button>
@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
     qs("[data-plan-status]", config).hidden = true; qs("[data-plan-content]", config).hidden = false;
     qs("[data-plan-type]", config).textContent = state.preview.tipo_unidad_etiqueta;
     qs("[data-plan-unit-price]", config).textContent = `${money(state.preview.precio_unitario)} / período`;
-    qs("[data-plan-units]", config).textContent = state.units; qs("[data-plan-periods]", config).textContent = state.periods;
+    qs("[data-plan-units]", config).value = state.units; qs("[data-plan-periods]", config).textContent = state.periods;
     qs("[data-plan-duration]", config).textContent = `${state.preview.duracion_base_dias * state.periods} días`;
     qs("[data-plan-total]", config).textContent = money(state.preview.precio_unitario * state.units * state.periods);
     qs('[data-plan-step="units"][data-delta="-1"]', config).disabled = state.units <= 1;
@@ -82,6 +82,15 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => node.classList.remove("is-added"), 650); return;
     }
     if (!event.target.closest("[data-plan-config]")) openPlan(node);
+  });
+  plans?.addEventListener("change", (event) => {
+    const input = event.target.closest("[data-plan-units]"); if (!input) return;
+    const node = input.closest("[data-reseller-plan-id]"), state = planStates.get(node);
+    if (!state?.preview) return;
+    const value = Number(input.value);
+    state.units = Number.isInteger(value) ? Math.max(1, Math.min(100, state.preview.disponibilidad_unidades, value)) : 1;
+    qs("[data-plan-feedback]", node).textContent = value === state.units ? "" : "Cantidad ajustada al limite disponible.";
+    renderConfig(node);
   });
   plans?.addEventListener("keydown", (event) => {
     if (!["Enter", " "].includes(event.key) || event.target.closest("button")) return;

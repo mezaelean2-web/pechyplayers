@@ -1,12 +1,10 @@
 from flask import Flask, render_template, request, redirect, session
-import sqlite3
 import os
 from werkzeug.utils import secure_filename
+import database
 
 app = Flask(__name__)
 app.secret_key = "pechy_players_seguro_2026"
-
-DB = "pechy.db"
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -39,7 +37,7 @@ productos_iniciales = [
 ]
 
 def conectar():
-    return sqlite3.connect(DB)
+    return database.conectar()
 
 def crear_db():
     conn = conectar()
@@ -237,5 +235,4 @@ def editar_producto():
     return redirect("/admin")
 
 if __name__ == "__main__":
-    crear_db()
     app.run(debug=True)

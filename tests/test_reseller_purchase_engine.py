@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import os
 import sqlite3
 import tempfile
@@ -46,7 +51,8 @@ class ResellerPurchaseEngineTest(unittest.TestCase):
         except PermissionError: pass
 
     def cuenta(self, modalidad="cuenta_completa", perfiles=0, estado="disponible"):
-        conn=database.conectar(); cur=conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado) VALUES ('Netflix',?,?,?)",(f"unit-{os.urandom(3).hex()}@example.com",modalidad,estado)); cuenta_id=cur.lastrowid
+        duracion = 15 if modalidad == "perfiles" else 30
+        conn=database.conectar(); cur=conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix',?,?,?,?)",(f"unit-{os.urandom(3).hex()}@example.com",modalidad,estado,duracion)); cuenta_id=cur.lastrowid
         for numero in range(perfiles): conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil) VALUES (?,?)",(cuenta_id,f"Perfil {numero+1}"))
         conn.commit(); conn.close()
         return cuenta_id
@@ -84,6 +90,65 @@ class ResellerPurchaseEngineTest(unittest.TestCase):
         resultado=reseller_accounts.comprar_plan_reseller(self.reseller,self.plan_cuenta,"eligible")
         conn=database.conectar(); actual=conn.execute("SELECT cuenta_id FROM reseller_purchases WHERE id=?",(resultado["purchase_id"],)).fetchone()[0]; conn.close()
         self.assertEqual(actual,elegible)
+
+    def test_una_sola_duracion_acepta_inventario_historico_null(self):
+        conn=database.conectar(); cuenta_id=conn.execute(
+            "INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix','legacy-null@example.com','cuenta_completa','disponible',NULL)"
+        ).lastrowid; conn.commit(); conn.close()
+        resultado=reseller_accounts.comprar_plan_reseller(self.reseller,self.plan_cuenta,"legacy-null")
+        conn=database.conectar(); asignada=conn.execute(
+            "SELECT cuenta_id FROM reseller_purchases WHERE id=?",(resultado["purchase_id"],)
+        ).fetchone()[0]; conn.close()
+        self.assertEqual(asignada,cuenta_id)
+
+    def test_multiples_duraciones_exigen_clasificacion_y_coincidencia_exacta(self):
+        conn=database.conectar()
+        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('Netflix','n.png','Cuenta 90','99000','disponible')")
+        plan_90=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan_90,'Netflix','cuenta',90))
+        conn.execute("INSERT INTO precios_revendedor_generales(plan_id,precio,activo) VALUES (?,?,1)",(plan_90,40000))
+        ids=[]
+        for correo,duracion in [('sin-clasificar@example.com',None),('unidad-90@example.com',90),('unidad-30@example.com',30)]:
+            ids.append(conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix',?,'cuenta_completa','disponible',?)",(correo,duracion)).lastrowid)
+        conn.commit(); conn.close()
+        compra_30=reseller_accounts.comprar_plan_reseller(self.reseller,self.plan_cuenta,"exacta-30")
+        compra_90=reseller_accounts.comprar_plan_reseller(self.reseller,plan_90,"exacta-90")
+        conn=database.conectar()
+        usadas=[conn.execute("SELECT cuenta_id FROM reseller_purchases WHERE id=?",(item["purchase_id"],)).fetchone()[0] for item in (compra_30,compra_90)]
+        conn.close()
+        self.assertEqual(usadas,[ids[2],ids[1]])
+
+    def test_politica_se_deriva_por_plataforma_y_modalidad(self):
+        conn=database.conectar()
+        for producto,plataforma,tipo,dias in [
+            ('YouTube 30','YouTube','cuenta',30),('YouTube 90','YouTube','cuenta',90),
+            ('Spotify 30','Spotify','perfil',30),('Spotify 90','Spotify','perfil',90),
+            ('YouTube perfil','YouTube','perfil',30)]:
+            conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES (?,'x.png','Plan','1','disponible')",(producto,))
+            plan=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+            conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan,plataforma,tipo,dias))
+        conn.commit()
+        youtube=database.politica_duracion_inventario('youtube','cuenta_completa',cursor=conn.cursor())
+        spotify=database.politica_duracion_inventario('Spotify','perfiles',cursor=conn.cursor())
+        youtube_perfil=database.politica_duracion_inventario('YouTube','perfiles',cursor=conn.cursor())
+        netflix_cuenta=database.politica_duracion_inventario('Netflix','cuenta_completa',cursor=conn.cursor())
+        conn.close()
+        self.assertEqual(youtube,{"requiere_duracion_inventario":True,"duraciones_disponibles":[30,90]})
+        self.assertEqual(spotify,{"requiere_duracion_inventario":True,"duraciones_disponibles":[30,90]})
+        self.assertFalse(youtube_perfil["requiere_duracion_inventario"])
+        self.assertFalse(netflix_cuenta["requiere_duracion_inventario"])
+
+    def test_payload_duracion_se_valida_o_se_limpia(self):
+        conn=database.conectar()
+        self.assertIsNone(database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',90,cursor=conn.cursor()))
+        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('Netflix 90','x.png','Plan','1','disponible')")
+        plan=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan,'Netflix','cuenta',90))
+        conn.commit()
+        with self.assertRaises(ValueError):
+            database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',60,cursor=conn.cursor())
+        self.assertEqual(database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',90,cursor=conn.cursor()),90)
+        conn.close()
 
     def test_perfil_solo_ocupa_un_perfil_y_no_la_madre(self):
         cuenta_id=self.cuenta("perfiles",2)

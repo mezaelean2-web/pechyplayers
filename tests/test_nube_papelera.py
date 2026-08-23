@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import os
 import json
 import sqlite3

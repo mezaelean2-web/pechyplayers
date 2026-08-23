@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import os
 import sqlite3
 import tempfile
@@ -58,7 +63,7 @@ class ResellerPurchasePreviewTest(unittest.TestCase):
 
     def unidad_cuenta(self):
         conn = database.conectar()
-        conn.execute("INSERT INTO nube_cuentas(plataforma,correo,contrasena,pin,modalidad) VALUES('Netflix','secret@example.com','clave','1234','cuenta_completa')")
+        conn.execute("INSERT INTO nube_cuentas(plataforma,correo,contrasena,pin,modalidad,duracion_unidad_dias) VALUES('Netflix','secret@example.com','clave','1234','cuenta_completa',30)")
         conn.commit(); conn.close()
 
     def estado(self):
@@ -116,7 +121,7 @@ class ResellerPurchasePreviewTest(unittest.TestCase):
         self.assertEqual(reseller_accounts.previsualizar_compra_plan(self.reseller, self.plan)["estado_disponibilidad"], "configuracion_pendiente")
 
     def test_perfil_disponible_y_periodos_validan_helper_compartido(self):
-        conn = database.conectar(); cur = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad) VALUES('Netflix','perfiles')"); conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil) VALUES(?,'P1')", (cur.lastrowid,)); conn.commit(); conn.close()
+        conn = database.conectar(); cur = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad,duracion_unidad_dias) VALUES('Netflix','perfiles',15)"); conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil) VALUES(?,'P1')", (cur.lastrowid,)); conn.commit(); conn.close()
         reseller_accounts.guardar_regla_inventario_plan(self.plan, "Netflix", "perfil", 15)
         resellers.guardar_precio_general(self.plan, 6000)
         preview = reseller_accounts.previsualizar_compra_plan(self.reseller, self.plan, 12)
@@ -126,7 +131,7 @@ class ResellerPurchasePreviewTest(unittest.TestCase):
     def test_varias_unidades_por_periodos_y_limite_de_inventario(self):
         for indice in range(4):
             conn = database.conectar(); conn.execute(
-                "INSERT INTO nube_cuentas(plataforma,correo,modalidad) VALUES('Netflix',?,'cuenta_completa')",
+                "INSERT INTO nube_cuentas(plataforma,correo,modalidad,duracion_unidad_dias) VALUES('Netflix',?,'cuenta_completa',30)",
                 (f"unidad{indice}@example.com",)); conn.commit(); conn.close()
         reseller_accounts.guardar_regla_inventario_plan(self.plan, "Netflix", "cuenta", 30)
         resellers.guardar_precio_general(self.plan, 8000)
@@ -142,12 +147,12 @@ class ResellerPurchasePreviewTest(unittest.TestCase):
     def test_preview_carrito_multiple_combina_linea_y_revalida_servidor(self):
         for indice in range(4):
             conn = database.conectar(); conn.execute(
-                "INSERT INTO nube_cuentas(plataforma,correo,modalidad) VALUES('Netflix',?,'cuenta_completa')",
+                "INSERT INTO nube_cuentas(plataforma,correo,modalidad,duracion_unidad_dias) VALUES('Netflix',?,'cuenta_completa',30)",
                 (f"cart{indice}@example.com",)); conn.commit(); conn.close()
         conn = database.conectar()
         conn.execute("INSERT INTO productos(nombre,plan,precio) VALUES('Max','Perfil','123456')")
         plan_max = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        cuenta = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad) VALUES('Max','perfiles')").lastrowid
+        cuenta = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad,duracion_unidad_dias) VALUES('Max','perfiles',15)").lastrowid
         conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil) VALUES(?,'P1')", (cuenta,))
         conn.commit(); conn.close()
         reseller_accounts.guardar_regla_inventario_plan(self.plan, "Netflix", "cuenta", 30)
@@ -178,8 +183,8 @@ class ResellerPurchasePreviewTest(unittest.TestCase):
         conn.execute("INSERT INTO productos(nombre,plan,precio) VALUES('Netflix','Perfil','999999')")
         plan_perfil = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
         for indice in range(4):
-            conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad) VALUES('Netflix',?,'cuenta_completa')", (f"full{indice}@example.com",))
-        cuenta_perfiles = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad) VALUES('Netflix','perfiles')").lastrowid
+            conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,duracion_unidad_dias) VALUES('Netflix',?,'cuenta_completa',30)", (f"full{indice}@example.com",))
+        cuenta_perfiles = conn.execute("INSERT INTO nube_cuentas(plataforma,modalidad,duracion_unidad_dias) VALUES('Netflix','perfiles',15)").lastrowid
         for indice in range(5):
             conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil) VALUES(?,?)", (cuenta_perfiles, f"P{indice}"))
         conn.commit(); conn.close()

@@ -7,6 +7,14 @@
   const recoveryModal = document.querySelector('#recoveryModal');
   const recoveryBody = recoveryModal && recoveryModal.querySelector('#recoveryBody');
   const csrf = document.querySelector('.accounts-heading')?.dataset.csrfToken || '';
+  const filters = document.querySelector('.accounts-filters');
+  try {
+    const products = JSON.parse(document.getElementById('accountProductsData')?.textContent || '[]');
+    const select = document.createElement('select'); select.name = 'producto'; select.setAttribute('aria-label', 'Producto o plataforma');
+    select.append(new Option('Todos los productos', ''));
+    products.forEach(product => select.append(new Option(product, product, false, product === new URLSearchParams(location.search).get('producto'))));
+    filters?.querySelector('button[type="submit"]')?.before(select);
+  } catch (_error) { /* El filtro base sigue operativo si el JSON no puede leerse. */ }
   const escapeHtml = value => String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
   const date = value => value ? escapeHtml(String(value).slice(0, 10)) : '—';
   const close = () => { modal.hidden = true; body.innerHTML = ''; document.body.classList.remove('account-modal-open'); };
@@ -26,10 +34,18 @@
     container.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => { const code = container.querySelectorAll('code')[Number(button.dataset.copy)]; await navigator.clipboard.writeText(code.dataset.value); button.textContent = 'Copiado'; setTimeout(() => { button.textContent = 'Copiar'; }, 1200); }));
   }
   const post = async (url, payload = {}) => {
-    const response = await fetch(url, {method:'POST', headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-Token':csrf}, body:JSON.stringify(payload)});
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || data.mensaje || 'No fue posible completar la operación.');
-    return data;
+    const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 30000);
+    try {
+      const response = await fetch(url, {method:'POST', signal:controller.signal, headers:{'Accept':'application/json','Content-Type':'application/json','X-CSRF-Token':csrf}, body:JSON.stringify(payload)});
+      const text = await response.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (_error) { throw new Error('Respuesta del servidor no válida.'); }
+      if (!response.ok) throw new Error(data.error || data.mensaje || 'No fue posible completar la operación.');
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') throw new Error('La operación tardó demasiado. Puedes reintentar con seguridad.');
+      throw error;
+    } finally { clearTimeout(timeout); }
   };
   async function openRenewal(id, cantidad = 1) {
     close(); renewalModal.hidden = false; document.body.classList.add('account-modal-open');
@@ -39,19 +55,19 @@
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       const options = Array.from({length:data.max_periodos}, (_, index) => `<option value="${index + 1}" ${index + 1 === cantidad ? 'selected' : ''}>${index + 1} período${index ? 's' : ''}</option>`).join('');
       renewalModal.querySelector('#renewalTitle').textContent = `${data.producto} · ${data.plan}`;
+      const renewalKey = crypto.randomUUID();
       renewalBody.innerHTML = `<div class="renewal-summary"><p><span>Vencimiento actual</span><strong>${date(data.fecha_vencimiento)}</strong></p><p><span>Precio por período</span><strong>${escapeHtml(data.precio_unitario_cop)}</strong></p><p><span>Duración total</span><strong>${data.duracion_total_dias} días</strong></p><p><span>Nuevo vencimiento estimado</span><strong>${date(data.nuevo_vencimiento_estimado)}</strong></p><p><span>Total a pagar</span><strong>${escapeHtml(data.precio_total_cop)}</strong></p><p><span>Saldo disponible</span><strong>${escapeHtml(data.saldo_cop)}</strong></p></div><label class="renewal-controls">Períodos<select id="renewalPeriods">${options}</select></label><div class="renewal-message">El backend verificará nuevamente precio, saldo, vigencia y asignación al confirmar.</div><button class="renewal-confirm" type="button">Confirmar renovación</button>`;
       renewalBody.querySelector('#renewalPeriods').addEventListener('change', event => openRenewal(id, Number(event.target.value)));
       renewalBody.querySelector('.renewal-confirm').addEventListener('click', async event => {
         event.currentTarget.disabled = true;
         try {
-          const result = await post(`/revendedores/mis-cuentas/${id}/renovar`, {cantidad_periodos:cantidad, idempotency_key:crypto.randomUUID()});
+          const result = await post(`/revendedores/mis-cuentas/${id}/renovar`, {cantidad_periodos:cantidad, idempotency_key:renewalKey});
           renewalBody.innerHTML = `<div class="renewal-message"><strong>${escapeHtml(result.mensaje)}</strong><br>${cantidad} período${cantidad === 1 ? '' : 's'} · ${escapeHtml(result.precio_total_cop || '')}<br>Nuevo vencimiento: ${date(result.fecha_vencimiento)}</div>`;
           setTimeout(() => window.location.reload(), 1400);
         } catch (error) {
-          event.currentTarget.disabled = false;
           renewalBody.querySelector('.renewal-message').classList.add('is-error');
           renewalBody.querySelector('.renewal-message').innerHTML = `${escapeHtml(error.message)} <a href="/revendedores/billetera#recargar">Ir a Billetera / Recargar saldo</a>`;
-        }
+        } finally { if (event.currentTarget.isConnected) event.currentTarget.disabled = false; }
       });
     } catch (error) { renewalBody.innerHTML = `<div class="renewal-message is-error">${escapeHtml(error.message)}</div>`; }
   }
@@ -85,6 +101,7 @@
       const response = await fetch(`/revendedores/mis-cuentas/${button.dataset.accountId}`, {headers: {'Accept':'application/json'}}); const data = await response.json(); if (!response.ok) throw new Error(data.error);
       const d = data.detalle; modal.querySelector('#accountModalTitle').textContent = d.producto;
       body.innerHTML = `<div class="account-detail-grid"><p><span>Plan</span><strong>${escapeHtml(d.plan_nombre)}</strong></p><p><span>Tipo</span><strong>${escapeHtml(d.tipo_etiqueta)}</strong></p><p><span>Compra</span><strong>${date(d.fecha_compra)}</strong></p><p><span>Activación</span><strong>${date(d.fecha_activacion)}</strong></p><p><span>Vencimiento</span><strong>${date(d.fecha_vencimiento)}</strong></p><p><span>Estado</span><strong>${escapeHtml(d.estado_etiqueta)}</strong></p><p><span>Períodos</span><strong>${d.cantidad_periodos ?? '—'}</strong></p><p><span>Duración total</span><strong>${escapeHtml(d.dias_contratados)} días</strong></p><p><span>Precio pagado</span><strong>${escapeHtml(d.precio_pagado_cop)}</strong></p><p><span>Identificador</span><strong>${escapeHtml(d.identificador)}</strong></p></div><div class="account-actions"><button class="is-primary" id="renewAccount" type="button">Renovar</button><button id="toggleNoRenew" type="button">${d.no_renovar ? 'Seguir renovando' : 'No renovar'}</button></div><section class="credentials-panel"><header><div><small>DATOS DE ACCESO</small><h3>Credenciales actuales</h3></div><button type="button" id="loadCredentials"><i data-lucide="shield-check"></i>Solicitar acceso</button></header><div id="credentialsBody"><p>Se consultarán de forma segura sólo cuando las solicites.</p></div></section>`;
+      if (!d.no_renovar && d.estado_visual !== 'VENCIDA') body.querySelector('#toggleNoRenew')?.remove();
       if (d.recuperada_de) {
         body.querySelector('.account-detail-grid').insertAdjacentHTML('beforeend', `<p><span>Nuevo ciclo</span><strong>Recuperada de ${escapeHtml(d.recuperada_de)}</strong></p>`);
       }
@@ -106,7 +123,7 @@
       } else {
         body.querySelector('#loadCredentials').addEventListener('click', event => { event.currentTarget.disabled = true; credentials(d.id, body.querySelector('#credentialsBody')); });
         body.querySelector('#renewAccount').addEventListener('click', () => openRenewal(d.id));
-        body.querySelector('#toggleNoRenew').addEventListener('click', async event => { event.currentTarget.disabled = true; try { await post(`/revendedores/mis-cuentas/${d.id}/${d.no_renovar ? 'seguir-renovando' : 'no-renovar'}`); window.location.reload(); } catch (error) { event.currentTarget.disabled = false; alert(error.message); } });
+        body.querySelector('#toggleNoRenew')?.addEventListener('click', async event => { event.currentTarget.disabled = true; try { await post(`/revendedores/mis-cuentas/${d.id}/${d.no_renovar ? 'seguir-renovando' : 'no-renovar'}`); window.location.reload(); } catch (error) { event.currentTarget.disabled = false; alert(error.message); } });
       }
       if (window.lucide) window.lucide.createIcons();
     } catch (error) { body.innerHTML = `<div class="credentials-empty"><strong>No fue posible cargar el detalle</strong><span>${escapeHtml(error.message)}</span></div>`; }

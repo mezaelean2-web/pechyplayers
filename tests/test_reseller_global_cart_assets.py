@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import pathlib
 import unittest
 
@@ -38,7 +43,7 @@ class ResellerGlobalCartAssetsTest(unittest.TestCase):
         ):
             self.assertIn(contract, self.script)
 
-    def test_modal_revalida_es_accesible_y_no_compra(self):
+    def test_modal_revalida_es_accesible_y_compra_solo_tras_preview(self):
         self.assertIn('role="dialog" aria-modal="true"', self.partial)
         self.assertIn('aria-haspopup="dialog"', self.partial)
         self.assertIn('event.key === "Escape"', self.script)
@@ -46,7 +51,14 @@ class ResellerGlobalCartAssetsTest(unittest.TestCase):
         self.assertIn('await validate()', self.script)
         self.assertIn('/revendedores/productos/carrito/preview', self.script)
         self.assertIn('data-cart-submit disabled', self.partial)
-        self.assertNotIn('/comprar', self.script)
+        self.assertIn('/revendedores/productos/carrito/comprar', self.script)
+        self.assertIn('Procesando compra', self.script)
+        self.assertIn('if (purchasing || !preview?.puede_prepararse', self.script)
+        self.assertIn('preview_token: preview.preview_token', self.script)
+        self.assertIn('error.code === "price_changed"', self.script)
+        self.assertIn('error.code === "cart_changed"', self.script)
+        self.assertIn('data-review-new-total', self.script)
+        self.assertIn('Ning&uacute;n cobro fue realizado', self.script)
 
     def test_shell_privado_y_catalogo_reseller_comparten_parcial(self):
         include = '{% include "resellers/_global_cart.html" %}'

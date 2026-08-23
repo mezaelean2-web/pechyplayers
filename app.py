@@ -7,6 +7,7 @@ import re
 import secrets
 import time
 from pathlib import Path
+from itsdangerous import BadSignature, URLSafeTimedSerializer
 
 
 def _cargar_entorno_local():
@@ -55,7 +56,39 @@ app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
-app.config.setdefault("RESELLER_PURCHASES_ENABLED", False)
+def _config_bool_explicita(valor):
+    """Solo activa una capacidad sensible ante un valor afirmativo inequivoco."""
+    if valor is True or valor == 1:
+        return True
+    if isinstance(valor, str):
+        return valor.strip().lower() in {"true", "1", "yes", "on"}
+    return False
+
+
+app.config["RESELLER_PURCHASES_ENABLED"] = _config_bool_explicita(
+    os.environ.get("RESELLER_PURCHASES_ENABLED"))
+
+
+def _serializador_preview_carrito():
+    return URLSafeTimedSerializer(app.secret_key, salt="reseller-cart-commercial-preview-v1")
+
+
+def _snapshot_preview_carrito(revendedor_id, preview):
+    return {
+        "v": 1, "revendedor_id": int(revendedor_id),
+        "cart_intent_id": str(preview.get("cart_intent_id") or ""),
+        "total": preview["total"],
+        "lineas": [{
+            "plan_id": linea["plan_id"],
+            "cantidad_unidades": linea["cantidad_unidades"],
+            "cantidad_periodos": linea["cantidad_periodos"],
+            "precio_unitario": linea["precio_unitario"],
+            "subtotal": linea["precio_total"],
+            "tipo_unidad": linea["tipo_unidad"],
+            "duracion_base_dias": linea["duracion_base_dias"],
+        } for linea in sorted(
+            preview["lineas"], key=lambda x: (x["plan_id"], x["cantidad_periodos"]))],
+    }
 
 _intentos_login_reseller = {}
 _LOGIN_RESELLER_MAX_INTENTOS = 5
@@ -569,7 +602,66 @@ def preview_carrito_producto_revendedor():
     except reseller_accounts.ResellerPurchaseError as error:
         estado = 404 if error.codigo == "plan_inexistente" else 400
         return jsonify({"ok": False, "codigo": error.codigo, "mensaje": error.mensaje}), estado
+    preview["preview_token"] = _serializador_preview_carrito().dumps(
+        _snapshot_preview_carrito(revendedor["id"], preview))
     return jsonify({"ok": True, "preview": preview})
+
+
+@app.post("/revendedores/productos/carrito/comprar")
+def comprar_carrito_producto_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "codigo": "sesion_requerida", "mensaje": "Debes iniciar sesión."}), 401
+    if not _validar_csrf_reseller():
+        return jsonify({"ok": False, "codigo": "csrf_invalido", "mensaje": "Token CSRF no válido."}), 403
+    if not _config_bool_explicita(app.config.get("RESELLER_PURCHASES_ENABLED")):
+        return jsonify({"ok": False, "codigo": "purchases_disabled",
+                        "mensaje": "Las compras reseller no están habilitadas."}), 409
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) != {"items", "cart_intent_id", "preview_token"}:
+        return jsonify({"ok": False, "codigo": "payload_invalido",
+                        "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    try:
+        snapshot = _serializador_preview_carrito().loads(datos.get("preview_token") or "")
+        if (snapshot.get("v") != 1 or snapshot.get("revendedor_id") != revendedor["id"]):
+            raise BadSignature("preview ajeno o incompatible")
+    except (BadSignature, AttributeError, TypeError):
+        return jsonify({"ok": False, "codigo": "cart_changed",
+                        "mensaje": "El carrito debe revalidarse antes de comprar."}), 409
+    try:
+        pedido = reseller_accounts.comprar_carrito_reseller(
+            revendedor["id"], datos.get("cart_intent_id"), datos.get("items"),
+            preview_snapshot=snapshot)
+    except reseller_accounts.ResellerPurchaseError as error:
+        estados = {"plan_inexistente": 404, "reseller_inexistente": 404,
+                   "saldo_insuficiente": 409, "inventario_agotado": 409,
+                   "idempotencia_incompatible": 409, "price_changed": 409,
+                   "cart_changed": 409}
+        cuerpo = {"ok": False, "codigo": error.codigo, "mensaje": error.mensaje}
+        if getattr(error, "detalles", None):
+            cuerpo.update(error.detalles)
+        return jsonify(cuerpo), estados.get(error.codigo, 400)
+    except Exception:
+        app.logger.exception("Fallo seguro al comprar carrito reseller")
+        return jsonify({"ok": False, "codigo": "error_interno",
+                        "mensaje": "No fue posible completar el pedido. Tu carrito sigue intacto."}), 500
+    return jsonify({"ok": True, "pedido": pedido})
+
+
+@app.get("/revendedores/pedidos/<int:order_id>/entrega")
+def entrega_pedido_revendedor(order_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return jsonify({"ok": False, "codigo": "sesion_requerida",
+                        "mensaje": "Debes iniciar sesión."}), 401
+    entrega = reseller_accounts.obtener_entrega_pedido_reseller(order_id, revendedor["id"])
+    if entrega is None:
+        return jsonify({"ok": False, "codigo": "pedido_inexistente",
+                        "mensaje": "Pedido no encontrado."}), 404
+    respuesta = jsonify({"ok": True, **entrega})
+    respuesta.headers["Cache-Control"] = "no-store, private"
+    respuesta.headers["Pragma"] = "no-cache"
+    return respuesta
 
 
 @app.post("/revendedores/productos/planes/<int:plan_id>/comprar")
@@ -600,14 +692,18 @@ def mis_cuentas_revendedor():
     if not revendedor:
         session.setdefault("reseller_auth_error", "sesion")
         return redirect("/revendedores/login")
-    estado, tipo, busqueda = (request.args.get("estado", "todas"),
-                              request.args.get("tipo", "todas"), request.args.get("q", ""))
+    estado, tipo, busqueda, producto = (request.args.get("estado", "todas"),
+                              request.args.get("tipo", "todas"), request.args.get("q", ""),
+                              request.args.get("producto", ""))
+    todas = reseller_accounts.listar_mis_cuentas(revendedor["id"])
     return render_template(
         "resellers/mis_cuentas.html", revendedor=revendedor,
-        cuentas=reseller_accounts.listar_mis_cuentas(revendedor["id"], estado, tipo, busqueda),
+        cuentas=reseller_accounts.listar_mis_cuentas(
+            revendedor["id"], estado, tipo, busqueda, producto),
+        productos=sorted({item["producto"] for item in todas if item.get("producto")}, key=str.casefold),
         metricas=reseller_accounts.resumen_mis_cuentas(revendedor["id"]),
         resumen=_resumen_privado_reseller(revendedor["id"]),
-        filtros={"estado": estado, "tipo": tipo, "q": busqueda},
+        filtros={"estado": estado, "tipo": tipo, "q": busqueda, "producto": producto},
         csrf_token=_csrf_reseller_token(), seccion_activa="mis_cuentas")
 
 
@@ -1600,7 +1696,8 @@ def admin_nube_cuentas():
         cuentas=cuentas,
         estadisticas=estadisticas,
         plataformas=plataformas,
-        tipos_cuenta=tipos_cuenta
+        tipos_cuenta=tipos_cuenta,
+        politicas_duracion_inventario=reseller_accounts.listar_politicas_duracion_inventario()
     )
 
 
@@ -1670,6 +1767,8 @@ def crear_nueva_cuenta_nube():
         "notas",
         ""
     ).strip()
+
+    duracion_unidad_dias = request.form.get("duracion_unidad_dias", "").strip()
 
 
     # ==========================================
@@ -1951,6 +2050,14 @@ def crear_nueva_cuenta_nube():
     # CREAR CUENTA
     # ==========================================
 
+    try:
+        duracion_unidad_dias = database.validar_duracion_unidad_inventario(
+            plataforma, modalidad, duracion_unidad_dias
+        )
+    except ValueError as error:
+        flash(str(error))
+        return redirect("/admin/nube-cuentas")
+
     crear_cuenta_nube(
 
         plataforma=plataforma,
@@ -1990,6 +2097,7 @@ def crear_nueva_cuenta_nube():
         fecha_aplicacion_pin=fecha_aplicacion_pin,
 
         pines_perfiles=pines_perfiles
+        ,duracion_unidad_dias=duracion_unidad_dias
     )
 
 
@@ -2271,6 +2379,7 @@ def carga_rapida_nube_route():
             valor_pin=int(re.sub(r"\D", "", str(datos.get("valor_pin", "0"))) or 0),
             precio_plan_referencia=int(re.sub(r"\D", "", str(datos.get("precio_plan_referencia", "0"))) or 0),
             fecha_aplicacion_pin=datos.get("fecha_aplicacion_pin", "")
+            ,duracion_unidad_dias=datos.get("duracion_unidad_dias")
         )
     except sqlite3.Error:
         return jsonify({"ok": False, "mensaje": "No se pudo completar la carga rápida."}), 500
@@ -5317,5 +5426,4 @@ print(os.getcwd())
 print("="*60)
 
 if __name__ == "__main__":
-    inicializar_db()
     app.run(host="0.0.0.0", port=5000, debug=True)

@@ -978,10 +978,22 @@ Nube de cuentas
                     <input
                         type="text"
                         name="plataforma"
+                        id="nubeNuevaPlataforma"
                         placeholder="Netflix"
                         required
                     >
 
+                </label>
+
+                <label>
+                    <span>DuraciÃ³n de la unidad *</span>
+                    <select name="duracion_unidad_dias" id="nubeNuevaDuracion" disabled>
+                        <option value="">Seleccionar...</option>
+                        {% for dias in duraciones_inventario|default([]) %}
+                        <option value="{{ dias }}">{{ (dias // 30) ~ (' mes' if dias // 30 == 1 else ' meses') if dias % 30 == 0 else dias ~ ' dÃ­as' }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="nube-ayuda">Clasifica la capacidad comercial de esta unidad.</small>
                 </label>
 
 
@@ -2408,6 +2420,7 @@ Nube de cuentas
             <div class="nube-form-grid">
                 <label><span>Plataforma *</span><select id="cargaRapidaPlataforma" required><option value="">Selecciona...</option>{% for plataforma in plataformas %}<option value="{{ plataforma }}">{{ plataforma }}</option>{% endfor %}</select></label>
                 <label><span>Modalidad *</span><select id="cargaRapidaModalidad"><option value="perfiles">Perfiles</option><option value="cuenta_completa">Cuenta completa</option></select></label>
+                <label><span>DuraciÃ³n del lote *</span><select id="cargaRapidaDuracion" disabled><option value="">Seleccionar...</option>{% for dias in duraciones_inventario|default([]) %}<option value="{{ dias }}">{{ (dias // 30) ~ (' mes' if dias // 30 == 1 else ' meses') if dias % 30 == 0 else dias ~ ' dÃ­as' }}</option>{% endfor %}</select></label>
                 <label><span>Control de pago</span><select id="cargaRapidaTipoPago"><option value="">Sin control especial</option><option value="pin">PIN</option><option value="autopagable">Autopagable</option></select></label>
                 <label><span>Perfiles por madre</span><input type="number" id="cargaRapidaCantidadPerfiles" min="1" max="10" value="5"></label>
                 <label><span>Plan</span><input type="text" id="cargaRapidaPlan" placeholder="Premium"></label>
@@ -2430,11 +2443,13 @@ Nube de cuentas
 
 {% block extra_js %}
 
+<script id="politicasDuracionInventario" type="application/json">{{ politicas_duracion_inventario|default({})|tojson }}</script>
+
 <script
     src="{{ url_for(
         'static',
         filename='js/admin/nube_cuentas.js'
-    ) }}"
+    ) }}?v=3"
 ></script>
 
 {% endblock %}

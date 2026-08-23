@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import json
 import os
 import tempfile
@@ -51,7 +56,7 @@ class ResellerPurchasePeriodsTest(unittest.TestCase):
     def _insertar_cuenta(self, estado="disponible"):
         conn = database.conectar()
         cur = conn.execute(
-            "INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado) VALUES ('Netflix',?,'cuenta_completa',?)",
+            "INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix',?,'cuenta_completa',?,30)",
             (f"{os.urandom(4).hex()}@example.com", estado),
         )
         cuenta_id = cur.lastrowid

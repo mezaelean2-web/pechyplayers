@@ -23,6 +23,8 @@ TIPOS_EVENTO = {
     "purchase", "renewal", "marked_no_renew", "unmarked_no_renew", "cut", "recovery", "expired"
 }
 MAX_CANTIDAD_PERIODOS = 12
+MAX_LINEAS_CARRITO = 50
+MAX_UNIDADES_PEDIDO = 100
 CLAVES_SENSIBLES = re.compile(
     r"(^|_)(password|contrasena|contraseña|pin|secret|token|credential|credencial|correo_acceso|email_acceso)($|_)",
     re.IGNORECASE,
@@ -32,10 +34,11 @@ CLAVES_SENSIBLES = re.compile(
 class ResellerPurchaseError(Exception):
     """Error de dominio seguro del motor de compras reseller."""
 
-    def __init__(self, codigo, mensaje):
+    def __init__(self, codigo, mensaje, detalles=None):
         super().__init__(mensaje)
         self.codigo = codigo
         self.mensaje = mensaje
+        self.detalles = detalles or {}
 
 
 ESTADO_PERSISTIDO_COMPRA = "active"
@@ -55,6 +58,9 @@ def inicializar_esquema(cursor=None):
     try:
         if propia:
             conn.execute("BEGIN IMMEDIATE")
+        columnas_nube = {fila[1] for fila in cur.execute("PRAGMA table_info(nube_cuentas)").fetchall()}
+        if columnas_nube and "duracion_unidad_dias" not in columnas_nube:
+            cur.execute("ALTER TABLE nube_cuentas ADD COLUMN duracion_unidad_dias INTEGER")
         eventos_sql = cur.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='reseller_purchase_events'").fetchone()
         if eventos_sql and "'unmarked_no_renew'" not in (eventos_sql[0] or ""):
             cur.executescript("""
@@ -212,6 +218,45 @@ def inicializar_esquema(cursor=None):
                 ON reseller_purchase_operations(revendedor_id, id DESC);
             CREATE INDEX IF NOT EXISTS idx_reseller_purchase_ops_purchase
                 ON reseller_purchase_operations(purchase_id, id DESC);
+
+            CREATE TABLE IF NOT EXISTS reseller_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                revendedor_id INTEGER NOT NULL,
+                cart_intent_id TEXT NOT NULL CHECK (length(trim(cart_intent_id)) > 0),
+                request_fingerprint TEXT NOT NULL,
+                estado TEXT NOT NULL DEFAULT 'processing'
+                    CHECK (estado IN ('processing', 'completed')),
+                total INTEGER NOT NULL CHECK (total >= 0),
+                cantidad_unidades INTEGER NOT NULL CHECK (cantidad_unidades > 0),
+                saldo_antes INTEGER,
+                saldo_despues INTEGER,
+                wallet_transaction_id INTEGER,
+                created_at TEXT NOT NULL,
+                completed_at TEXT,
+                UNIQUE (revendedor_id, cart_intent_id),
+                FOREIGN KEY (revendedor_id) REFERENCES revendedores(id),
+                FOREIGN KEY (wallet_transaction_id) REFERENCES reseller_wallet_transactions(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_reseller_orders_owner
+                ON reseller_orders(revendedor_id, id DESC);
+
+            CREATE TABLE IF NOT EXISTS reseller_order_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                plan_id INTEGER NOT NULL,
+                cantidad_unidades INTEGER NOT NULL CHECK (cantidad_unidades > 0),
+                cantidad_periodos INTEGER NOT NULL CHECK (cantidad_periodos > 0),
+                precio_unitario INTEGER NOT NULL CHECK (precio_unitario >= 0),
+                subtotal INTEGER NOT NULL CHECK (subtotal >= 0),
+                duracion_base_dias INTEGER NOT NULL CHECK (duracion_base_dias > 0),
+                duracion_total_dias INTEGER NOT NULL CHECK (duracion_total_dias > 0),
+                created_at TEXT NOT NULL,
+                UNIQUE (order_id, plan_id, cantidad_periodos),
+                FOREIGN KEY (order_id) REFERENCES reseller_orders(id),
+                FOREIGN KEY (plan_id) REFERENCES productos(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_reseller_order_lines_order
+                ON reseller_order_lines(order_id, id);
         """)
         # Migración aditiva: NULL evita inventar desgloses en compras históricas.
         columnas = {
@@ -221,10 +266,13 @@ def inicializar_esquema(cursor=None):
             "precio_unitario_pagado": "INTEGER CHECK (precio_unitario_pagado IS NULL OR precio_unitario_pagado >= 0)",
             "cantidad_periodos": "INTEGER CHECK (cantidad_periodos IS NULL OR cantidad_periodos > 0)",
             "duracion_base_dias": "INTEGER CHECK (duracion_base_dias IS NULL OR duracion_base_dias > 0)",
+            "order_id": "INTEGER REFERENCES reseller_orders(id)",
+            "order_line_id": "INTEGER REFERENCES reseller_order_lines(id)",
         }
         for nombre, definicion in adiciones.items():
             if nombre not in columnas:
                 cur.execute(f"ALTER TABLE reseller_purchases ADD COLUMN {nombre} {definicion}")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_reseller_purchases_order ON reseller_purchases(order_id, order_line_id)")
         if propia:
             conn.commit()
     except Exception:
@@ -331,7 +379,21 @@ def listar_reglas_inventario_admin():
         conn.close()
 
 
+def listar_duraciones_inventario():
+    conn = _conectar()
+    try:
+        return [int(fila[0]) for fila in conn.execute("""
+            SELECT DISTINCT duracion_dias
+            FROM reseller_plan_inventory_rules WHERE activo=1
+            ORDER BY duracion_dias
+        """).fetchall()]
+    finally:
+        conn.close()
+
+
 def listar_plataformas_inventario():
+    # Las politicas de duracion se exponen por separado; esta lista conserva
+    # exclusivamente las plataformas que existen fisicamente en la Nube.
     conn = _conectar()
     try:
         return [fila[0] for fila in conn.execute("""
@@ -339,6 +401,27 @@ def listar_plataformas_inventario():
             WHERE trim(COALESCE(plataforma, '')) != ''
             GROUP BY lower(trim(plataforma)) ORDER BY lower(trim(plataforma))
         """).fetchall()]
+    finally:
+        conn.close()
+
+
+def listar_politicas_duracion_inventario():
+    conn = _conectar()
+    try:
+        filas = conn.execute("""
+            SELECT MIN(trim(plataforma)) plataforma, tipo_unidad
+            FROM reseller_plan_inventory_rules WHERE activo=1
+            GROUP BY lower(trim(plataforma)), tipo_unidad
+        """).fetchall()
+        resultado = {}
+        for fila in filas:
+            modalidad = "perfiles" if fila["tipo_unidad"] == "perfil" else "cuenta_completa"
+            resultado[f"{fila['plataforma'].strip().casefold()}|{modalidad}"] = (
+                database.politica_duracion_inventario(
+                    fila["plataforma"], modalidad, cursor=conn.cursor()
+                )
+            )
+        return resultado
     finally:
         conn.close()
 
@@ -488,7 +571,8 @@ def _estado_visual_seguro(purchase, ahora=None):
         return "NO_RENOVADA" if purchase.get("no_renovar") else "ACTIVA"
 
 
-def listar_mis_cuentas(revendedor_id, estado=None, tipo=None, busqueda=None, ahora=None):
+def listar_mis_cuentas(revendedor_id, estado=None, tipo=None, busqueda=None,
+                       producto=None, ahora=None):
     """Listado privado y no sensible; ownership nace exclusivamente de la sesión."""
     conn = _conectar()
     try:
@@ -505,6 +589,7 @@ def listar_mis_cuentas(revendedor_id, estado=None, tipo=None, busqueda=None, aho
     estado = str(estado or "todas").strip().upper()
     tipo = str(tipo or "todas").strip().lower()
     busqueda = " ".join(str(busqueda or "").strip().lower().split())
+    producto = " ".join(str(producto or "").strip().lower().split())
     resultado = []
     for fila in filas:
         item = dict(fila)
@@ -518,6 +603,8 @@ def listar_mis_cuentas(revendedor_id, estado=None, tipo=None, busqueda=None, aho
         if estado not in {"", "TODAS"} and item["estado_visual"] != estado:
             continue
         if tipo in TIPOS_UNIDAD and item["tipo_unidad"] != tipo:
+            continue
+        if producto and " ".join(str(item.get("producto") or "").lower().split()) != producto:
             continue
         texto = " ".join(str(item.get(k) or "").lower() for k in ("producto", "plataforma", "plan_nombre"))
         if busqueda and busqueda not in texto:
@@ -541,6 +628,95 @@ def resumen_mis_cuentas(revendedor_id, ahora=None):
 def obtener_detalle_mi_cuenta(purchase_id, revendedor_id, ahora=None):
     return next((item for item in listar_mis_cuentas(revendedor_id, ahora=ahora)
                  if item["id"] == int(purchase_id)), None)
+
+
+def obtener_entrega_pedido_reseller(order_id, revendedor_id):
+    """Entrega credenciales actuales de un pedido propio sin alterar estado comercial."""
+    conn = _conectar()
+    try:
+        pedido = conn.execute("""SELECT id,total,cantidad_unidades,saldo_despues
+            FROM reseller_orders
+            WHERE id=? AND revendedor_id=? AND estado='completed'""",
+            (int(order_id), int(revendedor_id))).fetchone()
+        if not pedido:
+            return None
+        reseller = conn.execute("SELECT nombre FROM revendedores WHERE id=?",
+                                (int(revendedor_id),)).fetchone()
+        if not reseller:
+            return None
+        esperado = f"Reseller #{int(revendedor_id)} - {reseller['nombre']}"[:160]
+        purchases = conn.execute("""
+            SELECT rp.id,rp.plan_id,rp.cuenta_id,rp.perfil_id,rp.tipo_unidad,
+                   rp.cortada_at,rp.estado_persistido,p.nombre AS producto,p.plan,
+                   c.plataforma,c.correo,c.contrasena,c.pin AS cuenta_pin,
+                   c.nombre_cliente AS cuenta_cliente,c.estado AS cuenta_estado,
+                   c.modalidad,pr.nombre_perfil,pr.pin AS perfil_pin,
+                   pr.nombre_cliente AS perfil_cliente,pr.estado AS perfil_estado
+            FROM reseller_purchases rp
+            JOIN reseller_order_lines ol
+              ON ol.id=rp.order_line_id AND ol.order_id=rp.order_id
+             AND ol.plan_id=rp.plan_id
+            JOIN productos p ON p.id=rp.plan_id
+            JOIN nube_cuentas c ON c.id=rp.cuenta_id
+            LEFT JOIN nube_perfiles pr
+              ON pr.id=rp.perfil_id AND pr.cuenta_id=rp.cuenta_id
+            WHERE rp.order_id=? AND rp.revendedor_id=?
+            ORDER BY rp.id
+        """, (int(order_id), int(revendedor_id))).fetchall()
+        unidades = []
+        for purchase in purchases:
+            item = dict(purchase)
+            if item.get("cortada_at") or item.get("estado_persistido") != "active":
+                continue
+            cuenta_estado = str(item.get("cuenta_estado") or "").strip().lower()
+            tipo = item.get("tipo_unidad")
+            if tipo == "cuenta":
+                asignada = (item.get("perfil_id") is None
+                            and (item.get("modalidad") or "cuenta_completa") == "cuenta_completa"
+                            and item.get("cuenta_cliente") == esperado
+                            and cuenta_estado not in ESTADOS_UNIDAD_INCOMPATIBLES)
+                campos_base = (("correo", "Correo", item.get("correo"), False),
+                               ("contrasena", "Contraseña", item.get("contrasena"), True),
+                               ("pin", "PIN", item.get("cuenta_pin"), True))
+            elif tipo == "perfil":
+                perfil_estado = str(item.get("perfil_estado") or "").strip().lower()
+                asignada = (item.get("modalidad") == "perfiles"
+                            and item.get("perfil_id") is not None
+                            and item.get("perfil_cliente") == esperado
+                            and cuenta_estado not in (ESTADOS_UNIDAD_INCOMPATIBLES - {"disponible"})
+                            and perfil_estado not in ESTADOS_UNIDAD_INCOMPATIBLES)
+                campos_base = (("correo", "Correo", item.get("correo"), False),
+                               ("contrasena", "Contraseña", item.get("contrasena"), True),
+                               ("perfil", "Perfil", item.get("nombre_perfil"), False),
+                               ("pin", "PIN", item.get("perfil_pin"), True))
+            else:
+                asignada, campos_base = False, ()
+            if not asignada:
+                continue
+            campos = [{"clave": clave, "etiqueta": etiqueta, "valor": str(valor),
+                       "sensible": sensible}
+                      for clave, etiqueta, valor, sensible in campos_base
+                      if valor not in (None, "")]
+            unidades.append({
+                "numero": len(unidades) + 1,
+                "producto": item["producto"], "plan": item["plan"],
+                "plataforma": item.get("plataforma") or item["producto"],
+                "modalidad": tipo,
+                "modalidad_etiqueta": "Cuenta completa" if tipo == "cuenta" else "Perfil",
+                "campos": campos,
+            })
+        return {
+            "pedido": {
+                "identificador": f"PO-{pedido['id']:06d}",
+                "cantidad_unidades": pedido["cantidad_unidades"],
+                "total_pagado_cop": wallets.formato_cop(pedido["total"]),
+                "saldo_restante_cop": wallets.formato_cop(pedido["saldo_despues"]),
+            },
+            "unidades": unidades,
+            "entrega_completa": len(unidades) == int(pedido["cantidad_unidades"]),
+        }
+    finally:
+        conn.close()
 
 
 def obtener_credenciales_autorizadas(purchase_id, revendedor_id):
@@ -914,6 +1090,11 @@ def validar_cantidad_unidades(cantidad_unidades, disponibilidad=None):
 
 
 def _unidades_elegibles_en_cursor(cursor, regla, limite=None):
+    modalidad = "cuenta_completa" if regla["tipo_unidad"] == "cuenta" else "perfiles"
+    requiere_duracion = database.politica_duracion_inventario(
+        regla["plataforma"], modalidad, cursor=cursor
+    )["requiere_duracion_inventario"]
+    filtro_duracion = " AND c.duracion_unidad_dias=?" if requiere_duracion else ""
     """Única fuente de verdad para selección y conteo de inventario elegible."""
     if regla["tipo_unidad"] == "cuenta":
         sql = """
@@ -921,18 +1102,20 @@ def _unidades_elegibles_en_cursor(cursor, regla, limite=None):
             WHERE lower(trim(c.plataforma))=lower(trim(?))
               AND COALESCE(c.modalidad,'cuenta_completa')='cuenta_completa'
               AND lower(COALESCE(c.estado,'disponible'))='disponible'
+              {filtro_duracion}
               AND trim(COALESCE(c.nombre_cliente,''))=''
               AND trim(COALESCE(c.fecha_entrega,''))=''
               AND NOT EXISTS (SELECT 1 FROM reseller_purchases rp
                 WHERE rp.cuenta_id=c.id AND rp.estado_persistido='active')
             ORDER BY c.id
-        """
+        """.format(filtro_duracion=filtro_duracion)
     else:
         sql = """
             SELECT c.id cuenta_id, p.id perfil_id FROM nube_perfiles p
             JOIN nube_cuentas c ON c.id=p.cuenta_id
             WHERE lower(trim(c.plataforma))=lower(trim(?)) AND c.modalidad='perfiles'
               AND lower(COALESCE(p.estado,'disponible'))='disponible'
+              {filtro_duracion}
               AND lower(COALESCE(c.estado,'disponible')) NOT IN
                 ('caida','bloqueada','retirada','papelera','garantia','reemplazada','no_disponible')
               AND trim(COALESCE(p.nombre_cliente,''))=''
@@ -940,12 +1123,16 @@ def _unidades_elegibles_en_cursor(cursor, regla, limite=None):
               AND NOT EXISTS (SELECT 1 FROM reseller_purchases rp
                 WHERE rp.perfil_id=p.id AND rp.estado_persistido='active')
             ORDER BY p.id
-        """
+        """.format(filtro_duracion=filtro_duracion)
+    parametros = [regla["plataforma"]]
+    if requiere_duracion:
+        parametros.append(int(regla["duracion_dias"]))
     if limite is not None:
         sql += " LIMIT ?"
-        filas = cursor.execute(sql, (regla["plataforma"], int(limite))).fetchall()
+        parametros.append(int(limite))
+        filas = cursor.execute(sql, tuple(parametros)).fetchall()
     else:
-        filas = cursor.execute(sql, (regla["plataforma"],)).fetchall()
+        filas = cursor.execute(sql, tuple(parametros)).fetchall()
     return [dict(fila) for fila in filas]
 
 
@@ -1106,6 +1293,293 @@ def previsualizar_carrito_reseller(revendedor_id, lineas, cart_intent_id=None, a
     }
 
 
+def _normalizar_lineas_pedido(lineas):
+    if not isinstance(lineas, list) or not lineas:
+        raise ResellerPurchaseError("carrito_invalido", "El carrito debe contener al menos una línea.")
+    if len(lineas) > MAX_LINEAS_CARRITO:
+        raise ResellerPurchaseError("carrito_invalido", "El carrito contiene demasiadas líneas.")
+    consolidadas = {}
+    for linea in lineas:
+        if not isinstance(linea, dict) or set(linea) != {"plan_id", "cantidad_unidades", "cantidad_periodos"}:
+            raise ResellerPurchaseError("payload_invalido", "Cada línea debe contener solo plan_id, cantidad_unidades y cantidad_periodos.")
+        plan_id = linea.get("plan_id")
+        if isinstance(plan_id, bool) or not isinstance(plan_id, int) or plan_id < 1:
+            raise ResellerPurchaseError("solicitud_invalida", "Plan no válido.")
+        periodos = validar_cantidad_periodos(linea.get("cantidad_periodos"))
+        unidades = validar_cantidad_unidades(linea.get("cantidad_unidades"))
+        clave = (plan_id, periodos)
+        consolidadas[clave] = consolidadas.get(clave, 0) + unidades
+    normalizadas = [
+        {"plan_id": plan_id, "cantidad_periodos": periodos, "cantidad_unidades": unidades}
+        for (plan_id, periodos), unidades in sorted(consolidadas.items())
+    ]
+    if sum(linea["cantidad_unidades"] for linea in normalizadas) > MAX_UNIDADES_PEDIDO:
+        raise ResellerPurchaseError("carrito_invalido", "El pedido contiene demasiadas unidades.")
+    return normalizadas
+
+
+def _resultado_pedido(cursor, order_id, duplicado=False):
+    pedido = cursor.execute("SELECT * FROM reseller_orders WHERE id=?", (order_id,)).fetchone()
+    if not pedido or pedido["estado"] != "completed":
+        raise ResellerPurchaseError("operacion_incompleta", "El pedido previo no está completo.")
+    compras = cursor.execute("""
+        SELECT rp.id purchase_id, rp.plan_id, p.nombre producto, p.plan,
+               rp.tipo_unidad, rp.cantidad_periodos, rp.precio_unitario_pagado precio_unitario,
+               rp.precio_pagado precio_total, rp.fecha_activacion, rp.fecha_vencimiento,
+               rp.order_line_id
+        FROM reseller_purchases rp JOIN productos p ON p.id=rp.plan_id
+        WHERE rp.order_id=? ORDER BY rp.id
+    """, (order_id,)).fetchall()
+    lineas = cursor.execute("""
+        SELECT ol.id order_line_id, ol.plan_id, p.nombre producto, p.plan,
+               ol.cantidad_unidades, ol.cantidad_periodos, ol.precio_unitario,
+               ol.subtotal, ol.duracion_base_dias, ol.duracion_total_dias
+        FROM reseller_order_lines ol JOIN productos p ON p.id=ol.plan_id
+        WHERE ol.order_id=? ORDER BY ol.id
+    """, (order_id,)).fetchall()
+    return {
+        "order_id": pedido["id"], "identificador_pedido": f"PO-{pedido['id']:06d}",
+        "cart_intent_id": pedido["cart_intent_id"], "duplicado": bool(duplicado),
+        "cantidad_unidades": pedido["cantidad_unidades"], "cantidad_productos": len(lineas),
+        "total_pagado": pedido["total"], "total_pagado_cop": wallets.formato_cop(pedido["total"]),
+        "saldo_restante": pedido["saldo_despues"], "saldo_restante_cop": wallets.formato_cop(pedido["saldo_despues"]),
+        "lineas": [dict(fila) for fila in lineas],
+        "purchases": [{**dict(fila), "identificador": f"MC-{fila['purchase_id']:06d}"} for fila in compras],
+    }
+
+
+def comprar_carrito_reseller(revendedor_id, cart_intent_id, lineas, ahora=None,
+                             fallo_inyectado=None, preview_snapshot=None):
+    """Compra todas las unidades bajo una sola transacción SQLite o revierte todo."""
+    if isinstance(revendedor_id, bool):
+        raise ResellerPurchaseError("solicitud_invalida", "Revendedor no válido.")
+    try:
+        revendedor_id = int(revendedor_id)
+    except (TypeError, ValueError) as error:
+        raise ResellerPurchaseError("solicitud_invalida", "Revendedor no válido.") from error
+    intencion = str(cart_intent_id or "").strip()
+    if not intencion or len(intencion) > 180:
+        raise ResellerPurchaseError("idempotencia_invalida", "cart_intent_id no es válido.")
+    normalizadas = _normalizar_lineas_pedido(lineas)
+    huella = hashlib.sha256(json.dumps(
+        {"revendedor_id": revendedor_id, "lineas": normalizadas},
+        ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+    momento = _momento_bogota(ahora)
+    instante = momento.isoformat()
+
+    def fallar(punto):
+        if fallo_inyectado == punto:
+            raise RuntimeError(f"fallo_inyectado:{punto}")
+
+    conn = _conectar()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        previa = cursor.execute(
+            "SELECT * FROM reseller_orders WHERE revendedor_id=? AND cart_intent_id=?",
+            (revendedor_id, intencion)).fetchone()
+        if previa:
+            if previa["request_fingerprint"] != huella:
+                raise ResellerPurchaseError("idempotencia_incompatible", "cart_intent_id ya pertenece a otro carrito.")
+            resultado = _resultado_pedido(cursor, previa["id"], True)
+            conn.commit()
+            return resultado
+        revendedor = cursor.execute(
+            "SELECT id,nombre,telefono,estado FROM revendedores WHERE id=?", (revendedor_id,)).fetchone()
+        if not revendedor:
+            raise ResellerPurchaseError("reseller_inexistente", "Revendedor no encontrado.")
+        if (revendedor["estado"] or "").lower() != "activo":
+            raise ResellerPurchaseError("reseller_inactivo", "El revendedor no está activo.")
+
+        if preview_snapshot is not None:
+            esperadas = preview_snapshot.get("lineas") if isinstance(preview_snapshot, dict) else None
+            if (preview_snapshot.get("cart_intent_id") != intencion or
+                    preview_snapshot.get("revendedor_id") != revendedor_id or
+                    not isinstance(esperadas, list)):
+                raise ResellerPurchaseError("cart_changed", "El carrito cambio y debe revalidarse.")
+            lineas_esperadas = [{
+                "plan_id": x.get("plan_id"), "cantidad_unidades": x.get("cantidad_unidades"),
+                "cantidad_periodos": x.get("cantidad_periodos")
+            } for x in esperadas]
+            if lineas_esperadas != normalizadas:
+                raise ResellerPurchaseError("cart_changed", "El carrito cambio y debe revalidarse.")
+
+        preparadas, reservadas = [], set()
+        total = 0
+        for linea in normalizadas:
+            try:
+                producto, precio, origen = _resolver_precio_en_cursor(
+                    cursor, linea["plan_id"], revendedor_id, momento.date().isoformat())
+            except ResellerPurchaseError as error:
+                if preview_snapshot is not None and error.codigo in {
+                        "precio_reseller_no_configurado", "plan_inexistente"}:
+                    raise ResellerPurchaseError(
+                        "cart_changed", "Las condiciones del plan cambiaron; revalida el carrito.") from error
+                raise
+            regla = cursor.execute(
+                "SELECT * FROM reseller_plan_inventory_rules WHERE plan_id=?", (linea["plan_id"],)).fetchone()
+            if preview_snapshot is not None and (not regla or not regla["activo"]):
+                raise ResellerPurchaseError(
+                    "cart_changed", "Las condiciones del plan cambiaron; revalida el carrito.")
+            if not regla:
+                raise ResellerPurchaseError("regla_inexistente", "El plan no tiene regla de inventario.")
+            if not regla["activo"]:
+                raise ResellerPurchaseError("regla_inactiva", "La regla de inventario está inactiva.")
+            elegibles = []
+            for unidad in _unidades_elegibles_en_cursor(cursor, regla):
+                clave_unidad = (regla["tipo_unidad"], unidad["cuenta_id"] if regla["tipo_unidad"] == "cuenta" else unidad["perfil_id"])
+                if clave_unidad not in reservadas:
+                    reservadas.add(clave_unidad)
+                    elegibles.append(unidad)
+                    if len(elegibles) == linea["cantidad_unidades"]:
+                        break
+            if len(elegibles) != linea["cantidad_unidades"]:
+                raise ResellerPurchaseError("inventario_agotado", "El inventario cambió y no alcanza para completar el pedido.")
+            duracion_base = int(regla["duracion_dias"])
+            duracion_total = duracion_base * linea["cantidad_periodos"]
+            subtotal = precio * linea["cantidad_periodos"] * linea["cantidad_unidades"]
+            total += subtotal
+            preparadas.append({**linea, "producto": producto, "precio_unitario": precio,
+                               "origen_precio": origen, "regla": regla, "unidades": elegibles,
+                               "duracion_base_dias": duracion_base,
+                               "duracion_total_dias": duracion_total, "subtotal": subtotal})
+
+        if preview_snapshot is not None:
+            anteriores = {(x["plan_id"], x["cantidad_periodos"]): x
+                          for x in preview_snapshot["lineas"]}
+            cambios_precio = []
+            cambio_comercial = False
+            for actual in preparadas:
+                anterior = anteriores[(actual["plan_id"], actual["cantidad_periodos"])]
+                if (anterior.get("tipo_unidad") != actual["regla"]["tipo_unidad"] or
+                        anterior.get("duracion_base_dias") != actual["duracion_base_dias"]):
+                    cambio_comercial = True
+                if (anterior.get("precio_unitario") != actual["precio_unitario"] or
+                        anterior.get("subtotal") != actual["subtotal"]):
+                    cambios_precio.append({
+                        "plan_id": actual["plan_id"],
+                        "precio_anterior": anterior.get("precio_unitario"),
+                        "precio_actual": actual["precio_unitario"],
+                        "subtotal_anterior": anterior.get("subtotal"),
+                        "subtotal_nuevo": actual["subtotal"],
+                    })
+            if cambio_comercial:
+                raise ResellerPurchaseError(
+                    "cart_changed", "Las condiciones del carrito cambiaron. Revisa el nuevo detalle.")
+            if cambios_precio or preview_snapshot.get("total") != total:
+                raise ResellerPurchaseError(
+                    "price_changed", "El precio de tu pedido cambi\u00f3.", {
+                        "total_anterior": preview_snapshot.get("total"),
+                        "total_actual": total,
+                        "total_anterior_cop": wallets.formato_cop(preview_snapshot.get("total")),
+                        "total_actual_cop": wallets.formato_cop(total),
+                        "lineas_cambiadas": cambios_precio,
+                    })
+
+        wallet = wallets.asegurar_wallet(revendedor_id, cursor)
+        if int(wallet["saldo"]) < total:
+            raise ResellerPurchaseError("saldo_insuficiente", "Saldo insuficiente para completar el pedido.")
+        cursor.execute("""INSERT INTO reseller_orders
+            (revendedor_id,cart_intent_id,request_fingerprint,estado,total,cantidad_unidades,
+             saldo_antes,created_at) VALUES (?,?,?,'processing',?,?,?,?)""",
+            (revendedor_id, intencion, huella, total,
+             sum(x["cantidad_unidades"] for x in preparadas), wallet["saldo"], instante))
+        order_id = cursor.lastrowid
+        fallar("despues_order")
+        for linea in preparadas:
+            cursor.execute("""INSERT INTO reseller_order_lines
+                (order_id,plan_id,cantidad_unidades,cantidad_periodos,precio_unitario,subtotal,
+                 duracion_base_dias,duracion_total_dias,created_at) VALUES (?,?,?,?,?,?,?,?,?)""",
+                (order_id, linea["plan_id"], linea["cantidad_unidades"], linea["cantidad_periodos"],
+                 linea["precio_unitario"], linea["subtotal"], linea["duracion_base_dias"],
+                 linea["duracion_total_dias"], instante))
+            linea["order_line_id"] = cursor.lastrowid
+        fallar("despues_lineas")
+
+        etiqueta = f"Reseller #{revendedor_id} - {revendedor['nombre']}"[:160]
+        cliente_id = database._obtener_o_crear_cliente_nube(cursor, etiqueta, revendedor["telefono"] or "")
+        compras = []
+        for linea in preparadas:
+            vencimiento = momento + timedelta(days=linea["duracion_total_dias"])
+            for unidad in linea["unidades"]:
+                tabla = "nube_cuentas" if linea["regla"]["tipo_unidad"] == "cuenta" else "nube_perfiles"
+                unidad_id = unidad["cuenta_id"] if tabla == "nube_cuentas" else unidad["perfil_id"]
+                cursor.execute(f"""UPDATE {tabla} SET cliente_id=?,nombre_cliente=?,telefono=?,fecha_entrega=?,
+                    dias_cuenta=?,fecha_vencimiento=?,estado='activa',fecha_actualizacion=CURRENT_TIMESTAMP
+                    WHERE id=? AND lower(COALESCE(estado,'disponible'))='disponible'
+                      AND trim(COALESCE(nombre_cliente,''))=''""",
+                    (cliente_id, etiqueta, revendedor["telefono"] or "", momento.date().isoformat(),
+                     linea["duracion_total_dias"], vencimiento.date().isoformat(), unidad_id))
+                if cursor.rowcount != 1:
+                    raise ResellerPurchaseError("inventario_agotado", "El inventario cambió y no alcanza para completar el pedido.")
+                fallar("despues_inventario_parcial")
+                precio_unidad = linea["precio_unitario"] * linea["cantidad_periodos"]
+                cursor.execute("""INSERT INTO reseller_purchases
+                    (revendedor_id,plan_id,cuenta_id,perfil_id,tipo_unidad,operacion_origen,
+                     fecha_compra,fecha_activacion,fecha_vencimiento,dias_contratados,precio_pagado,
+                     precio_unitario_pagado,cantidad_periodos,duracion_base_dias,estado_persistido,
+                     order_id,order_line_id) VALUES (?,?,?,?,?,'purchase',?,?,?,?,?,?,?,?,?,?,?)""",
+                    (revendedor_id,linea["plan_id"],unidad["cuenta_id"],unidad["perfil_id"],
+                     linea["regla"]["tipo_unidad"],instante,instante,vencimiento.isoformat(),
+                     linea["duracion_total_dias"],precio_unidad,linea["precio_unitario"],
+                     linea["cantidad_periodos"],linea["duracion_base_dias"],ESTADO_PERSISTIDO_COMPRA,
+                     order_id,linea["order_line_id"]))
+                compras.append((cursor.lastrowid, linea, unidad, vencimiento, precio_unidad))
+                cursor.execute("""INSERT INTO nube_movimientos
+                    (cuenta_id,tipo,descripcion,estado_anterior,estado_nuevo,cliente_nombre)
+                    VALUES (?,?,?,'disponible','activa',?)""",
+                    (unidad["cuenta_id"], "asignacion_reseller_" + linea["regla"]["tipo_unidad"],
+                     "Unidad asignada por pedido reseller", etiqueta))
+                fallar("despues_purchases_parciales")
+
+        movimiento = wallets.apply_wallet_transaction(
+            revendedor_id, "purchase", total, f"Pedido reseller #{order_id}",
+            origen="reseller_order", actor=f"reseller:{revendedor_id}",
+            referencia=f"reseller_order:{order_id}", idempotency_key=f"reseller_order:{revendedor_id}:{intencion}",
+            cursor=cursor)
+        fallar("despues_debito")
+        for purchase_id, linea, unidad, vencimiento, precio_unidad in compras:
+            cursor.execute("UPDATE reseller_purchases SET wallet_transaction_id=? WHERE id=?",
+                           (movimiento["id"], purchase_id))
+            datos = {"order_id": order_id, "order_line_id": linea["order_line_id"],
+                     "producto": linea["producto"]["nombre"], "plan": linea["producto"]["plan"],
+                     "tipo_unidad": linea["regla"]["tipo_unidad"], "origen_precio": linea["origen_precio"],
+                     "precio_unitario": linea["precio_unitario"], "cantidad_periodos": linea["cantidad_periodos"],
+                     "precio_total": precio_unidad, "duracion_base_dias": linea["duracion_base_dias"],
+                     "duracion_total_dias": linea["duracion_total_dias"], "fecha_activacion": instante,
+                     "fecha_vencimiento": vencimiento.isoformat()}
+            _validar_metadata_publica(datos)
+            cursor.execute("""INSERT INTO reseller_purchase_events
+                (purchase_id,tipo,fecha,precio_aplicado,vencimiento_nuevo,wallet_transaction_id,
+                 actor_tipo,actor_id,datos_publicos_json,idempotency_key)
+                VALUES (?,'purchase',?,?,?,?,'reseller',?,?,?)""",
+                (purchase_id, instante, precio_unidad, vencimiento.isoformat(), movimiento["id"],
+                 revendedor_id, json.dumps(datos, ensure_ascii=False, sort_keys=True),
+                 f"order:{order_id}:purchase:{purchase_id}"))
+        fallar("despues_eventos")
+        cursor.execute("""UPDATE reseller_orders SET estado='completed',wallet_transaction_id=?,
+            saldo_despues=?,completed_at=? WHERE id=? AND estado='processing'""",
+            (movimiento["id"], movimiento["saldo_posterior"], instante, order_id))
+        if cursor.rowcount != 1:
+            raise ResellerPurchaseError("error_integridad", "El pedido no pudo completarse de forma íntegra.")
+        fallar("antes_completar_order")
+        resultado = _resultado_pedido(cursor, order_id)
+        conn.commit()
+        return resultado
+    except ResellerPurchaseError:
+        conn.rollback()
+        raise
+    except sqlite3.IntegrityError as error:
+        conn.rollback()
+        raise ResellerPurchaseError("error_integridad", "El pedido no pudo completarse de forma íntegra.") from error
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def _resultado_compra(cursor, purchase_id, duplicado=False):
     fila = cursor.execute("""
         SELECT rp.id purchase_id, rp.plan_id, p.nombre producto, p.plan,
@@ -1162,6 +1636,14 @@ def _cargar_contexto_recovery(cursor, purchase_id, revendedor_id, momento,
     cuenta = dict(cuenta_fila)
     if str(cuenta.get("plataforma") or "").strip().casefold() != str(regla["plataforma"]).strip().casefold():
         raise ResellerPurchaseError("plataforma_incompatible", "La plataforma de la unidad original ya no corresponde al plan.")
+    modalidad_regla = "cuenta_completa" if regla["tipo_unidad"] == "cuenta" else "perfiles"
+    if (database.politica_duracion_inventario(
+            regla["plataforma"], modalidad_regla, cursor=cursor
+        )["requiere_duracion_inventario"] and
+            (cuenta.get("duracion_unidad_dias") is None or
+             int(cuenta["duracion_unidad_dias"]) != int(regla["duracion_dias"]))):
+        raise ResellerPurchaseError(
+            "duracion_incompatible", "La duracion de la unidad original no corresponde al plan.")
     estados_bloqueados = {
         "caida": "DOWN", "bloqueada": "BLOCKED", "retirada": "RETIRED",
         "reemplazada": "REPLACED", "garantia": "WARRANTY", "papelera": "TRASHED",
@@ -1496,7 +1978,7 @@ def _cargar_contexto_renovacion(cursor, purchase_id, revendedor_id, momento,
         raise ResellerPurchaseError("unidad_inexistente", "La unidad asignada ya no existe.")
     cuenta = dict(cuenta)
     esperado = f"Reseller #{int(revendedor_id)} - {purchase['reseller_nombre']}"[:160]
-    if str(cuenta.get("estado") or "").strip().lower() in ESTADOS_UNIDAD_INCOMPATIBLES:
+    if str(cuenta.get("estado") or "").strip().lower() in (ESTADOS_UNIDAD_INCOMPATIBLES - {"disponible"}):
         raise ResellerPurchaseError("unidad_incompatible", "La cuenta asignada no estÃ¡ operativamente disponible.")
     perfil = None
     if purchase["tipo_unidad"] == "cuenta":
@@ -1513,6 +1995,14 @@ def _cargar_contexto_renovacion(cursor, purchase_id, revendedor_id, momento,
                          not in ESTADOS_UNIDAD_INCOMPATIBLES)
     if not coherente:
         raise ResellerPurchaseError("unidad_reasignada", "La unidad ya no corresponde a esta adquisiciÃ³n.")
+    modalidad_regla = "cuenta_completa" if regla["tipo_unidad"] == "cuenta" else "perfiles"
+    if (database.politica_duracion_inventario(
+            regla["plataforma"], modalidad_regla, cursor=cursor
+        )["requiere_duracion_inventario"] and
+            (cuenta.get("duracion_unidad_dias") is None or
+             int(cuenta["duracion_unidad_dias"]) != int(regla["duracion_dias"]))):
+        raise ResellerPurchaseError(
+            "duracion_incompatible", "La duracion de la unidad ya no corresponde al plan.")
     contexto = {"purchase": purchase, "regla": regla, "cuenta": cuenta,
                 "perfil": perfil, "precio_unitario": None, "origen_precio": None}
     if resolver_comercial:
@@ -1682,6 +2172,10 @@ def cambiar_no_renovar(purchase_id, revendedor_id, marcado, ahora=None):
         if bool(purchase["no_renovar"]) == marcado:
             conn.commit()
             return {"ok": True, "cambio": False, "no_renovar": marcado}
+        if marcado and _estado_visual_seguro(purchase, momento) != "VENCIDA":
+            raise ResellerPurchaseError(
+                "no_renovar_no_permitido",
+                "Solo puedes marcar No renovar cuando el servicio este vencido.")
         fecha = momento.isoformat() if marcado else None
         cursor.execute("UPDATE reseller_purchases SET no_renovar=?,no_renovar_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
                        (int(marcado),fecha,int(purchase_id)))

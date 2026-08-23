@@ -56,7 +56,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/cartelera-lobby.css') }}?v=999">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/resellers-public.css') }}?v=1">
 {% set es_catalogo_reseller = request.path == '/revendedores/productos' and revendedor_actual %}
-{% if es_catalogo_reseller %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-products.css') }}?v=5"><link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-cart.css') }}?v=2">{% endif %}
+{% if es_catalogo_reseller %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-products.css') }}?v=6"><link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-cart.css') }}?v=4">{% endif %}
 
 <style>
 
@@ -1951,7 +1951,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
-{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=2"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=5"></script>{% endif %}
+{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=6"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=6"></script>{% endif %}
 
 <script>
 

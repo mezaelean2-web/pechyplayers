@@ -1,3 +1,8 @@
+try:
+    from tests._bootstrap import TEST_DB
+except ModuleNotFoundError:
+    from _bootstrap import TEST_DB
+
 import os
 import tempfile
 import threading
@@ -43,7 +48,7 @@ class ResellerRecoveryTest(unittest.TestCase):
     def antigua(self, tipo="cuenta"):
         conn = database.conectar()
         modalidad = "cuenta_completa" if tipo == "cuenta" else "perfiles"
-        cuenta = conn.execute("INSERT INTO nube_cuentas(plataforma,correo,contrasena,modalidad,estado) VALUES ('Netflix','actual@test.com','clave-actual',?,'disponible')", (modalidad,)).lastrowid
+        cuenta = conn.execute("INSERT INTO nube_cuentas(plataforma,correo,contrasena,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix','actual@test.com','clave-actual',?,'disponible',30)", (modalidad,)).lastrowid
         perfil = None
         if tipo == "perfil":
             perfil = conn.execute("INSERT INTO nube_perfiles(cuenta_id,nombre_perfil,pin,estado) VALUES (?,'Uno','2468','disponible')", (cuenta,)).lastrowid
