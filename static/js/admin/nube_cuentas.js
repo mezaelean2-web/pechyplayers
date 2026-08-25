@@ -1,24 +1,22 @@
 document.addEventListener(
     "DOMContentLoaded",
     () => {
-        const politicasDuracionInventario = (() => {
-            try {
-                return JSON.parse(document.getElementById("politicasDuracionInventario")?.textContent || "{}");
-            } catch (_) {
-                return {};
-            }
-        })();
+        const duracionesInventarioManual = [30, 60, 90, 120, 150, 180];
+        const requiereDuracionInventario = plataforma => {
+            const tokens = String(plataforma || "")
+                .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase().match(/[a-z0-9]+/g) || [];
+            return tokens.includes("youtube") || tokens.includes("spotify");
+        };
         const etiquetaDuracionInventario = dias => Number(dias) % 30 === 0
             ? `${Number(dias) / 30} ${Number(dias) === 30 ? "mes" : "meses"}`
             : `${dias} dias`;
         const aplicarPoliticaDuracionInventario = (plataforma, modalidad, select) => {
             if (!select) return;
-            const clave = `${String(plataforma || "").trim().toLowerCase()}|${modalidad}`;
-            const politica = politicasDuracionInventario[clave] || {};
-            const requiere = politica.requiere_duracion_inventario === true;
+            const requiere = requiereDuracionInventario(plataforma);
             select.value = "";
-            select.replaceChildren(new Option("Seleccionar...", ""));
-            (politica.duraciones_disponibles || []).forEach(dias =>
+            select.replaceChildren(new Option("Seleccionar duración", ""));
+            duracionesInventarioManual.forEach(dias =>
                 select.add(new Option(etiquetaDuracionInventario(dias), String(dias)))
             );
             select.required = requiere;

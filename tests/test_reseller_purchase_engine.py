@@ -101,17 +101,21 @@ class ResellerPurchaseEngineTest(unittest.TestCase):
         ).fetchone()[0]; conn.close()
         self.assertEqual(asignada,cuenta_id)
 
-    def test_multiples_duraciones_exigen_clasificacion_y_coincidencia_exacta(self):
+    def test_youtube_exige_clasificacion_y_coincidencia_exacta(self):
         conn=database.conectar()
-        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('Netflix','n.png','Cuenta 90','99000','disponible')")
+        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('YouTube','y.png','Cuenta 30','99000','disponible')")
+        plan_30=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan_30,'YouTube Premium','cuenta',30))
+        conn.execute("INSERT INTO precios_revendedor_generales(plan_id,precio,activo) VALUES (?,?,1)",(plan_30,40000))
+        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('YouTube','y.png','Cuenta 90','99000','disponible')")
         plan_90=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan_90,'Netflix','cuenta',90))
+        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan_90,'YouTube Premium','cuenta',90))
         conn.execute("INSERT INTO precios_revendedor_generales(plan_id,precio,activo) VALUES (?,?,1)",(plan_90,40000))
         ids=[]
         for correo,duracion in [('sin-clasificar@example.com',None),('unidad-90@example.com',90),('unidad-30@example.com',30)]:
-            ids.append(conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('Netflix',?,'cuenta_completa','disponible',?)",(correo,duracion)).lastrowid)
+            ids.append(conn.execute("INSERT INTO nube_cuentas(plataforma,correo,modalidad,estado,duracion_unidad_dias) VALUES ('YouTube Premium',?,'cuenta_completa','disponible',?)",(correo,duracion)).lastrowid)
         conn.commit(); conn.close()
-        compra_30=reseller_accounts.comprar_plan_reseller(self.reseller,self.plan_cuenta,"exacta-30")
+        compra_30=reseller_accounts.comprar_plan_reseller(self.reseller,plan_30,"exacta-30")
         compra_90=reseller_accounts.comprar_plan_reseller(self.reseller,plan_90,"exacta-90")
         conn=database.conectar()
         usadas=[conn.execute("SELECT cuenta_id FROM reseller_purchases WHERE id=?",(item["purchase_id"],)).fetchone()[0] for item in (compra_30,compra_90)]
@@ -133,21 +137,18 @@ class ResellerPurchaseEngineTest(unittest.TestCase):
         youtube_perfil=database.politica_duracion_inventario('YouTube','perfiles',cursor=conn.cursor())
         netflix_cuenta=database.politica_duracion_inventario('Netflix','cuenta_completa',cursor=conn.cursor())
         conn.close()
-        self.assertEqual(youtube,{"requiere_duracion_inventario":True,"duraciones_disponibles":[30,90]})
-        self.assertEqual(spotify,{"requiere_duracion_inventario":True,"duraciones_disponibles":[30,90]})
-        self.assertFalse(youtube_perfil["requiere_duracion_inventario"])
+        permitidas=[30,60,90,120,150,180]
+        self.assertEqual(youtube,{"requiere_duracion_inventario":True,"duraciones_disponibles":permitidas})
+        self.assertEqual(spotify,{"requiere_duracion_inventario":True,"duraciones_disponibles":permitidas})
+        self.assertEqual(youtube_perfil,{"requiere_duracion_inventario":True,"duraciones_disponibles":permitidas})
         self.assertFalse(netflix_cuenta["requiere_duracion_inventario"])
 
     def test_payload_duracion_se_valida_o_se_limpia(self):
         conn=database.conectar()
         self.assertIsNone(database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',90,cursor=conn.cursor()))
-        conn.execute("INSERT INTO productos(nombre,imagen,plan,precio,estado) VALUES ('Netflix 90','x.png','Plan','1','disponible')")
-        plan=conn.execute("SELECT last_insert_rowid()").fetchone()[0]
-        conn.execute("INSERT INTO reseller_plan_inventory_rules(plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES (?,?,?,?,1)",(plan,'Netflix','cuenta',90))
-        conn.commit()
         with self.assertRaises(ValueError):
-            database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',60,cursor=conn.cursor())
-        self.assertEqual(database.validar_duracion_unidad_inventario('Netflix','cuenta_completa',90,cursor=conn.cursor()),90)
+            database.validar_duracion_unidad_inventario('YouTube Premium','cuenta_completa',45,cursor=conn.cursor())
+        self.assertEqual(database.validar_duracion_unidad_inventario('Spotify Premium','perfiles',90,cursor=conn.cursor()),90)
         conn.close()
 
     def test_perfil_solo_ocupa_un_perfil_y_no_la_madre(self):

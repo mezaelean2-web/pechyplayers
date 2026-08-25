@@ -64,31 +64,27 @@ def conectar():
     return conn
 
 
+DURACIONES_INVENTARIO_MANUAL = (30, 60, 90, 120, 150, 180)
+PLATAFORMAS_DURACION_MANUAL = {"youtube", "spotify"}
+
+
+def _plataforma_requiere_duracion_manual(plataforma):
+    """Reconoce la marca base aunque el nombre comercial incluya plan o sufijo."""
+    texto = unicodedata.normalize("NFD", str(plataforma or "").strip().lower())
+    texto = "".join(
+        caracter for caracter in texto if unicodedata.category(caracter) != "Mn"
+    )
+    tokens = set(re.findall(r"[a-z0-9]+", texto))
+    return bool(tokens & PLATAFORMAS_DURACION_MANUAL)
+
+
 def politica_duracion_inventario(plataforma, modalidad, cursor=None):
-    """Indica si las reglas activas exigen clasificar fisicamente por duracion."""
-    plataforma = " ".join(str(plataforma or "").strip().split())
-    modalidad = str(modalidad or "cuenta_completa").strip().lower()
-    tipo_unidad = "perfil" if modalidad in {"perfil", "perfiles"} else "cuenta"
-    propia = cursor is None
-    conn = conectar() if propia else cursor.connection
-    cur = conn.cursor() if propia else cursor
-    try:
-        existe = cur.execute(
-            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='reseller_plan_inventory_rules'"
-        ).fetchone()
-        duraciones = [] if not existe or not plataforma else [
-            int(fila[0]) for fila in cur.execute("""
-                SELECT DISTINCT duracion_dias FROM reseller_plan_inventory_rules
-                WHERE activo=1 AND lower(trim(plataforma))=lower(trim(?))
-                  AND tipo_unidad=? ORDER BY duracion_dias
-            """, (plataforma, tipo_unidad)).fetchall()
-        ]
-        requiere = len(duraciones) > 1
-        return {"requiere_duracion_inventario": requiere,
-                "duraciones_disponibles": duraciones if requiere else []}
-    finally:
-        if propia:
-            conn.close()
+    """Política física manual, independiente de reglas comerciales reseller."""
+    requiere = _plataforma_requiere_duracion_manual(plataforma)
+    return {
+        "requiere_duracion_inventario": requiere,
+        "duraciones_disponibles": list(DURACIONES_INVENTARIO_MANUAL) if requiere else [],
+    }
 
 
 def validar_duracion_unidad_inventario(plataforma, modalidad, valor, cursor=None):
