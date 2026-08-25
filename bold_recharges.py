@@ -2,6 +2,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import secrets
@@ -84,6 +85,18 @@ def initialize():
                 ON bold_webhook_events(order_id);
             CREATE INDEX IF NOT EXISTS idx_bold_events_intent
                 ON bold_webhook_events(intent_id, id DESC);
+            CREATE TABLE IF NOT EXISTS bold_reconciliation_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                intent_id INTEGER NOT NULL UNIQUE,
+                payment_id TEXT NOT NULL UNIQUE,
+                order_id TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                currency_basis TEXT NOT NULL,
+                sale_event_id TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                reconciled_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (intent_id) REFERENCES reseller_recharge_intents(id)
+            );
         """)
         conn.commit()
     finally:
@@ -103,47 +116,18 @@ def _amount(value):
 
 def _bold_config():
     environment = os.environ.get("BOLD_ENV", "test").strip().lower()
-    if environment != "test":
-        raise RuntimeError("Esta fase solo permite BOLD_ENV=test.")
+    if environment not in {"test", "production"}:
+        raise RuntimeError("BOLD_ENV debe ser test o production.")
     identity = os.environ.get("BOLD_IDENTITY_KEY", "").strip()
     secret = os.environ.get("BOLD_SECRET_KEY", "").strip()
     if not identity or not secret:
-        raise RuntimeError("La integración Bold TEST no está configurada.")
+        raise RuntimeError(f"La integración Bold {environment.upper()} no está configurada.")
     return {"environment": environment, "identity": identity, "secret": secret}
 
 
 def _test_config():
     config = _bold_config()
     return config["identity"], config["secret"]
-
-
-def safe_checkout_diagnostics(checkout):
-    """Metadatos de diagnóstico sin valores de llaves ni datos personales."""
-    identity = os.environ.get("BOLD_IDENTITY_KEY", "").strip()
-    secret = os.environ.get("BOLD_SECRET_KEY", "").strip()
-    fields = {}
-    for name in ("apiKey", "orderId", "amount", "currency", "integritySignature", "customerData"):
-        value = checkout.get(name)
-        fields[name] = {
-            "present": value is not None and value != "",
-            "type": type(value).__name__,
-            "length": len(value) if isinstance(value, (str, list, dict)) else None,
-        }
-    customer = checkout.get("customerData")
-    try:
-        fields["customerData"]["validJsonObject"] = isinstance(json.loads(customer), dict)
-    except (TypeError, ValueError):
-        fields["customerData"]["validJsonObject"] = False
-    return {
-        "environment": os.environ.get("BOLD_ENV", "test").strip().lower(),
-        "identityConfigured": bool(identity),
-        "identityType": type(identity).__name__,
-        "identityLength": len(identity),
-        "secretConfigured": bool(secret),
-        "secretType": type(secret).__name__,
-        "secretLength": len(secret),
-        "fields": fields,
-    }
 
 
 def create_intent(reseller_id, amount, redirection_url):
@@ -264,11 +248,174 @@ def _safe_identifier(value, maximum=180):
     return value if isinstance(value, str) and 0 < len(value) <= maximum else None
 
 
+def _normalize_bold_total(value):
+    """Normaliza un JSON number de Bold a pesos enteros sin perder exactitud."""
+    if isinstance(value, bool) or type(value) not in {int, float}:
+        raise ValueError("Monto Bold invalido.")
+    if isinstance(value, float):
+        if not math.isfinite(value) or not value.is_integer():
+            raise ValueError("Monto Bold invalido.")
+        value = int(value)
+    if value <= 0:
+        raise ValueError("Monto Bold invalido.")
+    return value
+
+
+class ReconciliationError(ValueError):
+    """Discrepancia segura: la reconciliacion completa debe abortarse."""
+
+    def __init__(self, reason):
+        self.reason = reason
+        super().__init__(reason)
+
+
+def reconcile_approved_payment(intent_id, official_voucher, *,
+                               expected_transaction_id, expected_reference_id,
+                               actor):
+    """Reconcilia un voucher ya consultado; esta funcion nunca consulta Bold.
+
+    payment-voucher no acredita moneda. Por eso la base monetaria se limita al
+    intent COP creado por este sistema, ligado por referencia unica, payment_id,
+    total exacto y el SALE_APPROVED local. La ausencia de cualquiera de esas
+    pruebas aborta toda la transaccion.
+    """
+    if not isinstance(official_voucher, dict):
+        raise ReconciliationError("invalid_official_response")
+    transaction_id = _safe_identifier(official_voucher.get("transaction_id"))
+    reference_id = _safe_identifier(official_voucher.get("reference_id"), 60)
+    expected_transaction_id = _safe_identifier(expected_transaction_id)
+    expected_reference_id = _safe_identifier(expected_reference_id, 60)
+    actor = _safe_identifier(actor, 80)
+    if not expected_transaction_id or transaction_id != expected_transaction_id:
+        raise ReconciliationError("transaction_id_mismatch")
+    if not expected_reference_id or reference_id != expected_reference_id:
+        raise ReconciliationError("reference_id_mismatch")
+    if official_voucher.get("payment_status") != "APPROVED":
+        raise ReconciliationError("official_status_not_approved")
+    try:
+        total = _normalize_bold_total(official_voucher.get("total"))
+    except ValueError as error:
+        raise ReconciliationError("amount_mismatch") from error
+    if not actor:
+        raise ReconciliationError("invalid_actor")
+
+    initialize()
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        intent = cursor.execute(
+            "SELECT * FROM reseller_recharge_intents WHERE id=?", (intent_id,)
+        ).fetchone()
+        if not intent:
+            raise ReconciliationError("intent_not_found")
+        if intent["environment"] != "production":
+            raise ReconciliationError("environment_not_production")
+        if intent["provider"] != PROVIDER or intent["moneda"] != CURRENCY:
+            raise ReconciliationError("invalid_local_payment_basis")
+        if intent["order_id"] != reference_id:
+            raise ReconciliationError("reference_id_mismatch")
+        if intent["monto"] != total:
+            raise ReconciliationError("amount_mismatch")
+        if not cursor.execute(
+            "SELECT id FROM revendedores WHERE id=?", (intent["revendedor_id"],)
+        ).fetchone():
+            raise ReconciliationError("reseller_not_found")
+
+        sale = cursor.execute(
+            """SELECT * FROM bold_webhook_events
+               WHERE payment_id=? AND order_id=? AND intent_id=?
+                 AND event_type='SALE_APPROVED' AND environment='production'
+               ORDER BY id ASC LIMIT 1""",
+            (transaction_id, reference_id, intent["id"]),
+        ).fetchone()
+        if not sale:
+            related = cursor.execute(
+                """SELECT 1 FROM bold_webhook_events
+                   WHERE (payment_id=? OR order_id=?) AND intent_id=? LIMIT 1""",
+                (transaction_id, reference_id, intent["id"]),
+            ).fetchone()
+            raise ReconciliationError(
+                "local_event_incorrect" if related else "local_sale_event_not_found"
+            )
+        if cursor.execute(
+            """SELECT 1 FROM bold_webhook_events
+               WHERE payment_id=? AND order_id=? AND intent_id=?
+                 AND event_type='VOID_APPROVED' AND id>? LIMIT 1""",
+            (transaction_id, reference_id, intent["id"], sale["id"]),
+        ).fetchone():
+            raise ReconciliationError("later_void_approved")
+        if cursor.execute(
+            """SELECT 1 FROM reseller_recharge_intents
+               WHERE provider=? AND external_transaction_id=? AND id<>? LIMIT 1""",
+            (PROVIDER, transaction_id, intent["id"]),
+        ).fetchone():
+            raise ReconciliationError("payment_owned_by_other_intent")
+
+        ledger = cursor.execute(
+            """SELECT * FROM reseller_wallet_transactions
+               WHERE provider=? AND external_reference=?""",
+            (PROVIDER, transaction_id),
+        ).fetchone()
+        audit = cursor.execute(
+            "SELECT * FROM bold_reconciliation_audit WHERE intent_id=?",
+            (intent["id"],),
+        ).fetchone()
+        if intent["estado"] != "pending":
+            if (intent["estado"] == "approved" and
+                    intent["external_transaction_id"] == transaction_id and
+                    ledger and ledger["idempotency_key"] == f"bold:payment:{transaction_id}" and
+                    ledger["revendedor_id"] == intent["revendedor_id"] and audit):
+                conn.commit()
+                return {"status": "duplicate", "reason": "already_reconciled",
+                        "movement_id": ledger["id"], "currency_confirmed_by_voucher": False}
+            raise ReconciliationError("intent_not_pending")
+        if ledger:
+            raise ReconciliationError("bold_ledger_already_exists")
+
+        movement = wallets.apply_wallet_transaction(
+            intent["revendedor_id"], "recharge", intent["monto"],
+            "Reconciliacion administrativa Bold", origen="bold_reconciliation",
+            actor=actor, referencia=reference_id, provider=PROVIDER,
+            external_reference=transaction_id,
+            idempotency_key=f"bold:payment:{transaction_id}", cursor=cursor,
+        )
+        if movement.get("duplicado"):
+            raise ReconciliationError("bold_ledger_already_exists")
+        cursor.execute(
+            """UPDATE reseller_recharge_intents SET estado='approved',
+               external_transaction_id=?, last_event_id=?, paid_at=CURRENT_TIMESTAMP,
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND estado='pending'""",
+            (transaction_id, sale["event_id"], intent["id"]),
+        )
+        if cursor.rowcount != 1:
+            raise RuntimeError("No se pudo cerrar la intencion de forma atomica.")
+        cursor.execute(
+            """INSERT INTO bold_reconciliation_audit
+               (intent_id, payment_id, order_id, amount, currency_basis,
+                sale_event_id, actor) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (intent["id"], transaction_id, reference_id, total,
+             "local_intent_COP_voucher_currency_absent", sale["event_id"], actor),
+        )
+        conn.commit()
+        return {"status": "processed", "reason": "reconciled",
+                "movement_id": movement["id"],
+                "saldo_anterior": movement["saldo_anterior"],
+                "saldo_posterior": movement["saldo_posterior"],
+                "currency_confirmed_by_voucher": False}
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 def process_webhook(payload):
     if not isinstance(payload, dict):
         raise ValueError("Payload inválido.")
     event_id = payload.get("id")
     event_type = payload.get("type")
+    stored_event_type = event_type if isinstance(event_type, str) else None
     data = payload.get("data")
     if not _safe_identifier(event_id) or not isinstance(data, dict):
         raise ValueError("Payload inválido.")
@@ -295,12 +442,11 @@ def process_webhook(payload):
             """INSERT INTO bold_webhook_events
                (event_id, payment_id, order_id, event_type, environment)
                VALUES (?, ?, ?, ?, ?)""",
-            (event_id, transaction_id, order_id,
-             event_type if isinstance(event_type, str) else None, environment),
+            (event_id, transaction_id, order_id, stored_event_type, environment),
         )
-        if event_type not in KNOWN_EVENTS:
+        if not isinstance(event_type, str) or event_type not in KNOWN_EVENTS:
             result = _event_result(
-                cursor, event_id, "ignored", "unknown_event", event_type=event_type
+                cursor, event_id, "ignored", "unknown_event", event_type=stored_event_type
             )
             conn.commit()
             return result
@@ -345,7 +491,11 @@ def process_webhook(payload):
             conn.commit()
             return result
         total, currency = amount_data.get("total"), amount_data.get("currency")
-        if isinstance(total, bool) or not isinstance(total, int) or total != intent["monto"]:
+        try:
+            normalized_total = _normalize_bold_total(total)
+        except ValueError:
+            normalized_total = None
+        if normalized_total != intent["monto"]:
             result = _event_result(
                 cursor, event_id, "ignored", "amount_mismatch", **event_fields
             )

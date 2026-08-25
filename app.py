@@ -51,7 +51,23 @@ from datetime import datetime
 app = Flask(__name__)
 Compress(app)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 60 * 60 * 24 * 30
-app.secret_key = os.environ.get("SECRET_KEY", "clave-temporal-local")
+
+
+def _configured_secret_key():
+    configured = os.environ.get("SECRET_KEY", "").strip()
+    environments = {
+        os.environ.get("APP_ENV", "").strip().lower(),
+        os.environ.get("FLASK_ENV", "").strip().lower(),
+        os.environ.get("BOLD_ENV", "").strip().lower(),
+    }
+    production = "production" in environments
+    testing = os.environ.get("PECHY_TESTING", "").strip() == "1"
+    if production and not testing and not configured:
+        raise RuntimeError("SECRET_KEY debe configurarse para iniciar en producción.")
+    return configured or "clave-temporal-local"
+
+
+app.secret_key = _configured_secret_key()
 app.permanent_session_lifetime = timedelta(minutes=30)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -1013,7 +1029,6 @@ def crear_recarga_reseller():
         return jsonify({"ok": False, "error": str(error)}), 400
     except RuntimeError as error:
         return jsonify({"ok": False, "error": str(error)}), 503
-    app.logger.warning("Bold TEST checkout diagnostics: %s", bold_recharges.safe_checkout_diagnostics(checkout))
     return jsonify({"ok": True, "checkout": checkout}), 201
 
 

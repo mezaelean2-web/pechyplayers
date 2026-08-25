@@ -120,7 +120,7 @@ class BoldRechargesTest(unittest.TestCase):
         self.assertNotIn("test_secret", json.dumps(checkout))
         self.assertEqual(self.counts(), (0, 0, "pending"))
 
-    def test_configuracion_test_incompleta_o_produccion_fallan_controladamente(self):
+    def test_configuracion_incompleta_o_ambiente_invalido_fallan_controladamente(self):
         os.environ["BOLD_IDENTITY_KEY"] = ""
         response = self.client.post(
             "/revendedores/recargas", json={"monto": 10000},
@@ -129,13 +129,13 @@ class BoldRechargesTest(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertIn("Bold TEST", response.get_json()["error"])
 
-        os.environ.update(BOLD_ENV="production", BOLD_IDENTITY_KEY="test_identity")
+        os.environ.update(BOLD_ENV="staging", BOLD_IDENTITY_KEY="test_identity")
         response = self.client.post(
             "/revendedores/recargas", json={"monto": 10000},
             headers={"X-CSRF-Token": "csrf-bold"}
         )
         self.assertEqual(response.status_code, 503)
-        self.assertIn("BOLD_ENV=test", response.get_json()["error"])
+        self.assertIn("BOLD_ENV debe ser test o production", response.get_json()["error"])
 
     def test_redirection_url_configurable_sin_dominio_hardcodeado(self):
         os.environ["BOLD_REDIRECTION_URL"] = "https://pruebas.example/retorno-bold"
@@ -297,6 +297,35 @@ class BoldRechargesTest(unittest.TestCase):
                                 event_id="evt-currency", transaction="PAY-C")
         self.assertEqual(self.post_payload(amount).get_json()["reason"], "amount_mismatch")
         self.assertEqual(self.post_payload(currency).get_json()["reason"], "currency_mismatch")
+        self.assertEqual(self.counts(), (0, 0, "pending"))
+
+    def test_total_json_number_entero_equivalente_acredita_exactamente_una_vez(self):
+        checkout = self.create(10000)
+        payload = self.payload(
+            checkout["orderId"], amount=10000.0,
+            event_id="evt-float-equivalent", transaction="PAY-FLOAT-EQUIVALENT",
+        )
+        self.assertEqual(self.post_payload(payload).get_json()["reason"], "sale_approved")
+        self.assertEqual(self.post_payload(payload).get_json()["reason"], "duplicate_event")
+        self.assertEqual(self.counts(), (1, 10000, "approved"))
+
+    def test_totales_invalidos_o_no_equivalentes_nunca_acreditan(self):
+        checkout = self.create(50000)
+        invalid_values = (
+            True, "50000", 50000.5, float("nan"), float("inf"),
+            -50000, 0, None, [], {},
+        )
+        for index, value in enumerate(invalid_values):
+            with self.subTest(value=value):
+                payload = self.payload(
+                    checkout["orderId"], amount=value,
+                    event_id=f"evt-invalid-total-{index}",
+                    transaction=f"PAY-INVALID-TOTAL-{index}",
+                )
+                self.assertEqual(
+                    self.post_payload(payload).get_json()["reason"],
+                    "amount_mismatch",
+                )
         self.assertEqual(self.counts(), (0, 0, "pending"))
 
     def test_evento_duplicado_y_eventos_distintos_mismo_pago_acreditan_una_vez(self):
