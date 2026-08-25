@@ -5,10 +5,17 @@
 <section class="rules-page" data-csrf-token="{{ csrf_token }}">
   <header><div><span>RESELLERS · INVENTARIO</span><h1>Reglas plan → inventario</h1>
     <p>Define qué unidad real consume cada plan. Guardar una regla no asigna inventario.</p></div></header>
+  <div class="rules-search" role="search">
+    <label for="rulesSearch">Buscar reglas</label>
+    <div class="rules-search__control">
+      <input id="rulesSearch" type="search" placeholder="Buscar producto, plan o ID..." autocomplete="off">
+      <button id="rulesSearchClear" type="button" aria-label="Limpiar búsqueda" title="Limpiar búsqueda" hidden>&times;</button>
+    </div>
+  </div>
   {% if not plataformas %}<div class="rules-empty">Crea primero una cuenta en Nube para disponer de plataformas estructuradas.</div>{% endif %}
   <div class="rules-grid">
   {% for item in reglas %}
-    <form class="rule-card" data-plan-id="{{ item.plan_id }}">
+    <form class="rule-card" data-plan-id="{{ item.plan_id }}" data-producto="{{ item.producto|e }}" data-plan="{{ item.plan|e }}">
       <div class="rule-title"><span>#{{ item.plan_id }}</span><h2>{{ item.producto }}</h2><p>{{ item.plan }}</p></div>
       <label>Inventario<select name="plataforma" required><option value="">Seleccionar</option>{% for plataforma in plataformas %}<option value="{{ plataforma }}" {% if item.plataforma and item.plataforma|lower == plataforma|lower %}selected{% endif %}>{{ plataforma }}</option>{% endfor %}</select></label>
       <label>Tipo de unidad<select name="tipo_unidad" required><option value="cuenta" {% if item.tipo_unidad == 'cuenta' %}selected{% endif %}>Cuenta completa</option><option value="perfil" {% if item.tipo_unidad == 'perfil' %}selected{% endif %}>Perfil</option></select></label>
@@ -18,6 +25,7 @@
     </form>
   {% endfor %}
   </div>
+  <div class="rules-no-results" id="rulesNoResults" role="status" hidden>No encontramos reglas que coincidan con tu búsqueda.</div>
 </section>
 {% endblock %}
 {% block extra_js %}<script src="{{ url_for('static', filename='js/admin/reglas_reseller.js') }}"></script>{% endblock %}

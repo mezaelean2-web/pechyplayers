@@ -157,6 +157,16 @@ function enviarAgotadoAWhatsApp(card) {
           const copia = document.createElement("div");
           copia.className = "modal-plan";
           copia.innerHTML = plan.innerHTML;
+          if (plan.dataset.publicPlanId && !plan.dataset.resellerPlanId) {
+            const agregar = document.createElement("button");
+            agregar.type = "button";
+            agregar.className = "modal-plan-cart-add";
+            agregar.dataset.publicCartAdd = plan.dataset.publicPlanId;
+            agregar.textContent = "Agregar al carrito";
+            agregar.setAttribute("aria-label", `Agregar ${nombre} ${plan.querySelector("span")?.textContent.trim() || "plan"} al carrito`);
+            copia.appendChild(agregar);
+            copia.classList.add("modal-plan--customer-cart");
+          }
           if (plan.dataset.resellerPlanId) {
             copia.dataset.resellerPlanId = plan.dataset.resellerPlanId;
             copia.dataset.resellerPriceReady = plan.dataset.resellerPriceReady || "false";

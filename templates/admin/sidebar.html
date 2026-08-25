@@ -50,6 +50,12 @@
 
     <div class="sidebar-group-title">INVENTARIO</div>
 
+<a href="/admin/pedidos-clientes"
+   class="sidebar-link {% if request.path.startswith('/admin/pedidos-clientes') %}active{% endif %}">
+    <i data-lucide="shopping-bag" class="sidebar-icon"></i>
+    <span>Pedidos clientes</span>
+</a>
+
 <a href="/admin/revendedores"
    class="sidebar-link {% if request.path.startswith('/admin/revendedores') %}active{% endif %}">
     <i data-lucide="users-round" class="sidebar-icon"></i>

@@ -7,6 +7,8 @@ import os
 import re
 import secrets
 import sqlite3
+import urllib.error
+import urllib.request
 
 import database
 import wallets
@@ -97,6 +99,33 @@ def initialize():
                 reconciled_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (intent_id) REFERENCES reseller_recharge_intents(id)
             );
+            CREATE TABLE IF NOT EXISTS bold_remote_reconciliation_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                intent_id INTEGER NOT NULL,
+                reseller_id INTEGER NOT NULL,
+                wallet_id INTEGER NOT NULL,
+                order_id TEXT NOT NULL,
+                payment_id TEXT,
+                amount INTEGER NOT NULL,
+                local_currency TEXT NOT NULL,
+                official_status TEXT,
+                queried_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                http_status INTEGER,
+                environment TEXT NOT NULL,
+                verification_source TEXT NOT NULL,
+                result TEXT NOT NULL,
+                movement_id INTEGER,
+                evidence_sha256 TEXT,
+                detail TEXT NOT NULL DEFAULT '',
+                FOREIGN KEY (intent_id) REFERENCES reseller_recharge_intents(id),
+                FOREIGN KEY (reseller_id) REFERENCES revendedores(id),
+                FOREIGN KEY (wallet_id) REFERENCES reseller_wallets(id),
+                FOREIGN KEY (movement_id) REFERENCES reseller_wallet_transactions(id)
+            );
+            CREATE INDEX IF NOT EXISTS idx_bold_remote_audit_intent
+                ON bold_remote_reconciliation_audit(intent_id, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_bold_remote_audit_payment
+                ON bold_remote_reconciliation_audit(payment_id);
         """)
         conn.commit()
     finally:
@@ -248,6 +277,12 @@ def _safe_identifier(value, maximum=180):
     return value if isinstance(value, str) and 0 < len(value) <= maximum else None
 
 
+def _safe_bold_identifier(value, maximum=180):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        return None
+    return value if len(value) <= maximum else None
+
+
 def _normalize_bold_total(value):
     """Normaliza un JSON number de Bold a pesos enteros sin perder exactitud."""
     if isinstance(value, bool) or type(value) not in {int, float}:
@@ -267,6 +302,277 @@ class ReconciliationError(ValueError):
     def __init__(self, reason):
         self.reason = reason
         super().__init__(reason)
+
+
+class RemoteReconciliationError(ReconciliationError):
+    """Fallo cerrado al consultar o reconciliar directamente contra Bold."""
+
+    def __init__(self, reason, *, http_status=None):
+        self.http_status = http_status
+        super().__init__(reason)
+
+
+def fetch_official_voucher(order_id, *, timeout=10):
+    """Consulta Bold desde backend; nunca recibe evidencia aportada por el cliente."""
+    order_id = _safe_bold_identifier(order_id, 60)
+    if not order_id:
+        raise RemoteReconciliationError("invalid_local_order_id")
+    config = _bold_config()
+    if config["environment"] != "production":
+        raise RemoteReconciliationError("environment_not_production")
+    request = urllib.request.Request(
+        f"https://payments.api.bold.co/v2/payment-voucher/{order_id}",
+        headers={"Authorization": f"x-api-key {config['identity']}"},
+        method="GET",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            status = int(response.status)
+            raw = response.read()
+    except urllib.error.HTTPError as error:
+        raise RemoteReconciliationError("official_http_error", http_status=error.code) from error
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        reason = "official_timeout" if isinstance(getattr(error, "reason", error), TimeoutError) else "official_network_error"
+        raise RemoteReconciliationError(reason) from error
+    if status < 200 or status >= 300:
+        raise RemoteReconciliationError("official_http_error", http_status=status)
+    try:
+        voucher = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise RemoteReconciliationError("official_invalid_json", http_status=status) from error
+    if not isinstance(voucher, dict):
+        raise RemoteReconciliationError("official_incomplete_response", http_status=status)
+    return voucher, status, hashlib.sha256(raw).hexdigest()
+
+
+def _insert_remote_audit(cursor, *, intent, wallet_id, payment_id, official_status,
+                         http_status, result, movement_id=None, evidence_sha256=None,
+                         detail=""):
+    cursor.execute(
+        """INSERT INTO bold_remote_reconciliation_audit
+           (intent_id, reseller_id, wallet_id, order_id, payment_id, amount,
+            local_currency, official_status, http_status, environment,
+            verification_source, result, movement_id, evidence_sha256, detail)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                   'bold_payment_voucher_v2', ?, ?, ?, ?)""",
+        (intent["id"], intent["revendedor_id"], wallet_id, intent["order_id"],
+         payment_id, intent["monto"], intent["moneda"], official_status,
+         http_status, intent["environment"], result, movement_id,
+         evidence_sha256, detail[:180]),
+    )
+
+
+def _audit_remote_rejection(intent, wallet_id, reason, *, payment_id=None,
+                            official_status=None, http_status=None,
+                            evidence_sha256=None):
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        _insert_remote_audit(
+            conn.cursor(), intent=intent, wallet_id=wallet_id,
+            payment_id=payment_id, official_status=official_status,
+            http_status=http_status, result="rejected",
+            evidence_sha256=evidence_sha256, detail=reason,
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def reconcile_pending_from_bold(intent_id):
+    """Recupera un pending mediante consulta oficial, sin depender del navegador.
+
+    payment-voucher v2 no devuelve moneda. Se valida COP contra el intent local
+    firmado al crear el checkout, pero no se afirma que Bold haya confirmado COP.
+    """
+    try:
+        intent_id = int(intent_id)
+    except (TypeError, ValueError) as error:
+        raise RemoteReconciliationError("invalid_intent_id") from error
+    if intent_id <= 0:
+        raise RemoteReconciliationError("invalid_intent_id")
+    actor = "system:bold-recovery"
+
+    initialize()
+    conn = _connect()
+    try:
+        intent_row = conn.execute(
+            "SELECT * FROM reseller_recharge_intents WHERE id=?", (intent_id,)
+        ).fetchone()
+        if not intent_row:
+            raise RemoteReconciliationError("intent_not_found")
+        intent = dict(intent_row)
+        wallet = conn.execute(
+            "SELECT * FROM reseller_wallets WHERE revendedor_id=?",
+            (intent["revendedor_id"],),
+        ).fetchone()
+        if not wallet:
+            raise RemoteReconciliationError("wallet_not_found")
+        wallet_id = wallet["id"]
+        if intent["estado"] == "approved" and intent["external_transaction_id"]:
+            ledger = conn.execute(
+                """SELECT * FROM reseller_wallet_transactions
+                   WHERE provider=? AND external_reference=?""",
+                (PROVIDER, intent["external_transaction_id"]),
+            ).fetchone()
+            if (ledger and ledger["revendedor_id"] == intent["revendedor_id"] and
+                    ledger["wallet_id"] == wallet_id and
+                    ledger["idempotency_key"] == f"bold:payment:{intent['external_transaction_id']}"):
+                return {"status": "duplicate", "reason": "already_reconciled",
+                        "movement_id": ledger["id"],
+                        "currency_confirmed_by_voucher": False}
+        if intent["estado"] != "pending":
+            raise RemoteReconciliationError("intent_not_pending")
+        if (intent["provider"] != PROVIDER or intent["environment"] != "production" or
+                intent["moneda"] != CURRENCY):
+            raise RemoteReconciliationError("invalid_local_payment_basis")
+        reseller = conn.execute(
+            "SELECT id, estado FROM revendedores WHERE id=?", (intent["revendedor_id"],)
+        ).fetchone()
+        if not reseller or reseller["estado"] != "activo":
+            raise RemoteReconciliationError("reseller_not_active")
+    finally:
+        conn.close()
+
+    try:
+        voucher, http_status, evidence_sha256 = fetch_official_voucher(intent["order_id"])
+    except RemoteReconciliationError as error:
+        _audit_remote_rejection(intent, wallet_id, error.reason,
+                                http_status=error.http_status)
+        raise
+    except Exception as error:
+        _audit_remote_rejection(intent, wallet_id, "official_network_error")
+        raise RemoteReconciliationError("official_network_error") from error
+
+    payment_id = _safe_bold_identifier(voucher.get("transaction_id")) if isinstance(voucher, dict) else None
+    official_status = voucher.get("payment_status") if isinstance(voucher, dict) else None
+    reason = None
+    if not isinstance(voucher, dict):
+        reason = "official_incomplete_response"
+    elif official_status != "APPROVED":
+        reason = "official_status_not_approved"
+    elif _safe_bold_identifier(voucher.get("reference_id"), 60) != intent["order_id"]:
+        reason = "reference_id_mismatch"
+    elif not payment_id:
+        reason = "invalid_transaction_id"
+    else:
+        try:
+            if _normalize_bold_total(voucher.get("total")) != intent["monto"]:
+                reason = "amount_mismatch"
+        except ValueError:
+            reason = "amount_mismatch"
+    if reason:
+        _audit_remote_rejection(
+            intent, wallet_id, reason, payment_id=payment_id,
+            official_status=official_status, http_status=http_status,
+            evidence_sha256=evidence_sha256,
+        )
+        raise RemoteReconciliationError(reason, http_status=http_status)
+
+    conn = _connect()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        current = cursor.execute(
+            "SELECT * FROM reseller_recharge_intents WHERE id=?", (intent_id,)
+        ).fetchone()
+        if not current:
+            raise RemoteReconciliationError("intent_not_found")
+        invariant_fields = ("order_id", "monto", "moneda", "provider", "environment", "revendedor_id")
+        if any(current[field] != intent[field] for field in invariant_fields):
+            raise RemoteReconciliationError("intent_changed")
+        reseller = cursor.execute(
+            "SELECT id, estado FROM revendedores WHERE id=?", (current["revendedor_id"],)
+        ).fetchone()
+        locked_wallet = cursor.execute(
+            "SELECT * FROM reseller_wallets WHERE id=? AND revendedor_id=?",
+            (wallet_id, current["revendedor_id"]),
+        ).fetchone()
+        if not reseller or reseller["estado"] != "activo":
+            raise RemoteReconciliationError("reseller_not_active")
+        if not locked_wallet:
+            raise RemoteReconciliationError("wallet_changed")
+
+        ledger = cursor.execute(
+            """SELECT * FROM reseller_wallet_transactions
+               WHERE provider=? AND external_reference=?""",
+            (PROVIDER, payment_id),
+        ).fetchone()
+        if current["estado"] == "approved":
+            if (current["external_transaction_id"] == payment_id and ledger and
+                    ledger["revendedor_id"] == current["revendedor_id"] and
+                    ledger["wallet_id"] == wallet_id and
+                    ledger["idempotency_key"] == f"bold:payment:{payment_id}"):
+                _insert_remote_audit(
+                    cursor, intent=current, wallet_id=wallet_id,
+                    payment_id=payment_id, official_status=official_status,
+                    http_status=http_status, result="already_reconciled",
+                    movement_id=ledger["id"], evidence_sha256=evidence_sha256,
+                    detail="concurrent_credit_won_before_remote_reconciliation",
+                )
+                conn.commit()
+                return {"status": "duplicate", "reason": "already_reconciled",
+                        "movement_id": ledger["id"],
+                        "currency_confirmed_by_voucher": False}
+            raise RemoteReconciliationError("intent_changed")
+        if current["estado"] != "pending":
+            raise RemoteReconciliationError("intent_changed")
+        if cursor.execute(
+            """SELECT 1 FROM reseller_recharge_intents
+               WHERE provider=? AND external_transaction_id=? AND id<>? LIMIT 1""",
+            (PROVIDER, payment_id, current["id"]),
+        ).fetchone():
+            raise RemoteReconciliationError("payment_owned_by_other_intent")
+        if ledger:
+            raise RemoteReconciliationError("bold_ledger_already_exists")
+
+        movement = wallets.apply_wallet_transaction(
+            current["revendedor_id"], "recharge", current["monto"],
+            "Recuperacion automatica Bold", origen="bold_remote_reconciliation",
+            actor=actor, referencia=current["order_id"], provider=PROVIDER,
+            external_reference=payment_id,
+            idempotency_key=f"bold:payment:{payment_id}", cursor=cursor,
+        )
+        if movement.get("duplicado"):
+            raise RemoteReconciliationError("bold_ledger_already_exists")
+        cursor.execute(
+            """UPDATE reseller_recharge_intents SET estado='approved',
+               external_transaction_id=?, paid_at=CURRENT_TIMESTAMP,
+               updated_at=CURRENT_TIMESTAMP WHERE id=? AND estado='pending'""",
+            (payment_id, current["id"]),
+        )
+        if cursor.rowcount != 1:
+            raise RemoteReconciliationError("intent_changed")
+        _insert_remote_audit(
+            cursor, intent=current, wallet_id=wallet_id, payment_id=payment_id,
+            official_status=official_status, http_status=http_status,
+            result="processed", movement_id=movement["id"],
+            evidence_sha256=evidence_sha256,
+            detail="currency_from_local_intent_not_confirmed_by_voucher",
+        )
+        conn.commit()
+        return {"status": "processed", "reason": "reconciled_from_official_voucher",
+                "movement_id": movement["id"],
+                "currency_confirmed_by_voucher": False}
+    except Exception as error:
+        conn.rollback()
+        reason = error.reason if isinstance(error, RemoteReconciliationError) else "transaction_failed"
+        try:
+            _audit_remote_rejection(
+                intent, wallet_id, reason, payment_id=payment_id,
+                official_status=official_status, http_status=http_status,
+                evidence_sha256=evidence_sha256,
+            )
+        except Exception:
+            pass
+        if isinstance(error, RemoteReconciliationError):
+            raise
+        raise
+    finally:
+        conn.close()
 
 
 def reconcile_approved_payment(intent_id, official_voucher, *,

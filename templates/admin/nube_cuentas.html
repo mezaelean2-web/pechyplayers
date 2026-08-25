@@ -21,7 +21,7 @@ Nube de cuentas
 
 {% block contenido %}
 
-<div class="nube-page">
+<div class="nube-page" data-csrf-token="{{ csrf_token }}">
 
     <header class="nube-hero">
 
@@ -242,7 +242,7 @@ Nube de cuentas
 
     <nav class="nube-hojas" id="nubeHojas" aria-label="Inventario por plataforma">
         <button type="button" class="nube-hoja activo" data-plataforma="" aria-pressed="true"><span>✦</span>Todas</button>
-        {% for plataforma in plataformas %}<button type="button" class="nube-hoja" data-plataforma="{{ plataforma|lower }}" aria-pressed="false"><span>{{ plataforma[:1]|upper }}</span>{{ plataforma }}</button>{% endfor %}
+        {% for plataforma in plataformas %}<button type="button" class="nube-hoja" data-plataforma="{{ plataforma }}" aria-pressed="false" title="Doble clic o clic derecho para renombrar"><span>{{ plataforma[:1]|upper }}</span>{{ plataforma }}</button>{% endfor %}
     </nav>
 
     <div class="nube-buscador">
@@ -594,6 +594,18 @@ Nube de cuentas
                 </button>
 
 
+                <button type="button" class="nube-accion nube-editar-cuenta"
+                    title="Editar cuenta" data-id="{{ cuenta.id }}">
+                    <i data-lucide="square-pen"></i><span class="nube-accion-texto">Editar</span>
+                </button>
+
+
+                <button type="button" class="nube-accion nube-eliminar-cuenta"
+                    title="Eliminar cuenta" data-id="{{ cuenta.id }}">
+                    <i data-lucide="trash-2"></i><span class="nube-accion-texto">Eliminar</span>
+                </button>
+
+
                 <button
                     type="button"
                     class="nube-accion nube-gestionar-cuenta"
@@ -913,6 +925,54 @@ Nube de cuentas
 
     </section>
 
+</div>
+
+<div class="nube-modal" id="modalRenombrarPlataforma" aria-hidden="true">
+    <div class="nube-modal-backdrop" data-cerrar-renombrar-plataforma></div>
+    <div class="nube-modal-panel nube-modal-plataforma">
+        <div class="nube-modal-header"><div><span>INVENTARIO</span><h2>Editar plataforma</h2>
+            <p>Actualiza el nombre y sus referencias operativas asociadas.</p></div>
+            <button type="button" class="nube-modal-cerrar" data-cerrar-renombrar-plataforma aria-label="Cerrar"><i data-lucide="x"></i></button>
+        </div>
+        <form class="nube-form" id="formRenombrarPlataforma">
+            <input type="hidden" id="plataformaNombreActual">
+            <label><span>Nombre actual</span><input id="plataformaNombreActualVisible" readonly></label>
+            <label><span>Nuevo nombre</span><input id="plataformaNombreNuevo" autocomplete="off" required></label>
+            <p class="nube-form-mensaje" id="mensajeRenombrarPlataforma" role="status"></p>
+            <div class="nube-form-acciones"><button type="button" class="nube-btn-secundario" data-cerrar-renombrar-plataforma>Cancelar</button><button type="submit" class="nube-btn-principal">Guardar</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="nube-modal" id="modalEditarCuenta" aria-hidden="true">
+    <div class="nube-modal-backdrop" data-cerrar-edicion></div>
+    <div class="nube-modal-panel">
+        <div class="nube-modal-header"><div><span>INVENTARIO</span><h2>Editar cuenta</h2>
+            <p>Corrige datos y clasificación sin alterar historial comercial.</p></div>
+            <button type="button" class="nube-modal-cerrar" data-cerrar-edicion><i data-lucide="x"></i></button>
+        </div>
+        <form class="nube-form" id="formEditarCuenta">
+            <input type="hidden" id="editarCuentaId">
+            <div class="nube-form-grid">
+                <label><span>Plataforma *</span><input id="editarPlataforma" required></label>
+                <label><span>Correo / usuario *</span><input id="editarCorreo" required></label>
+                <label><span>Contraseña *</span><input id="editarContrasena" required autocomplete="off"></label>
+                <label><span>PIN</span><input id="editarPin" autocomplete="off"></label>
+                <label><span>Modalidad *</span><select id="editarModalidad" required>
+                    <option value="cuenta_completa">Cuenta completa</option><option value="perfiles">Perfiles</option>
+                </select></label>
+                <label id="editarDuracionGrupo"><span>Duración física *</span><select id="editarDuracion">
+                    <option value="">Seleccionar duración</option>{% for dias in [30,60,90,120,150,180] %}<option value="{{ dias }}">{{ dias }} días</option>{% endfor %}
+                </select></label>
+                <label id="editarPerfilesGrupo"><span>Cantidad de perfiles *</span>
+                    <input id="editarCantidadPerfiles" type="number" min="1" max="10"></label>
+            </div>
+            <div class="nube-ayuda" id="editarImpactoModalidad" hidden></div>
+            <div class="nube-form-mensaje" id="editarCuentaMensaje" role="alert" hidden></div>
+            <div class="nube-modal-acciones"><button type="button" class="nube-modal-cancelar" data-cerrar-edicion>Cancelar</button>
+                <button type="submit" class="nube-modal-guardar">Guardar cambios</button></div>
+        </form>
+    </div>
 </div>
 
 <div

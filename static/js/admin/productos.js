@@ -499,3 +499,59 @@ document.addEventListener("DOMContentLoaded", function () {
 
     aplicarFiltros();
 });
+
+document.addEventListener("submit", async function (evento) {
+    const planForm = evento.target.closest("[data-plan-discount-form]");
+    if (!planForm) return;
+    evento.preventDefault();
+    const button = planForm.querySelector('button[type="submit"]');
+    const feedback = planForm.querySelector("[data-plan-discount-feedback]");
+    button.disabled = true;
+    try {
+        const response = await fetch(`/admin/productos/${encodeURIComponent(planForm.dataset.planId)}/descuento-carrito`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json", "X-CSRF-Token": planForm.querySelector('[name="csrf_token"]').value},
+            body: JSON.stringify({eligible: planForm.querySelector('[name="eligible"]').checked})
+        });
+        const data = await response.json().catch(function () { return {}; });
+        if (!response.ok) throw new Error(data.mensaje || "No fue posible guardar.");
+        feedback.textContent = "Participación guardada.";
+    } catch (error) { feedback.textContent = error.message; }
+    finally { button.disabled = false; }
+});
+
+document.addEventListener("DOMContentLoaded", function () {
+    const panel = document.querySelector("[data-cart-discount-admin]");
+    if (!panel) return;
+    const feedback = panel.querySelector("[data-discount-feedback]");
+    panel.querySelectorAll("[data-discount-rule]").forEach(function (form) {
+        const active = form.querySelector('[name="active"]');
+        active.addEventListener("change", function () { active.nextElementSibling.textContent = active.checked ? "Sí" : "No"; });
+        form.addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const minimum = Number(form.querySelector('[name="minimum"]').value);
+            const percent = Number(form.querySelector('[name="percent"]').value);
+            if (!Number.isInteger(minimum) || !Number.isFinite(percent) || Math.round(percent * 100) !== percent * 100) {
+                feedback.textContent = "Usa un mínimo entero y un porcentaje con máximo dos decimales."; return;
+            }
+            const id = form.dataset.ruleId;
+            try {
+                const response = await fetch(id ? `/admin/productos/descuentos-carrito/${id}` : "/admin/productos/descuentos-carrito", {
+                    method: id ? "PUT" : "POST",
+                    headers: {"Content-Type": "application/json", "X-CSRF-Token": panel.dataset.csrfToken},
+                    body: JSON.stringify({minimum_eligible_services: minimum, discount_bps: Math.round(percent * 100), active: active.checked})
+                });
+                const data = await response.json().catch(function () { return {}; });
+                if (!response.ok) throw new Error(data.mensaje || "No fue posible guardar la regla.");
+                window.location.reload();
+            } catch (error) { feedback.textContent = error.message; }
+        });
+        form.querySelector("[data-delete-rule]")?.addEventListener("click", async function () {
+            if (!window.confirm("¿Eliminar este nivel de descuento?")) return;
+            const response = await fetch(`/admin/productos/descuentos-carrito/${form.dataset.ruleId}`, {method: "DELETE", headers: {"X-CSRF-Token": panel.dataset.csrfToken}});
+            const data = await response.json().catch(function () { return {}; });
+            if (!response.ok) { feedback.textContent = data.mensaje || "No fue posible eliminar."; return; }
+            form.remove(); feedback.textContent = "Nivel eliminado.";
+        });
+    });
+});

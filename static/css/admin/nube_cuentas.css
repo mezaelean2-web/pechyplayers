@@ -1105,6 +1105,18 @@
     color:#35d973;
 }
 
+.nube-editar-cuenta,
+.nube-eliminar-cuenta{
+    width:auto;
+    padding:0 8px;
+    gap:5px;
+    font-size:11px;
+}
+
+.nube-eliminar-cuenta{
+    color:#e87979;
+}
+
 .nube-estado-notificada{
     color:#b9c0ff;
     border:1px solid rgba(105,116,255,.3);
@@ -4963,10 +4975,35 @@ body.nube-modal-abierto{
     background:#191a1f;
 }
 
-.nube-page.nube-inventario-sticky .nube-tabla thead th{
+.nube-tabla-sticky-shell{
     position:sticky;
     top:calc(var(--nube-sticky-top) + var(--nube-toolbar-sticky-height));
     z-index:760;
+    height:var(--nube-table-head-height, 40px);
+    margin-bottom:calc(-1 * var(--nube-table-head-height, 40px));
+    overflow:hidden;
+    pointer-events:none;
+}
+
+.nube-tabla-sticky-shell[hidden]{
+    display:none;
+}
+
+.nube-tabla-sticky-viewport{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+}
+
+.nube-tabla-sticky-clone{
+    margin:0;
+    table-layout:fixed;
+    will-change:transform;
+}
+
+.nube-tabla-sticky-clone th{
+    box-sizing:border-box;
+    background:#191a1f;
     box-shadow:
         inset 0 -1px rgba(255,255,255,.07),
         0 8px 18px rgba(0,0,0,.24);
@@ -5012,7 +5049,84 @@ body.nube-modal-abierto{
         box-shadow:0 10px 24px rgba(0,0,0,.34);
     }
 
-    .nube-page.nube-inventario-sticky .nube-tabla thead th{
+    .nube-tabla-sticky-shell{
         top:calc(var(--nube-sticky-top) + var(--nube-toolbar-sticky-height));
+    }
+}
+
+/* Renombre administrativo de plataforma */
+.nube-modal-plataforma{
+    width:min(520px,calc(100vw - 32px));
+}
+
+.nube-modal-plataforma .nube-form{
+    gap:15px;
+    padding:22px 26px 26px;
+    overflow:visible;
+}
+
+.nube-modal-plataforma .nube-form > label{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+}
+
+.nube-modal-plataforma .nube-form > label > span{
+    color:#969ba6;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.55px;
+    text-transform:uppercase;
+}
+
+.nube-modal-plataforma input{
+    width:100%;
+    box-sizing:border-box;
+    padding:12px 13px;
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:10px;
+    color:#f5f6f8;
+    background:#111318;
+    outline:none;
+}
+
+.nube-modal-plataforma input:focus{
+    border-color:rgba(212,175,55,.45);
+    box-shadow:0 0 0 3px rgba(212,175,55,.09);
+}
+
+.nube-modal-plataforma input[readonly]{
+    color:#a8acb5;
+    background:#17191e;
+}
+
+.nube-form-acciones{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    margin-top:3px;
+}
+
+.nube-form-mensaje{
+    margin:0;
+    color:#99d7ad;
+    font-size:12px;
+}
+
+.nube-form-mensaje.error{
+    color:#ff9a9a;
+}
+
+@media(max-width:520px){
+    .nube-modal-plataforma .nube-form{
+        padding:18px;
+    }
+
+    .nube-form-acciones{
+        flex-direction:column-reverse;
+    }
+
+    .nube-form-acciones button{
+        width:100%;
     }
 }

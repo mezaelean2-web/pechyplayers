@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, session, flash, send_file, jsonify, url_for
 import sqlite3
+import hashlib
 from flask_compress import Compress
 import json
 import os
@@ -41,6 +42,9 @@ import resellers
 import wallets
 import bold_recharges
 import reseller_accounts
+import customer_cart
+import customer_orders
+import customer_bold_payments
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -404,7 +408,8 @@ def inicio():
         peliculas=peliculas_ordenadas,
         peliculas_por_categoria=peliculas_por_categoria,
         categorias_cartelera=categorias_cartelera,
-        revendedor_actual=revendedor_actual
+        revendedor_actual=revendedor_actual,
+        csrf_customer_checkout_token=_csrf_customer_checkout_token()
     )
 
 
@@ -430,6 +435,28 @@ def _csrf_admin_token():
     return token
 
 
+def _csrf_customer_checkout_token():
+    token = session.get("csrf_customer_checkout")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_customer_checkout"] = token
+    return token
+
+
+def _validar_csrf_customer_checkout():
+    recibido = request.headers.get("X-CSRF-Token", "")
+    esperado = session.get("csrf_customer_checkout", "")
+    return bool(recibido and esperado and secrets.compare_digest(recibido, esperado))
+
+
+def _customer_checkout_session_hash():
+    token = session.get("customer_checkout_guest_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["customer_checkout_guest_token"] = token
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
 def _validar_csrf_admin():
     recibido = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token", "")
     esperado = session.get("csrf_admin", "")
@@ -437,13 +464,28 @@ def _validar_csrf_admin():
 
 
 def _limpiar_sesion_reseller():
-    session.pop("reseller_id", None)
-    session.pop("reseller_auth_version", None)
+    for clave in (
+        "reseller_id", "reseller_auth_version", "csrf_reseller",
+        "reseller_auth_error",
+    ):
+        session.pop(clave, None)
 
 
 def _invalidar_sesion_reseller(motivo="sesion"):
     _limpiar_sesion_reseller()
     session["reseller_auth_error"] = motivo
+
+
+@app.after_request
+def _evitar_cache_privado_reseller(respuesta):
+    if request.path == "/revendedores" or request.path.startswith("/revendedores/"):
+        if "Cache-Control" not in respuesta.headers:
+            respuesta.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private, max-age=0"
+        if "Pragma" not in respuesta.headers:
+            respuesta.headers["Pragma"] = "no-cache"
+        if "Expires" not in respuesta.headers:
+            respuesta.headers["Expires"] = "0"
+    return respuesta
 
 
 def _revendedor_sesion_actual():
@@ -563,7 +605,7 @@ def dashboard_revendedor():
         "resellers/dashboard.html",
         revendedor=revendedor,
         resumen=resumen,
-        productos_destacados=catalogo[:4],
+        productos_destacados=catalogo[:1],
         csrf_token=_csrf_reseller_token(),
         seccion_activa="inicio",
     )
@@ -900,7 +942,7 @@ def billetera_revendedor():
 def registro_revendedor():
     resellers.inicializar_revendedores()
     if _revendedor_sesion_actual():
-        return redirect("/")
+        return redirect("/revendedores")
     error = None
     if request.method == "POST":
         if not _validar_csrf_reseller():
@@ -929,7 +971,7 @@ def registro_revendedor():
 def login_revendedor():
     resellers.inicializar_revendedores()
     if _revendedor_sesion_actual():
-        return redirect("/")
+        return redirect("/revendedores")
     motivo_sesion = session.pop("reseller_auth_error", None)
     error = (
         "Tu cuenta se encuentra temporalmente bloqueada."
@@ -969,7 +1011,7 @@ def logout_revendedor():
     if not _validar_csrf_reseller():
         return "Solicitud no válida", 403
     _limpiar_sesion_reseller()
-    return redirect("/")
+    return redirect("/revendedores/login")
 
 
 @app.route("/revendedores/cuenta", methods=["GET", "POST"])
@@ -1070,7 +1112,13 @@ def webhook_bold():
         else:
             try:
                 payload = json.loads(raw_body.decode("utf-8"))
-                result = bold_recharges.process_webhook(payload)
+                data = payload.get("data") if isinstance(payload, dict) else None
+                metadata = data.get("metadata") if isinstance(data, dict) else None
+                reference = metadata.get("reference") if isinstance(metadata, dict) else None
+                if isinstance(reference, str) and reference.startswith("CUST-"):
+                    result = customer_bold_payments.process_webhook(payload)
+                else:
+                    result = bold_recharges.process_webhook(payload)
                 response = (jsonify({"ok": True, **result}), 200)
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError, TypeError):
                 response = (jsonify({"ok": False, "error": "Payload inválido."}), 400)
@@ -1221,8 +1269,201 @@ def admin_productos():
         "admin/productos.html",
         productos=productos,
         categorias=categorias,
+        reglas_descuento_carrito=customer_cart.list_discount_rules(),
         csrf_token=_csrf_revendedores_token()
     )
+
+
+@app.route("/admin/productos/descuentos-carrito", methods=["POST"])
+def crear_regla_descuento_carrito_admin():
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_revendedores():
+        return _error_revendedores("Token CSRF no válido.", 403)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"minimum_eligible_services", "discount_bps", "active"}:
+        return _error_revendedores("Payload de regla no válido.")
+    try:
+        rule_id = customer_cart.save_discount_rule(
+            None, data["minimum_eligible_services"], data["discount_bps"], data["active"]
+        )
+    except sqlite3.IntegrityError:
+        return _error_revendedores("Ya existe una regla para ese mínimo.", 409)
+    except ValueError as error:
+        return _error_revendedores(error)
+    return jsonify({"ok": True, "id": rule_id}), 201
+
+
+@app.route("/admin/productos/descuentos-carrito/<int:rule_id>", methods=["PUT", "DELETE"])
+def regla_descuento_carrito_admin(rule_id):
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_revendedores():
+        return _error_revendedores("Token CSRF no válido.", 403)
+    try:
+        if request.method == "DELETE":
+            customer_cart.delete_discount_rule(rule_id)
+        else:
+            data = request.get_json(silent=True)
+            if not isinstance(data, dict) or set(data) != {"minimum_eligible_services", "discount_bps", "active"}:
+                return _error_revendedores("Payload de regla no válido.")
+            customer_cart.save_discount_rule(
+                rule_id, data["minimum_eligible_services"], data["discount_bps"], data["active"]
+            )
+    except LookupError as error:
+        return _error_revendedores(error, 404)
+    except sqlite3.IntegrityError:
+        return _error_revendedores("Ya existe una regla para ese mínimo.", 409)
+    except ValueError as error:
+        return _error_revendedores(error)
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/productos/<int:plan_id>/descuento-carrito", methods=["PATCH"])
+def elegibilidad_descuento_carrito_admin(plan_id):
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_revendedores():
+        return _error_revendedores("Token CSRF no válido.", 403)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"eligible"}:
+        return _error_revendedores("Payload de elegibilidad no válido.")
+    try:
+        customer_cart.set_plan_discount_eligibility(plan_id, data["eligible"])
+    except LookupError as error:
+        return _error_revendedores(error, 404)
+    except ValueError as error:
+        return _error_revendedores(error)
+    return jsonify({"ok": True})
+
+
+@app.route("/compras/carrito/preview", methods=["POST"])
+def preview_carrito_publico():
+    if request.content_length is not None and request.content_length > 4096:
+        return jsonify({"ok": False, "code": "payload_too_large", "message": "El carrito supera el tamaño permitido."}), 413
+    if not request.is_json:
+        return jsonify({"ok": False, "code": "invalid_json", "message": "Se requiere JSON válido."}), 415
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return jsonify({"ok": False, "code": "invalid_json", "message": "El JSON no es válido."}), 400
+    try:
+        result = customer_cart.calculate_cart(payload)
+    except customer_cart.CartValidationError as error:
+        return jsonify({"ok": False, "code": error.code, "message": str(error)}), 400
+    except Exception:
+        app.logger.exception("Error controlado al calcular preview del carrito público")
+        return jsonify({"ok": False, "code": "preview_unavailable", "message": "No pudimos calcular el carrito."}), 500
+    return jsonify({"ok": True, "preview": result})
+
+
+@app.route("/compras/pedidos", methods=["POST"])
+def crear_pedido_cliente_publico():
+    if request.content_length is not None and request.content_length > 8192:
+        return jsonify({"ok": False, "code": "payload_too_large", "message": "La solicitud supera el tamaño permitido."}), 413
+    if not request.is_json:
+        return jsonify({"ok": False, "code": "invalid_json", "message": "Se requiere JSON válido."}), 415
+    if not _validar_csrf_customer_checkout():
+        return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció. Recarga la página e inténtalo nuevamente."}), 403
+    payload = request.get_json(silent=True)
+    if payload is None:
+        return jsonify({"ok": False, "code": "invalid_json", "message": "El JSON no es válido."}), 400
+    try:
+        order, created = customer_orders.create_order(payload, guest_session_hash=_customer_checkout_session_hash())
+    except (customer_orders.OrderValidationError, customer_cart.CartValidationError) as error:
+        return jsonify({"ok": False, "code": getattr(error, "code", "invalid_order"), "message": str(error)}), getattr(error, "status", 400)
+    except Exception:
+        app.logger.exception("Error controlado al crear pedido público")
+        return jsonify({"ok": False, "code": "order_unavailable", "message": "No pudimos preparar el pedido. Inténtalo nuevamente."}), 500
+    public_order = {key: value for key, value in order.items() if key != "customer"}
+    return jsonify({"ok": True, "created": created, "order": public_order}), 201 if created else 200
+
+
+@app.route("/compras/checkout-profile", methods=["GET"])
+def perfil_checkout_cliente_publico():
+    if not _validar_csrf_customer_checkout():
+        return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
+    customer = customer_orders.get_checkout_customer(_customer_checkout_session_hash())
+    response = jsonify({"ok": True, "customer": customer})
+    response.headers["Cache-Control"] = "no-store, private"
+    return response
+
+
+@app.route("/compras/pedidos/cancelar-actual", methods=["POST"])
+def cancelar_pedido_cliente_actual():
+    if not _validar_csrf_customer_checkout():
+        return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
+    if not request.is_json or request.get_json(silent=True) != {}:
+        return jsonify({"ok": False, "code": "invalid_payload", "message": "La solicitud de cancelación no es válida."}), 400
+    try:
+        result = customer_orders.cancel_current_order(_customer_checkout_session_hash())
+    except customer_orders.OrderValidationError as error:
+        return jsonify({"ok": False, "code": error.code, "message": str(error)}), error.status
+    if result["result"] in {"ownership_mismatch", "not_cancellable"}:
+        return jsonify({"ok": False, "code": "order_not_cancellable", "message": "El pedido actual no puede cancelarse automáticamente."}), 409
+    return jsonify({"ok": True, "result": result["result"]})
+
+
+@app.route("/compras/pedidos/<public_order_id>/pago/bold", methods=["POST"])
+def iniciar_pago_bold_cliente(public_order_id):
+    if not _validar_csrf_customer_checkout():
+        return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
+    if not request.is_json or request.get_json(silent=True) != {}:
+        return jsonify({"ok": False, "code": "invalid_payload", "message": "La solicitud de pago no es válida."}), 400
+    redirection_url = os.environ.get("BOLD_CUSTOMER_REDIRECTION_URL", "").strip()
+    if not redirection_url:
+        redirection_url = url_for("resultado_pago_bold_cliente", order=public_order_id, _external=True)
+    try:
+        result = customer_bold_payments.create_or_reuse_checkout(
+            public_order_id, _customer_checkout_session_hash(), redirection_url)
+    except customer_bold_payments.CustomerPaymentError as error:
+        return jsonify({"ok": False, "code": error.reason, "message": str(error)}), error.status
+    except RuntimeError as error:
+        return jsonify({"ok": False, "code": "bold_unavailable", "message": str(error)}), 503
+    response = jsonify({"ok": True, **result})
+    response.headers["Cache-Control"] = "no-store, private"
+    return response
+
+
+@app.route("/compras/pago/resultado")
+def resultado_pago_bold_cliente():
+    public_order_id = request.args.get("order", "")
+    return render_template("customer_payment_result.html", public_order_id=public_order_id,
+                           csrf_token=_csrf_customer_checkout_token())
+
+
+@app.route("/compras/pedidos/<public_order_id>/estado")
+def estado_pago_cliente(public_order_id):
+    if not _validar_csrf_customer_checkout():
+        return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
+    try:
+        result = customer_bold_payments.get_status(
+            public_order_id, _customer_checkout_session_hash(), reconcile=True)
+    except customer_bold_payments.CustomerPaymentError as error:
+        return jsonify({"ok": False, "code": error.reason, "message": str(error)}), error.status
+    response = jsonify({"ok": True, **result})
+    response.headers["Cache-Control"] = "no-store, private"
+    return response
+
+
+@app.route("/admin/pedidos-clientes")
+def admin_pedidos_clientes():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    filtro = request.args.get("estado", "pending")
+    if filtro not in {"pending", "paid", "cancelled", "expired", "all"}:
+        filtro = "pending"
+    return render_template("admin/pedidos_clientes.html", pedidos=customer_orders.list_orders_admin(filtro), filtro=filtro)
+
+
+@app.route("/admin/pedidos-clientes/<public_order_id>")
+def admin_pedido_cliente_detalle(public_order_id):
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    pedido = customer_orders.get_order_admin(public_order_id)
+    if pedido is None:
+        return render_template("admin/pedido_cliente_detalle.html", pedido=None), 404
+    return render_template("admin/pedido_cliente_detalle.html", pedido=pedido,
+                           pago=customer_bold_payments.get_payment_admin(pedido["internal_id"]))
 
 
 @app.route("/admin/reglas-inventario-reseller")
@@ -1268,11 +1509,17 @@ def _obtener_producto_por_plan(id_plan):
     """Resuelve el grupo histórico de producto desde un ID real de plan."""
     conn = conectar()
     try:
+        columnas_producto = {fila[1] for fila in conn.execute("PRAGMA table_info(productos)")}
+        elegibilidad_sql = (
+            "p.participa_descuento_carrito"
+            if "participa_descuento_carrito" in columnas_producto else "0"
+        )
         filas = conn.execute(
-            """
+            f"""
             SELECT p.id, p.nombre, p.imagen, p.plan, p.precio, p.oferta_precio,
                    oferta_activa, destacado, visible, estado, categoria,
-                   orden_categoria, g.precio AS precio_reseller_general,
+                   orden_categoria, {elegibilidad_sql} AS participa_descuento_carrito,
+                   g.precio AS precio_reseller_general,
                    g.activo AS precio_reseller_activo
             FROM productos AS p
             LEFT JOIN precios_revendedor_generales AS g ON g.plan_id = p.id
@@ -1308,6 +1555,7 @@ def _obtener_producto_por_plan(id_plan):
                 "oferta_activa": fila["oferta_activa"],
                 "destacado": fila["destacado"],
                 "visible": fila["visible"]
+                ,"participa_descuento_carrito": fila["participa_descuento_carrito"]
             }
             for fila in filas
         ]
@@ -1712,8 +1960,39 @@ def admin_nube_cuentas():
         estadisticas=estadisticas,
         plataformas=plataformas,
         tipos_cuenta=tipos_cuenta,
-        politicas_duracion_inventario=reseller_accounts.listar_politicas_duracion_inventario()
+        politicas_duracion_inventario=reseller_accounts.listar_politicas_duracion_inventario(),
+        csrf_token=_csrf_admin_token()
     )
+
+
+@app.route("/admin/nube-cuentas/plataformas/renombrar", methods=["POST"])
+def renombrar_plataforma_nube_route():
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    if not _validar_csrf_admin():
+        return jsonify({"ok": False, "mensaje": "Solicitud de seguridad invÃ¡lida."}), 403
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) != {"nombre_actual", "nombre_nuevo"}:
+        return jsonify({"ok": False, "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    try:
+        resultado = database.renombrar_plataforma_nube(
+            datos.get("nombre_actual"), datos.get("nombre_nuevo")
+        )
+    except database.RenombrarPlataformaNubeError as error:
+        estado = 404 if error.codigo == "plataforma_no_encontrada" else (
+            409 if error.codigo in {
+                "plataforma_existente", "referencia_desconocida", "esquema_incompleto"
+            } else 400
+        )
+        return jsonify({"ok": False, "codigo": error.codigo, "mensaje": str(error)}), estado
+    except (sqlite3.IntegrityError, RuntimeError):
+        app.logger.exception("Renombre de plataforma Nube bloqueado de forma segura")
+        return jsonify({
+            "ok": False,
+            "codigo": "conflicto_integridad",
+            "mensaje": "No se pudo renombrar la plataforma sin comprometer sus referencias.",
+        }), 409
+    return jsonify(resultado)
 
 
 @app.route(
@@ -2324,6 +2603,65 @@ def actualizar_notas_cuenta_nube_route(cuenta_id):
     datos = request.get_json(silent=True) or {}
     resultado = actualizar_notas_cuenta_nube(cuenta_id, datos.get("notas", ""))
     return jsonify(resultado), (200 if resultado.get("ok") else 404)
+
+
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/edicion", methods=["GET"])
+def contexto_edicion_cuenta_nube_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    contexto = database.obtener_contexto_edicion_cuenta_nube(cuenta_id)
+    if not contexto:
+        return jsonify({"ok": False, "mensaje": "Cuenta no encontrada"}), 404
+    return jsonify({"ok": True, **contexto})
+
+
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/edicion", methods=["POST"])
+def guardar_edicion_cuenta_nube_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    if not _validar_csrf_admin():
+        return jsonify({"ok": False, "mensaje": "Solicitud de seguridad inválida."}), 403
+    datos = request.get_json(silent=True)
+    permitidos = {"plataforma", "correo", "contrasena", "pin", "modalidad",
+                  "duracion_unidad_dias", "cantidad_perfiles", "confirmar_cambio_modalidad"}
+    if not isinstance(datos, dict) or set(datos) - permitidos:
+        return jsonify({"ok": False, "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    try:
+        resultado = database.actualizar_cuenta_nube_admin(
+            cuenta_id, datos, bool(datos.get("confirmar_cambio_modalidad"))
+        )
+    except (sqlite3.IntegrityError, RuntimeError):
+        app.logger.exception("Edición de cuenta Nube bloqueada de forma segura")
+        return jsonify({"ok": False, "codigo": "conflicto_integridad",
+                        "mensaje": "La cuenta cambió o tiene relaciones que impiden esta edición."}), 409
+    if resultado.get("ok"):
+        return jsonify(resultado)
+    estado = 404 if resultado.get("codigo") == "no_encontrada" else (
+        409 if resultado.get("codigo") in {"historial_comercial", "confirmacion_requerida", "perfiles_con_actividad"} else 400
+    )
+    return jsonify(resultado), estado
+
+
+@app.route("/admin/nube-cuentas/<int:cuenta_id>/eliminar", methods=["POST"])
+def eliminar_cuenta_nube_route(cuenta_id):
+    if not session.get("admin"):
+        return jsonify({"ok": False, "mensaje": "No autorizado"}), 401
+    if not _validar_csrf_admin():
+        return jsonify({"ok": False, "mensaje": "Solicitud de seguridad inválida."}), 403
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) - {"confirmacion"}:
+        return jsonify({"ok": False, "mensaje": "La solicitud contiene datos no permitidos."}), 400
+    try:
+        resultado = database.eliminar_cuenta_nube_descartable(cuenta_id, datos.get("confirmacion") is True)
+    except (sqlite3.IntegrityError, RuntimeError):
+        app.logger.exception("Eliminación de cuenta Nube bloqueada de forma segura")
+        return jsonify({"ok": False, "codigo": "conflicto_integridad",
+                        "mensaje": "La cuenta cambió o conserva referencias que impiden eliminarla."}), 409
+    if resultado.get("ok"):
+        return jsonify(resultado)
+    if resultado.get("codigo") == "no_encontrada":
+        return jsonify(resultado), 404
+    return jsonify(resultado), 409
 
 
 @app.route("/admin/nube-cuentas/pagos-pin", methods=["POST"])

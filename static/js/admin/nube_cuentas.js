@@ -33,6 +33,185 @@ document.addEventListener(
         );
         plataformaNueva?.addEventListener("input", refrescarDuracionNueva);
         tipoNueva?.addEventListener("change", refrescarDuracionNueva);
+
+        const paginaNubeAdmin = document.querySelector(".nube-page");
+        const csrfNubeAdmin = paginaNubeAdmin?.dataset.csrfToken || "";
+        const modalRenombrarPlataforma = document.getElementById("modalRenombrarPlataforma");
+        const formRenombrarPlataforma = document.getElementById("formRenombrarPlataforma");
+        const plataformaNombreActual = document.getElementById("plataformaNombreActual");
+        const plataformaNombreActualVisible = document.getElementById("plataformaNombreActualVisible");
+        const plataformaNombreNuevo = document.getElementById("plataformaNombreNuevo");
+        const mensajeRenombrarPlataforma = document.getElementById("mensajeRenombrarPlataforma");
+        const modalEditarCuenta = document.getElementById("modalEditarCuenta");
+        const formEditarCuenta = document.getElementById("formEditarCuenta");
+        const editarCuentaId = document.getElementById("editarCuentaId");
+        const editarPlataforma = document.getElementById("editarPlataforma");
+        const editarCorreo = document.getElementById("editarCorreo");
+        const editarContrasena = document.getElementById("editarContrasena");
+        const editarPin = document.getElementById("editarPin");
+        const editarModalidad = document.getElementById("editarModalidad");
+        const editarDuracion = document.getElementById("editarDuracion");
+        const editarCantidadPerfiles = document.getElementById("editarCantidadPerfiles");
+        const editarPerfilesGrupo = document.getElementById("editarPerfilesGrupo");
+        const editarImpactoModalidad = document.getElementById("editarImpactoModalidad");
+        const editarCuentaMensaje = document.getElementById("editarCuentaMensaje");
+        let contextoEditarCuenta = null;
+
+        const mostrarMensajeRenombre = (texto, error = true) => {
+            if (!mensajeRenombrarPlataforma) return;
+            mensajeRenombrarPlataforma.hidden = !texto;
+            mensajeRenombrarPlataforma.textContent = texto || "";
+            mensajeRenombrarPlataforma.classList.toggle("error", error);
+        };
+        const abrirRenombrePlataforma = nombre => {
+            if (!modalRenombrarPlataforma || !nombre) return;
+            plataformaNombreActual.value = nombre;
+            plataformaNombreActualVisible.value = nombre;
+            plataformaNombreNuevo.value = nombre;
+            mostrarMensajeRenombre("");
+            modalRenombrarPlataforma.classList.add("abierto");
+            modalRenombrarPlataforma.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+            requestAnimationFrame(() => {
+                plataformaNombreNuevo.focus();
+                plataformaNombreNuevo.select();
+            });
+        };
+        const cerrarRenombrePlataforma = () => {
+            modalRenombrarPlataforma?.classList.remove("abierto");
+            modalRenombrarPlataforma?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto");
+            formRenombrarPlataforma?.reset();
+            mostrarMensajeRenombre("");
+        };
+        modalRenombrarPlataforma?.querySelectorAll("[data-cerrar-renombrar-plataforma]").forEach(
+            control => control.addEventListener("click", cerrarRenombrePlataforma)
+        );
+        formRenombrarPlataforma?.addEventListener("submit", async evento => {
+            evento.preventDefault();
+            mostrarMensajeRenombre("");
+            const actual = String(plataformaNombreActual.value || "").replace(/\s+/g, " ").trim();
+            const nuevo = String(plataformaNombreNuevo.value || "").replace(/\s+/g, " ").trim();
+            if (!nuevo) {
+                mostrarMensajeRenombre("Escribe un nombre nuevo para la plataforma.");
+                return;
+            }
+            const clave = valor => valor.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            if (clave(actual) === clave(nuevo)) {
+                mostrarMensajeRenombre("El nuevo nombre equivale al nombre actual.");
+                return;
+            }
+            if (!window.confirm(`Renombrar plataforma\n\n${actual}\n→\n${nuevo}\n\nSe actualizarán las cuentas y reglas reseller operativas asociadas.`)) return;
+            const boton = formRenombrarPlataforma.querySelector("button[type='submit']");
+            boton.disabled = true;
+            try {
+                const respuesta = await fetch("/admin/nube-cuentas/plataformas/renombrar", {
+                    method: "POST",
+                    headers: {"Content-Type":"application/json", Accept:"application/json", "X-CSRF-Token":csrfNubeAdmin},
+                    body: JSON.stringify({nombre_actual:actual, nombre_nuevo:nuevo})
+                });
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo renombrar la plataforma.");
+                cerrarRenombrePlataforma();
+                window.location.reload();
+            } catch (error) {
+                mostrarMensajeRenombre(error.message || "No se pudo renombrar la plataforma.");
+            } finally {
+                boton.disabled = false;
+            }
+        });
+
+        const mensajeEdicion = (texto, error = true) => {
+            if (!editarCuentaMensaje) return;
+            editarCuentaMensaje.hidden = !texto;
+            editarCuentaMensaje.textContent = texto || "";
+            editarCuentaMensaje.classList.toggle("error", error);
+        };
+        const refrescarCamposEdicion = () => {
+            const perfiles = editarModalidad?.value === "perfiles";
+            if (editarPerfilesGrupo) editarPerfilesGrupo.hidden = !perfiles;
+            if (editarCantidadPerfiles) editarCantidadPerfiles.required = perfiles;
+            const anterior = contextoEditarCuenta?.cuenta?.modalidad || "cuenta_completa";
+            const cambia = anterior !== editarModalidad?.value;
+            if (editarImpactoModalidad) {
+                editarImpactoModalidad.hidden = !cambia;
+                editarImpactoModalidad.textContent = cambia
+                    ? (perfiles
+                        ? `Se crearán ${editarCantidadPerfiles?.value || 0} perfiles vacíos. No se modificará ninguna asignación.`
+                        : `Se retirarán ${contextoEditarCuenta?.perfiles?.length || 0} perfiles únicamente si están completamente vacíos.`)
+                    : "";
+            }
+        };
+        async function abrirEdicionCuenta(cuentaId) {
+            mensajeEdicion("");
+            const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(cuentaId)}/edicion`, {headers:{Accept:"application/json"}});
+            const resultado = await respuesta.json();
+            if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo cargar la cuenta.");
+            contextoEditarCuenta = resultado;
+            const cuenta = resultado.cuenta;
+            editarCuentaId.value = cuenta.id;
+            editarPlataforma.value = cuenta.plataforma || "";
+            editarCorreo.value = cuenta.correo || "";
+            editarContrasena.value = cuenta.contrasena || "";
+            editarPin.value = cuenta.pin || "";
+            editarModalidad.value = cuenta.modalidad || "cuenta_completa";
+            editarCantidadPerfiles.value = cuenta.cantidad_perfiles || resultado.perfiles.length || 1;
+            aplicarPoliticaDuracionInventario(cuenta.plataforma, cuenta.modalidad, editarDuracion);
+            editarDuracion.value = cuenta.duracion_unidad_dias == null ? "" : String(cuenta.duracion_unidad_dias);
+            refrescarCamposEdicion();
+            modalEditarCuenta.classList.add("abierto"); modalEditarCuenta.setAttribute("aria-hidden", "false");
+            document.body.classList.add("nube-modal-abierto");
+        }
+        function cerrarEdicionCuenta() {
+            modalEditarCuenta?.classList.remove("abierto"); modalEditarCuenta?.setAttribute("aria-hidden", "true");
+            document.body.classList.remove("nube-modal-abierto"); contextoEditarCuenta = null;
+        }
+        async function solicitarEliminacionCuenta(cuentaId) {
+            const llamar = async confirmacion => {
+                const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(cuentaId)}/eliminar`, {
+                    method:"POST", headers:{"Content-Type":"application/json",Accept:"application/json","X-CSRF-Token":csrfNubeAdmin},
+                    body:JSON.stringify({confirmacion})
+                });
+                const resultado = await respuesta.json(); return {respuesta, resultado};
+            };
+            let {respuesta, resultado} = await llamar(false);
+            if (resultado.codigo !== "confirmacion_requerida") throw new Error(resultado.mensaje || "La cuenta no se puede eliminar.");
+            const cuenta = resultado.cuenta || {};
+            if (!window.confirm(`Eliminar definitivamente la cuenta #${cuenta.id}\n${cuenta.plataforma || ""} · ${cuenta.correo || ""}\n\nEsta acción solo continuará si sigue completamente descartable.`)) return;
+            ({respuesta, resultado} = await llamar(true));
+            if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo eliminar la cuenta.");
+            window.location.reload();
+        }
+        editarPlataforma?.addEventListener("input", () => {
+            const valor = editarDuracion?.value;
+            aplicarPoliticaDuracionInventario(editarPlataforma.value, editarModalidad?.value, editarDuracion);
+            if ([...editarDuracion.options].some(opcion => opcion.value === valor)) editarDuracion.value = valor;
+        });
+        editarModalidad?.addEventListener("change", refrescarCamposEdicion);
+        editarCantidadPerfiles?.addEventListener("input", refrescarCamposEdicion);
+        modalEditarCuenta?.querySelectorAll("[data-cerrar-edicion]").forEach(control => control.addEventListener("click", cerrarEdicionCuenta));
+        formEditarCuenta?.addEventListener("submit", async evento => {
+            evento.preventDefault(); mensajeEdicion("");
+            const cambiaModalidad = contextoEditarCuenta?.cuenta?.modalidad !== editarModalidad.value;
+            const cambiaPerfiles = editarModalidad.value === "perfiles" &&
+                Number(contextoEditarCuenta?.cuenta?.cantidad_perfiles || contextoEditarCuenta?.perfiles?.length || 0) !== Number(editarCantidadPerfiles.value || 0);
+            const requiereConfirmacion = cambiaModalidad || cambiaPerfiles;
+            const detalleConfirmacion = cambiaModalidad ? editarImpactoModalidad?.textContent :
+                `La configuración cambiará de ${contextoEditarCuenta?.perfiles?.length || 0} a ${editarCantidadPerfiles.value || 0} perfiles.`;
+            const confirmar = !requiereConfirmacion || window.confirm(`${detalleConfirmacion || "Cambiar configuración"}\n\n¿Confirmas este cambio estructural?`);
+            if (!confirmar) return;
+            const boton = formEditarCuenta.querySelector("button[type='submit']"); boton.disabled = true;
+            try {
+                const payload = {plataforma:editarPlataforma.value,correo:editarCorreo.value,contrasena:editarContrasena.value,
+                    pin:editarPin.value,modalidad:editarModalidad.value,duracion_unidad_dias:editarDuracion.disabled ? null : editarDuracion.value,
+                    cantidad_perfiles:Number(editarCantidadPerfiles.value || 0),confirmar_cambio_modalidad:requiereConfirmacion};
+                const respuesta = await fetch(`/admin/nube-cuentas/${encodeURIComponent(editarCuentaId.value)}/edicion`, {
+                    method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json","X-CSRF-Token":csrfNubeAdmin},body:JSON.stringify(payload)});
+                const resultado = await respuesta.json();
+                if (!respuesta.ok || !resultado.ok) throw new Error(resultado.mensaje || "No se pudo guardar la cuenta.");
+                cerrarEdicionCuenta(); await refreshCuentaNube(editarCuentaId.value);
+            } catch(error) { mensajeEdicion(error.message, true); } finally { boton.disabled = false; }
+        });
         refrescarDuracionNueva();
         // CENTRO DE INVENTARIO: búsqueda y filtros locales combinables.
         const inventario = {
@@ -41,6 +220,16 @@ document.addEventListener(
         };
         const normalizarInventario = valor => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
         const claveInventario = valor => normalizarInventario(valor).replace(/\s+/g, "_");
+        const colorAutomaticoPlataformaNube = valor => {
+            const nombre = normalizarInventario(valor);
+            if (!nombre) return "";
+            let hash = 2166136261;
+            for (const caracter of nombre){
+                hash ^= caracter.codePointAt(0);
+                hash = Math.imul(hash, 16777619);
+            }
+            return `hsl(${(hash >>> 0) % 360} 68% 48%)`;
+        };
         const normalizarTipoInventario = valor => {
             const clave = claveInventario(valor);
             if (["cuenta_completa", "cuenta_completas", "completa", "completas"].includes(clave)) return "cuenta_completa";
@@ -173,6 +362,7 @@ document.addEventListener(
         function aplicarIdentidadVisualFilaNube(fila){
             const identidad = identidadVisualNube(fila.dataset.plataforma, fila.dataset.tipo);
             fila.classList.add(`plataforma-${identidad.clase}`);
+            if (identidad.colorAutomatico) fila.style.setProperty("--plataforma", identidad.colorAutomatico);
             const icono = fila.querySelector(".nube-plataforma-icono");
             if (icono) icono.textContent = identidad.icono;
             const etiqueta = fila.querySelector(".nube-plataforma-info span");
@@ -309,7 +499,18 @@ document.addEventListener(
         }
         let debounceInventario;
         document.getElementById("nubeBuscar")?.addEventListener("input", evento => { clearTimeout(debounceInventario); debounceInventario = setTimeout(() => { inventario.busqueda = evento.target.value; aplicarFiltrosInventario(); }, 180); });
-        document.getElementById("nubeHojas")?.addEventListener("click", evento => { const boton = evento.target.closest("[data-plataforma]"); if (!boton) return; sincronizarPlataformaInventario(boton.dataset.plataforma); aplicarFiltrosInventario(); });
+        const hojasPlataformaNube = document.getElementById("nubeHojas");
+        hojasPlataformaNube?.addEventListener("click", evento => { const boton = evento.target.closest("[data-plataforma]"); if (!boton) return; sincronizarPlataformaInventario(boton.dataset.plataforma); aplicarFiltrosInventario(); });
+        hojasPlataformaNube?.addEventListener("dblclick", evento => {
+            const boton = evento.target.closest("[data-plataforma]");
+            if (boton?.dataset.plataforma) abrirRenombrePlataforma(boton.dataset.plataforma);
+        });
+        hojasPlataformaNube?.addEventListener("contextmenu", evento => {
+            const boton = evento.target.closest("[data-plataforma]");
+            if (!boton?.dataset.plataforma) return;
+            evento.preventDefault();
+            abrirRenombrePlataforma(boton.dataset.plataforma);
+        });
         selectPlataformaInventario?.addEventListener("change", evento => { sincronizarPlataformaInventario(evento.target.value); aplicarFiltrosInventario(); });
         document.getElementById("nubeTipos")?.addEventListener("click", evento => { const boton = evento.target.closest("[data-tipo]"); if (!boton) return; inventario.tipo = boton.dataset.tipo; document.querySelectorAll("#nubeTipos [data-tipo]").forEach(b => { const activo = b === boton; b.classList.toggle("activo", activo); b.setAttribute("aria-pressed", String(activo)); }); aplicarFiltrosInventario(); });
         const abrirFiltrosInventario = document.getElementById("nubeAbrirFiltros"), panelFiltrosInventario = document.getElementById("nubeFiltrosPanel");
@@ -336,11 +537,13 @@ document.addEventListener(
         const identidadVisualNube = (plataforma, tipo = "") => {
             const clave = claveInventario(`${plataforma || ""} ${tipo || ""}`);
             return registryVisualNube.find(item => item.prueba(clave)) ||
-                { clase: "otra", label: String(plataforma || "Otra"), icono: String(plataforma || "O").slice(0, 1).toUpperCase() };
+                { clase: "otra", label: String(plataforma || "Otra"), icono: String(plataforma || "O").slice(0, 1).toUpperCase(),
+                    colorAutomatico: colorAutomaticoPlataformaNube(plataforma) };
         };
         document.querySelectorAll("[data-plataforma],.nube-cuenta-madre").forEach(nodo => {
             const identidad = identidadVisualNube(nodo.dataset.plataforma, nodo.dataset.tipo);
             nodo.classList.add(`plataforma-${identidad.clase}`);
+            if (identidad.colorAutomatico) nodo.style.setProperty("--plataforma", identidad.colorAutomatico);
             const icono = nodo.matches(".nube-hoja") ? nodo.querySelector("span") : nodo.querySelector(".nube-plataforma-icono");
             if (icono) icono.textContent = identidad.icono;
             if (nodo.matches(".nube-hoja") && nodo.dataset.plataforma){
@@ -354,6 +557,16 @@ document.addEventListener(
             const madre = fila.matches(".nube-cuenta-madre") ? fila : document.querySelector(`.nube-cuenta-madre[data-cuenta-id="${CSS.escape(fila.dataset.parentId || "")}"]`);
             const ver = evento.target.closest(".nube-ver-cuenta,.nube-ver-perfil");
             if (ver) { abrirDrawer(ver); return; }
+            const editarCuenta = evento.target.closest(".nube-editar-cuenta");
+            if (editarCuenta) {
+                abrirEdicionCuenta(editarCuenta.dataset.id).catch(error => window.alert(error.message));
+                return;
+            }
+            const eliminarCuenta = evento.target.closest(".nube-eliminar-cuenta");
+            if (eliminarCuenta) {
+                solicitarEliminacionCuenta(eliminarCuenta.dataset.id).catch(error => window.alert(error.message));
+                return;
+            }
             const gestionarPerfil = evento.target.closest(".nube-gestionar-perfil");
             if (gestionarPerfil) { abrirGestionPerfil(gestionarPerfil); return; }
             const gestionar = evento.target.closest(".nube-gestionar-cuenta");
@@ -395,7 +608,45 @@ document.addEventListener(
         const paginaNube = document.querySelector(".nube-page");
         const toolbarInventario = document.querySelector(".nube-toolbar-premium");
         const tablaInventario = document.querySelector(".nube-tabla");
+        const wrapperInventario = document.querySelector(".nube-tabla-wrapper");
+        const tarjetaInventario = document.querySelector(".nube-tabla-card");
+        const cabeceraInventario = tablaInventario?.querySelector("thead");
         let stickyRafNube = null;
+        let stickyTablaNube = null;
+        let stickyTablaClonNube = null;
+
+        function crearStickyTablaNube(){
+            if (!wrapperInventario || !tarjetaInventario || !tablaInventario || !cabeceraInventario) return;
+            stickyTablaNube = document.createElement("div");
+            stickyTablaNube.className = "nube-tabla-sticky-shell";
+            stickyTablaNube.hidden = true;
+            stickyTablaNube.setAttribute("aria-hidden", "true");
+            const viewport = document.createElement("div");
+            viewport.className = "nube-tabla-sticky-viewport";
+            stickyTablaClonNube = document.createElement("table");
+            stickyTablaClonNube.className = "nube-tabla nube-tabla-sticky-clone";
+            stickyTablaClonNube.append(cabeceraInventario.cloneNode(true));
+            viewport.append(stickyTablaClonNube);
+            stickyTablaNube.append(viewport);
+            tarjetaInventario.insertBefore(stickyTablaNube, wrapperInventario);
+        }
+
+        function sincronizarStickyTablaNube(){
+            if (!stickyTablaNube || !stickyTablaClonNube || !cabeceraInventario || !wrapperInventario) return;
+            const originales = Array.from(cabeceraInventario.querySelectorAll("th"));
+            const copias = Array.from(stickyTablaClonNube.querySelectorAll("th"));
+            const alto = Math.ceil(cabeceraInventario.getBoundingClientRect().height);
+            stickyTablaNube.style.setProperty("--nube-table-head-height", `${alto}px`);
+            stickyTablaClonNube.style.width = `${tablaInventario.getBoundingClientRect().width}px`;
+            originales.forEach((celda, indice) => {
+                const ancho = `${celda.getBoundingClientRect().width}px`;
+                if (!copias[indice]) return;
+                copias[indice].style.width = ancho;
+                copias[indice].style.minWidth = ancho;
+                copias[indice].style.maxWidth = ancho;
+            });
+            stickyTablaClonNube.style.transform = `translateX(${-wrapperInventario.scrollLeft}px)`;
+        }
 
         function leerTopStickyNube(){
             if (!paginaNube) return 0;
@@ -414,10 +665,16 @@ document.addEventListener(
             actualizarAlturaStickyNube();
             const topSticky = leerTopStickyNube();
             const altoToolbar = Math.ceil(toolbarInventario.getBoundingClientRect().height);
+            const topCabecera = topSticky + altoToolbar;
+            const rectTabla = tablaInventario.getBoundingClientRect();
+            const altoCabecera = cabeceraInventario?.getBoundingClientRect().height || 0;
             const toolbarActivo = toolbarInventario.getBoundingClientRect().top <= topSticky + 1;
-            const tablaEnTop = tablaInventario.getBoundingClientRect().top <= topSticky + altoToolbar + 1;
+            const tablaEnTop = rectTabla.top <= topCabecera + 1;
+            const tablaEnRecorrido = tablaEnTop && rectTabla.bottom > topCabecera + altoCabecera;
             toolbarInventario.classList.toggle("nube-toolbar-sticky-activo", toolbarActivo);
-            paginaNube.classList.toggle("nube-inventario-sticky", tablaEnTop);
+            paginaNube.classList.toggle("nube-inventario-sticky", tablaEnRecorrido);
+            if (stickyTablaNube) stickyTablaNube.hidden = !tablaEnRecorrido;
+            if (tablaEnRecorrido) sincronizarStickyTablaNube();
         }
 
         function pedirEstadoStickyNube(){
@@ -425,13 +682,19 @@ document.addEventListener(
             stickyRafNube = window.requestAnimationFrame(actualizarEstadoStickyNube);
         }
 
+        crearStickyTablaNube();
         actualizarAlturaStickyNube();
+        sincronizarStickyTablaNube();
         pedirEstadoStickyNube();
         window.addEventListener("scroll", pedirEstadoStickyNube, { passive: true });
         window.addEventListener("resize", pedirEstadoStickyNube, { passive: true });
+        wrapperInventario?.addEventListener("scroll", sincronizarStickyTablaNube, { passive: true });
 
         if (window.ResizeObserver && toolbarInventario){
             new ResizeObserver(pedirEstadoStickyNube).observe(toolbarInventario);
+        }
+        if (window.ResizeObserver && tablaInventario){
+            new ResizeObserver(sincronizarStickyTablaNube).observe(tablaInventario);
         }
 
         // ==========================================

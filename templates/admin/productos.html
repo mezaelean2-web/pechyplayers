@@ -22,6 +22,28 @@
 
     </div>
 
+    <section class="cart-discount-admin" data-cart-discount-admin data-csrf-token="{{ csrf_token }}">
+        <div class="cart-discount-admin__heading"><span>CONFIGURACIÓN COMERCIAL</span><h2>Descuentos del carrito</h2><p>El mayor nivel activo alcanzado se aplica solo a los planes participantes.</p></div>
+        <div class="cart-discount-admin__table">
+            <div class="cart-discount-admin__row cart-discount-admin__row--head"><span>Mínimo de servicios</span><span>Descuento</span><span>Activa</span><span>Acciones</span></div>
+            {% for regla in reglas_descuento_carrito %}
+            <form class="cart-discount-admin__row" data-discount-rule data-rule-id="{{ regla.id }}">
+                <input name="minimum" type="number" min="2" step="1" value="{{ regla.minimum_eligible_services }}" required>
+                <label><input name="percent" type="number" min="0" max="100" step="0.01" value="{{ regla.discount_bps / 100 }}" required><span>%</span></label>
+                <label class="cart-discount-admin__toggle"><input name="active" type="checkbox" {% if regla.active == 1 %}checked{% endif %}><span>{{ 'Sí' if regla.active == 1 else 'No' }}</span></label>
+                <div><button type="submit">Guardar</button><button type="button" class="is-danger" data-delete-rule>Eliminar</button></div>
+            </form>
+            {% endfor %}
+            <form class="cart-discount-admin__row cart-discount-admin__row--new" data-discount-rule>
+                <input name="minimum" type="number" min="2" step="1" placeholder="2" required>
+                <label><input name="percent" type="number" min="0" max="100" step="0.01" placeholder="5" required><span>%</span></label>
+                <label class="cart-discount-admin__toggle"><input name="active" type="checkbox" checked><span>Sí</span></label>
+                <div><button type="submit">Agregar nivel</button></div>
+            </form>
+        </div>
+        <p data-discount-feedback role="status" aria-live="polite"></p>
+    </section>
+
     <div class="producto-create-backdrop" id="productoCreateBackdrop" hidden>
         <section class="producto-create-modal" role="dialog" aria-modal="true" aria-labelledby="productoCreateTitle" tabindex="-1">
             <header class="producto-create-header">

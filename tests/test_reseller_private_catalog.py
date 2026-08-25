@@ -28,7 +28,8 @@ class ResellerPrivateCatalogTest(unittest.TestCase):
             oferta_activa INTEGER DEFAULT 0, destacado INTEGER DEFAULT 0,
             visible INTEGER DEFAULT 1, orden INTEGER DEFAULT 1,
             categoria TEXT DEFAULT 'Streaming', orden_categoria INTEGER DEFAULT 1,
-            estado TEXT DEFAULT 'disponible')""")
+            estado TEXT DEFAULT 'disponible',
+            participa_descuento_carrito INTEGER NOT NULL DEFAULT 0)""")
         conn.execute("""CREATE TABLE categorias (
             id INTEGER PRIMARY KEY, nombre TEXT NOT NULL, icono TEXT DEFAULT '',
             color TEXT DEFAULT '', visible INTEGER DEFAULT 1, orden INTEGER DEFAULT 1)""")

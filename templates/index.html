@@ -43,7 +43,7 @@
 <link rel="preload"
       href="{{ url_for('static', filename='img/platforms/netflix.jpg') }}"
       as="image">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=6">
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/mobile.css') }}?v=11">
 
@@ -761,6 +761,12 @@
     WhatsApp
 
 </a>
+    {% if not es_catalogo_reseller %}
+    <button class="public-nav-cart" type="button" data-customer-cart-open aria-controls="customerCart" aria-haspopup="dialog" aria-expanded="false" aria-label="Abrir carrito, 0 servicios">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3h2l2.4 10.3a2 2 0 0 0 2 1.5h7.8a2 2 0 0 0 1.9-1.4L21 7H6"></path><circle cx="10" cy="20" r="1.25"></circle><circle cx="18" cy="20" r="1.25"></circle></svg>
+      <span>Carrito</span><strong data-customer-cart-count aria-hidden="true">0</strong>
+    </button>
+    {% endif %}
     {% if revendedor_actual %}
     <a class="reseller-nav-account" href="/revendedores/cuenta"><span>Hola, {{ revendedor_actual.nombre.split()[0] }}</span><small>Saldo: {{ revendedor_actual.saldo_wallet_cop }}</small><small>Revendedor · Mi cuenta</small></a>
     <form class="reseller-nav-logout" action="/revendedores/logout" method="POST"><input type="hidden" name="csrf_token" value="{{ session.get('csrf_reseller', '') }}"><button type="submit">Salir</button></form>
@@ -1349,7 +1355,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
     <div class="plans">
       {% for plan in producto.planes %}
-      <div class="plan"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
+      <div class="plan" data-public-plan-id="{{ plan.id }}"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
         <span>{{ plan.plan }}</span>
         {{ precio_visible(plan) }}
       </div>
@@ -1489,7 +1495,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 
                 {% for plan in producto.planes %}
 
-                <div class="plan"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
+                <div class="plan" data-public-plan-id="{{ plan.id }}"{% if es_catalogo_reseller %} data-reseller-plan-id="{{ plan.id }}" data-reseller-price-ready="{{ 'true' if plan.precio_reseller.precio is not none else 'false' }}" tabindex="0" role="button"{% endif %}>
 
                     <span>{{ plan.plan }}</span>
 
@@ -1951,7 +1957,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
-{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=6"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=6"></script>{% endif %}
+{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=6"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=6"></script>{% else %}{% include "_customer_cart.html" %}<script defer src="{{ url_for('static', filename='js/customer-cart.js') }}?v=7"></script>{% endif %}
 
 <script>
 

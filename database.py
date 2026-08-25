@@ -100,6 +100,9 @@ def validar_duracion_unidad_inventario(plataforma, modalidad, valor, cursor=None
         raise ValueError(f"Selecciona una duracion de inventario valida ({permitidas} dias).")
     return duracion
 
+
+MODALIDADES_INVENTARIO = {"cuenta_completa", "perfiles"}
+
 def obtener_config():
     conn = conectar()
     cursor = conn.cursor()
@@ -553,6 +556,14 @@ def inicializar_db():
             cursor.execute(f"ALTER TABLE productos ADD COLUMN {columna}")
         except:
             pass
+
+    # Fase 1 del carrito público: únicamente configuración comercial.
+    import customer_cart
+    customer_cart.initialize_schema(conn)
+    import customer_orders
+    customer_orders.initialize_schema(conn)
+    import customer_bold_payments
+    customer_bold_payments.initialize_schema(conn)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS promociones (
@@ -1295,7 +1306,8 @@ SELECT
     visible,
     estado,
     categoria,
-    orden_categoria
+    orden_categoria,
+    participa_descuento_carrito
 FROM productos
 ORDER BY
     CASE
@@ -1323,7 +1335,8 @@ ORDER BY
     visible,
     estado,
     categoria,
-    orden_categoria
+    orden_categoria,
+    participa_descuento_carrito
 ) in filas:
         if nombre not in productos:
             productos[nombre] = {
@@ -1345,6 +1358,7 @@ ORDER BY
             "oferta_activa": oferta_activa,
             "destacado": destacado,
             "visible": visible
+            ,"participa_descuento_carrito": participa_descuento_carrito
         })
 
     return list(productos.values())
@@ -5860,6 +5874,230 @@ def restaurar_cuenta_papelera_nube(cuenta_id):
 # NUBE DE CUENTAS — BUSCADOR UNIVERSAL
 # ==========================================
 
+def _tabla_existe_nube(cursor, tabla):
+    return cursor.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (tabla,)).fetchone() is not None
+
+
+def _contar_nube(cursor, tabla, condicion, parametros):
+    if not _tabla_existe_nube(cursor, tabla):
+        return 0
+    return int(cursor.execute(f'SELECT COUNT(*) FROM "{tabla}" WHERE {condicion}', tuple(parametros)).fetchone()[0])
+
+
+def _perfil_vacio_para_estructura(perfil):
+    return (str(perfil["estado"] or "disponible").lower() == "disponible"
+            and perfil["cliente_id"] is None and not str(perfil["nombre_cliente"] or "").strip()
+            and not str(perfil["telefono"] or "").strip() and not str(perfil["fecha_entrega"] or "").strip()
+            and int(perfil["dias_cuenta"] or 0) == 0 and not str(perfil["fecha_vencimiento"] or "").strip()
+            and int(perfil["garantia_usada"] or 0) == 0 and int(perfil["cantidad_garantias"] or 0) == 0
+            and not str(perfil["notas"] or "").strip())
+
+
+def _referencias_no_reconocidas_nube(cursor, cuenta_id, perfil_ids):
+    conocidas = {
+        "nube_cuentas", "nube_perfiles", "nube_movimientos", "nube_pagos_pin",
+        "nube_notificacion_servicios", "nube_archivos_asignaciones", "nube_reemplazos",
+        "nube_reemplazos_perfiles", "nube_transferencias_servicios", "reseller_purchases",
+    }
+    total = 0
+    tablas = [fila[0] for fila in cursor.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ).fetchall()]
+    for tabla in tablas:
+        if tabla in conocidas:
+            continue
+        columnas = [fila[1] for fila in cursor.execute(f'PRAGMA table_info("{tabla}")').fetchall()]
+        for columna in columnas:
+            clave = columna.lower()
+            valores = perfil_ids if "perfil" in clave and clave.endswith("_id") else (
+                [cuenta_id] if "cuenta" in clave and clave.endswith("_id") else []
+            )
+            if not valores:
+                continue
+            marcas = ",".join("?" for _ in valores)
+            total += int(cursor.execute(
+                f'SELECT COUNT(*) FROM "{tabla}" WHERE "{columna}" IN ({marcas})', valores
+            ).fetchone()[0])
+    return total
+
+
+def _referencias_estructurales_nube(cursor, cuenta_id, perfiles):
+    perfil_ids = [int(item["id"]) for item in perfiles]
+    referencias = {
+        "compras reseller": _contar_nube(cursor, "reseller_purchases", "cuenta_id=?", [cuenta_id]),
+        "movimientos comerciales": _contar_nube(
+            cursor, "nube_movimientos",
+            "cuenta_id=? AND lower(tipo) NOT IN ('creacion','edicion_administrativa')", [cuenta_id]
+        ),
+        "pagos PIN": _contar_nube(cursor, "nube_pagos_pin", "cuenta_id=?", [cuenta_id]),
+        "notificaciones": _contar_nube(cursor, "nube_notificacion_servicios", "cuenta_id=?", [cuenta_id]),
+        "asignaciones archivadas": _contar_nube(cursor, "nube_archivos_asignaciones", "cuenta_id=?", [cuenta_id]),
+        "reemplazos de cuentas": _contar_nube(cursor, "nube_reemplazos", "cuenta_anterior_id=? OR cuenta_nueva_id=?", [cuenta_id, cuenta_id]),
+        "reemplazos de perfiles": _contar_nube(cursor, "nube_reemplazos_perfiles", "cuenta_anterior_id=? OR cuenta_nueva_id=?", [cuenta_id, cuenta_id]),
+        "transferencias": _contar_nube(cursor, "nube_transferencias_servicios", "cuenta_origen_id=? OR cuenta_destino_id=?", [cuenta_id, cuenta_id]),
+    }
+    if perfil_ids:
+        marcas = ",".join("?" for _ in perfil_ids)
+        referencias["compras reseller"] += _contar_nube(cursor, "reseller_purchases", f"perfil_id IN ({marcas})", perfil_ids)
+        referencias["notificaciones"] += _contar_nube(cursor, "nube_notificacion_servicios", f"perfil_id IN ({marcas})", perfil_ids)
+        referencias["asignaciones archivadas"] += _contar_nube(cursor, "nube_archivos_asignaciones", f"perfil_id IN ({marcas})", perfil_ids)
+        referencias["reemplazos de perfiles"] += _contar_nube(cursor, "nube_reemplazos_perfiles", f"perfil_anterior_id IN ({marcas}) OR perfil_nuevo_id IN ({marcas})", [*perfil_ids, *perfil_ids])
+        referencias["transferencias"] += _contar_nube(cursor, "nube_transferencias_servicios", f"perfil_origen_id IN ({marcas}) OR perfil_destino_id IN ({marcas})", [*perfil_ids, *perfil_ids])
+    no_reconocidas = _referencias_no_reconocidas_nube(cursor, cuenta_id, perfil_ids)
+    if no_reconocidas:
+        referencias["referencias no reconocidas"] = no_reconocidas
+    return {clave: valor for clave, valor in referencias.items() if valor}
+
+
+def obtener_contexto_edicion_cuenta_nube(cuenta_id, cursor=None):
+    propia = cursor is None
+    conn = conectar() if propia else None
+    cursor = conn.cursor() if propia else cursor
+    try:
+        cuenta = cursor.execute("SELECT * FROM nube_cuentas WHERE id=?", (int(cuenta_id),)).fetchone()
+        if not cuenta:
+            return None
+        perfiles = [dict(item) for item in cursor.execute("SELECT * FROM nube_perfiles WHERE cuenta_id=? ORDER BY orden,id", (int(cuenta_id),)).fetchall()]
+        referencias = _referencias_estructurales_nube(cursor, int(cuenta_id), perfiles)
+        asignada = bool(cuenta["cliente_id"] is not None or str(cuenta["nombre_cliente"] or "").strip()
+                        or str(cuenta["fecha_entrega"] or "").strip()
+                        or any(not _perfil_vacio_para_estructura(item) for item in perfiles))
+        return {"cuenta": dict(cuenta), "perfiles": perfiles, "referencias": referencias,
+                "asignada": asignada, "cambio_estructural_bloqueado": bool(asignada or referencias)}
+    finally:
+        if propia:
+            conn.close()
+
+
+def actualizar_cuenta_nube_admin(cuenta_id, datos, confirmar_cambio_modalidad=False, _fallar_en=None):
+    try:
+        cuenta_id = int(cuenta_id)
+    except (TypeError, ValueError):
+        return {"ok": False, "codigo": "cuenta_invalida", "mensaje": "Cuenta inválida."}
+    plataforma = " ".join(str(datos.get("plataforma") or "").strip().split())
+    correo = str(datos.get("correo") or "").strip()
+    contrasena = str(datos.get("contrasena") or "").strip()
+    pin = str(datos.get("pin") or "").strip()
+    modalidad = str(datos.get("modalidad") or "").strip().lower()
+    if not plataforma or not correo or not contrasena:
+        return {"ok": False, "codigo": "datos_invalidos", "mensaje": "Plataforma, correo y contraseña son obligatorios."}
+    if modalidad not in MODALIDADES_INVENTARIO:
+        return {"ok": False, "codigo": "modalidad_invalida", "mensaje": "La modalidad no es válida."}
+    try:
+        cantidad = int(datos.get("cantidad_perfiles") or 0)
+    except (TypeError, ValueError):
+        cantidad = -1
+    if modalidad == "perfiles" and not 1 <= cantidad <= 10:
+        return {"ok": False, "codigo": "perfiles_invalidos", "mensaje": "La cantidad de perfiles debe estar entre 1 y 10."}
+    if modalidad == "cuenta_completa":
+        cantidad = 0
+    conn = conectar()
+    try:
+        cursor = conn.cursor(); cursor.execute("PRAGMA foreign_keys=ON"); cursor.execute("BEGIN IMMEDIATE")
+        contexto = obtener_contexto_edicion_cuenta_nube(cuenta_id, cursor=cursor)
+        if not contexto:
+            conn.rollback(); return {"ok": False, "codigo": "no_encontrada", "mensaje": "La cuenta no existe."}
+        actual = contexto["cuenta"]
+        cambia_plataforma = plataforma.casefold() != str(actual["plataforma"] or "").strip().casefold()
+        modalidad_anterior = str(actual["modalidad"] or "cuenta_completa")
+        cambia_modalidad = modalidad != modalidad_anterior
+        politica = politica_duracion_inventario(plataforma, modalidad, cursor=cursor)
+        if not politica["requiere_duracion_inventario"] and not cambia_plataforma and not cambia_modalidad:
+            duracion = actual["duracion_unidad_dias"]
+        else:
+            duracion = validar_duracion_unidad_inventario(
+                plataforma, modalidad, datos.get("duracion_unidad_dias"), cursor=cursor
+            )
+        cambia_perfiles = modalidad == "perfiles" and cantidad != int(actual["cantidad_perfiles"] or len(contexto["perfiles"]))
+        estructural = (cambia_plataforma or cambia_modalidad
+                       or duracion != actual["duracion_unidad_dias"] or cambia_perfiles)
+        if estructural and contexto["cambio_estructural_bloqueado"]:
+            razones = list(contexto["referencias"])
+            if contexto["asignada"]: razones.insert(0, "asignaciones existentes")
+            conn.rollback(); return {"ok": False, "codigo": "historial_comercial", "mensaje":
+                "No se puede cambiar plataforma, modalidad o duración porque existen " + ", ".join(razones) + "."}
+        perfiles = contexto["perfiles"]
+        if (cambia_modalidad or cambia_perfiles) and not confirmar_cambio_modalidad:
+            conn.rollback()
+            if cambia_modalidad:
+                accion = "retirar" if modalidad == "cuenta_completa" else "crear"
+                total = len(perfiles) if modalidad == "cuenta_completa" else cantidad
+                mensaje = f"Confirma el cambio de modalidad: se van a {accion} {total} perfil(es)."
+            else:
+                total = abs(cantidad - len(perfiles))
+                mensaje = f"Confirma el cambio de configuración: se van a {'crear' if cantidad > len(perfiles) else 'retirar'} {total} perfil(es)."
+            return {"ok": False, "codigo": "confirmacion_requerida", "mensaje": mensaje, "perfiles_afectados": total}
+        if modalidad_anterior == "perfiles" and modalidad == "cuenta_completa":
+            if any(not _perfil_vacio_para_estructura(item) for item in perfiles):
+                conn.rollback(); return {"ok": False, "codigo": "perfiles_con_actividad", "mensaje": "No se puede convertir la cuenta porque uno o más perfiles tienen actividad."}
+            cursor.execute("DELETE FROM nube_perfiles WHERE cuenta_id=?", (cuenta_id,))
+        elif modalidad_anterior == "cuenta_completa" and modalidad == "perfiles":
+            for numero in range(1, cantidad + 1):
+                cursor.execute("INSERT INTO nube_perfiles (cuenta_id,nombre_perfil,pin,estado,orden) VALUES (?,?,?,'disponible',?)", (cuenta_id, f"Perfil {numero}", "", numero))
+        elif modalidad == "perfiles" and cantidad != len(perfiles):
+            if cantidad < len(perfiles):
+                retirados = perfiles[cantidad:]
+                if any(not _perfil_vacio_para_estructura(item) for item in retirados):
+                    conn.rollback(); return {"ok": False, "codigo": "perfiles_con_actividad", "mensaje": "No se pueden retirar perfiles con actividad."}
+                ids = [item["id"] for item in retirados]
+                cursor.execute(f"DELETE FROM nube_perfiles WHERE id IN ({','.join('?' for _ in ids)})", ids)
+            else:
+                for numero in range(len(perfiles) + 1, cantidad + 1):
+                    cursor.execute("INSERT INTO nube_perfiles (cuenta_id,nombre_perfil,pin,estado,orden) VALUES (?,?,?,'disponible',?)", (cuenta_id, f"Perfil {numero}", "", numero))
+        if _fallar_en == "despues_perfiles": raise RuntimeError("Fallo de prueba después de perfiles")
+        tipo_cuenta = "perfil" if modalidad == "perfiles" else "cuenta_completa"
+        cursor.execute("""UPDATE nube_cuentas SET plataforma=?,correo=?,contrasena=?,pin=?,tipo_cuenta=?,modalidad=?,
+            cantidad_perfiles=?,duracion_unidad_dias=?,fecha_actualizacion=CURRENT_TIMESTAMP WHERE id=?""",
+            (plataforma, correo, contrasena, pin, tipo_cuenta, modalidad, cantidad, duracion, cuenta_id))
+        cursor.execute("INSERT INTO nube_movimientos (cuenta_id,tipo,descripcion,estado_anterior,estado_nuevo) VALUES (?,'edicion_administrativa',?,?,?)", (cuenta_id, "Cuenta editada desde Nube", modalidad_anterior, modalidad))
+        if _fallar_en == "antes_commit": raise RuntimeError("Fallo de prueba antes de commit")
+        conn.commit(); return {"ok": True, "cuenta_id": cuenta_id, "modalidad": modalidad,
+                               "cantidad_perfiles": cantidad, "duracion_unidad_dias": duracion}
+    except ValueError as error:
+        conn.rollback(); return {"ok": False, "codigo": "datos_invalidos", "mensaje": str(error)}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        conn.close()
+
+
+def eliminar_cuenta_nube_descartable(cuenta_id, confirmacion=False, _fallar_en=None):
+    try: cuenta_id = int(cuenta_id)
+    except (TypeError, ValueError): return {"ok": False, "codigo": "cuenta_invalida", "mensaje": "Cuenta inválida."}
+    conn = conectar()
+    try:
+        cursor = conn.cursor(); cursor.execute("PRAGMA foreign_keys=ON"); cursor.execute("BEGIN IMMEDIATE")
+        contexto = obtener_contexto_edicion_cuenta_nube(cuenta_id, cursor=cursor)
+        if not contexto:
+            conn.rollback(); return {"ok": False, "codigo": "no_encontrada", "mensaje": "La cuenta no existe."}
+        cuenta, perfiles = contexto["cuenta"], contexto["perfiles"]
+        razones = []
+        if str(cuenta["estado"] or "disponible").lower() != "disponible": razones.append("la cuenta no está disponible")
+        if contexto["asignada"]: razones.append("existen asignaciones o perfiles con actividad")
+        razones.extend(contexto["referencias"].keys())
+        movimientos = cursor.execute("SELECT id,tipo FROM nube_movimientos WHERE cuenta_id=? ORDER BY id", (cuenta_id,)).fetchall()
+        if len(movimientos) != 1 or str(movimientos[0]["tipo"] or "").lower() != "creacion":
+            razones.append("el historial no contiene únicamente el movimiento técnico inicial")
+        if any(not _perfil_vacio_para_estructura(item) for item in perfiles): razones.append("uno o más perfiles no están completamente vacíos")
+        if razones:
+            conn.rollback(); unicas = list(dict.fromkeys(razones))
+            return {"ok": False, "codigo": "eliminacion_bloqueada", "mensaje": "No se puede eliminar: " + "; ".join(unicas) + ".", "razones": unicas}
+        if not confirmacion:
+            conn.rollback(); return {"ok": False, "codigo": "confirmacion_requerida", "mensaje": "Confirma explícitamente la eliminación definitiva de esta cuenta.", "cuenta": {"id": cuenta_id, "plataforma": cuenta["plataforma"], "correo": cuenta["correo"]}}
+        cursor.execute("DELETE FROM nube_perfiles WHERE cuenta_id=?", (cuenta_id,))
+        cursor.execute("DELETE FROM nube_movimientos WHERE cuenta_id=? AND lower(tipo)='creacion'", (cuenta_id,))
+        if _fallar_en == "antes_cuenta": raise RuntimeError("Fallo de prueba antes de eliminar cuenta")
+        cursor.execute("DELETE FROM nube_cuentas WHERE id=?", (cuenta_id,))
+        if cursor.rowcount != 1: raise RuntimeError("La cuenta cambió durante la eliminación.")
+        if cursor.execute("PRAGMA foreign_key_check").fetchone(): raise RuntimeError("La eliminación produciría referencias huérfanas.")
+        if _fallar_en == "antes_commit": raise RuntimeError("Fallo de prueba antes de commit")
+        conn.commit(); return {"ok": True, "cuenta_id": cuenta_id}
+    except Exception:
+        conn.rollback(); raise
+    finally:
+        conn.close()
+
+
 def buscar_cuentas_nube(
     termino="",
     plataforma="",
@@ -6049,6 +6287,153 @@ def buscar_cuentas_nube(
 # ==========================================
 # NUBE DE CUENTAS — PLATAFORMAS DINÁMICAS
 # ==========================================
+
+class RenombrarPlataformaNubeError(ValueError):
+    def __init__(self, codigo, mensaje):
+        self.codigo = codigo
+        super().__init__(mensaje)
+
+
+def _nombre_plataforma_nube(valor):
+    texto = " ".join(str(valor or "").strip().split())
+    if not texto:
+        raise RenombrarPlataformaNubeError(
+            "nombre_invalido", "El nombre de la plataforma no puede estar vacÃ­o."
+        )
+    if any(unicodedata.category(caracter).startswith("C") for caracter in texto):
+        raise RenombrarPlataformaNubeError(
+            "nombre_invalido", "El nombre de la plataforma contiene caracteres no vÃ¡lidos."
+        )
+    return texto
+
+
+def _clave_plataforma_nube(valor):
+    texto = unicodedata.normalize(
+        "NFD", " ".join(str(valor or "").strip().split()).casefold()
+    )
+    return "".join(
+        caracter for caracter in texto if unicodedata.category(caracter) != "Mn"
+    )
+
+
+def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
+    actual = _nombre_plataforma_nube(nombre_actual)
+    nuevo = _nombre_plataforma_nube(nombre_nuevo)
+    clave_actual = _clave_plataforma_nube(actual)
+    clave_nueva = _clave_plataforma_nube(nuevo)
+    if clave_actual == clave_nueva:
+        raise RenombrarPlataformaNubeError(
+            "nombre_equivalente", "El nuevo nombre equivale al nombre actual."
+        )
+
+    conn = conectar()
+    try:
+        conn.execute("PRAGMA foreign_keys=ON")
+        conn.execute("BEGIN IMMEDIATE")
+        cursor = conn.cursor()
+        permitidas = {
+            ("nube_cuentas", "plataforma"),
+            ("reseller_plan_inventory_rules", "plataforma"),
+            ("cartelera_plataformas", "plataforma"),
+        }
+        encontradas = set()
+        tablas = cursor.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+        ).fetchall()
+        for tabla in tablas:
+            for columna in cursor.execute(
+                f'PRAGMA table_info("{tabla["name"]}")'
+            ).fetchall():
+                nombre_columna = columna["name"].casefold()
+                if "plataform" in nombre_columna or "platform" in nombre_columna:
+                    encontradas.add((tabla["name"], columna["name"]))
+        if encontradas - permitidas:
+            raise RenombrarPlataformaNubeError(
+                "referencia_desconocida",
+                "Existe una referencia de plataforma no reconocida; el renombre fue bloqueado.",
+            )
+        requeridas = {
+            ("nube_cuentas", "plataforma"),
+            ("reseller_plan_inventory_rules", "plataforma"),
+        }
+        if not requeridas.issubset(encontradas):
+            raise RenombrarPlataformaNubeError(
+                "esquema_incompleto", "No estÃ¡ disponible el esquema operativo completo."
+            )
+
+        cuentas = cursor.execute("SELECT id, plataforma FROM nube_cuentas").fetchall()
+        reglas = cursor.execute(
+            "SELECT id, plataforma FROM reseller_plan_inventory_rules"
+        ).fetchall()
+        cuentas_origen = [
+            fila for fila in cuentas
+            if _clave_plataforma_nube(fila["plataforma"]) == clave_actual
+        ]
+        reglas_origen = [
+            fila for fila in reglas
+            if _clave_plataforma_nube(fila["plataforma"]) == clave_actual
+        ]
+        if not cuentas_origen:
+            raise RenombrarPlataformaNubeError(
+                "plataforma_no_encontrada", "La plataforma no existe en Nube."
+            )
+        if any(
+            _clave_plataforma_nube(fila["plataforma"]) == clave_nueva
+            for fila in [*cuentas, *reglas]
+        ):
+            raise RenombrarPlataformaNubeError(
+                "plataforma_existente",
+                "Ya existe una plataforma equivalente al nuevo nombre.",
+            )
+
+        ids_cuentas = [fila["id"] for fila in cuentas_origen]
+        ids_reglas = [fila["id"] for fila in reglas_origen]
+        cursor.executemany(
+            "UPDATE nube_cuentas SET plataforma=? WHERE id=?",
+            [(nuevo, cuenta_id) for cuenta_id in ids_cuentas],
+        )
+        if cursor.rowcount != len(ids_cuentas):
+            raise RuntimeError("No se actualizaron todas las cuentas de la plataforma.")
+        if ids_reglas:
+            cursor.executemany(
+                """UPDATE reseller_plan_inventory_rules
+                   SET plataforma=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                [(nuevo, regla_id) for regla_id in ids_reglas],
+            )
+            if cursor.rowcount != len(ids_reglas):
+                raise RuntimeError("No se actualizaron todas las reglas reseller.")
+
+        cuentas_finales = cursor.execute(
+            "SELECT plataforma FROM nube_cuentas"
+        ).fetchall()
+        reglas_finales = cursor.execute(
+            "SELECT plataforma FROM reseller_plan_inventory_rules"
+        ).fetchall()
+        if any(
+            _clave_plataforma_nube(fila["plataforma"]) == clave_actual
+            for fila in [*cuentas_finales, *reglas_finales]
+        ):
+            raise RuntimeError("Quedaron referencias operativas con el nombre anterior.")
+        if sum(
+            _clave_plataforma_nube(fila["plataforma"]) == clave_nueva
+            for fila in cuentas_finales
+        ) != len(ids_cuentas):
+            raise RuntimeError("La verificaciÃ³n final de cuentas no coincide.")
+
+        conn.commit()
+        return {
+            "ok": True,
+            "nombre_anterior": actual,
+            "nombre_nuevo": nuevo,
+            "cuentas_actualizadas": len(ids_cuentas),
+            "reglas_actualizadas": len(ids_reglas),
+        }
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
 
 def obtener_plataformas_nube():
 

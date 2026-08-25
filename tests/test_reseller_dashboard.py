@@ -200,10 +200,45 @@ class ResellerDashboardTest(unittest.TestCase):
         self.autenticar()
         self.assertEqual(self.client.get("/revendedores/logout").status_code, 405)
         self.assertEqual(self.client.post("/revendedores/logout").status_code, 403)
+        with self.client.session_transaction() as session:
+            session["cliente_id"] = 77
+            session["reseller_auth_error"] = "anterior"
         respuesta = self.client.post("/revendedores/logout", data={
             "csrf_token": "csrf-dashboard"
         })
         self.assertEqual(respuesta.status_code, 302)
+        self.assertTrue(respuesta.headers["Location"].endswith("/revendedores/login"))
+        with self.client.session_transaction() as session:
+            self.assertEqual(session.get("cliente_id"), 77)
+            for clave in ("reseller_id", "reseller_auth_version", "csrf_reseller",
+                          "reseller_auth_error"):
+                self.assertNotIn(clave, session)
+        posterior = self.client.get("/revendedores/cuenta")
+        self.assertEqual(posterior.status_code, 302)
+        self.assertTrue(posterior.headers["Location"].endswith("/revendedores/login"))
+
+    def test_sesion_cliente_no_autoriza_rutas_reseller(self):
+        cliente = app_module.app.test_client()
+        with cliente.session_transaction() as session:
+            session["cliente_id"] = 123
+            session["usuario"] = "cliente@example.com"
+        for ruta in ("/revendedores", "/revendedores/mis-cuentas",
+                     "/revendedores/billetera", "/revendedores/cuenta"):
+            with self.subTest(ruta=ruta):
+                respuesta = cliente.get(ruta)
+                self.assertEqual(respuesta.status_code, 302)
+                self.assertTrue(respuesta.headers["Location"].endswith("/revendedores/login"))
+
+    def test_paginas_reseller_y_logout_no_se_guardan_en_cache(self):
+        self.autenticar()
+        respuesta = self.respuesta_dashboard()
+        self.assertIn("no-store", respuesta.headers["Cache-Control"])
+        self.assertIn("private", respuesta.headers["Cache-Control"])
+        self.assertEqual(respuesta.headers["Pragma"], "no-cache")
+        salida = self.client.post("/revendedores/logout", data={"csrf_token":"csrf-dashboard"})
+        self.assertIn("no-store", salida.headers["Cache-Control"])
+        login = self.client.get("/revendedores/login")
+        self.assertIn("no-store", login.headers["Cache-Control"])
 
     def test_shell_contiene_navegacion_desktop_y_movil(self):
         self.autenticar()
@@ -241,6 +276,27 @@ class ResellerDashboardTest(unittest.TestCase):
         self.assertIn("Productos para ti", html)
         self.assertIn("$11.000 COP", html)
         self.assertNotIn('href="/">Ver cat', html)
+
+    def test_productos_para_ti_renderiza_solo_el_primero_elegible(self):
+        self.insertar_planes(1, 2, 3)
+        for plan_id in (1, 2, 3):
+            resellers.guardar_precio_general(plan_id, 10000 + plan_id)
+        productos = [
+            self.producto(1, "Primero elegible", 1),
+            self.producto(2, "Segundo elegible", 2),
+            self.producto(3, "Tercero elegible", 3),
+        ]
+        self.autenticar()
+        html = self.respuesta_dashboard(
+            productos, [{"nombre":"Streaming", "visible":1}]
+        ).get_data(as_text=True)
+        self.assertIn("Primero elegible", html)
+        self.assertNotIn("Segundo elegible", html)
+        self.assertNotIn("Tercero elegible", html)
+        self.assertIn("Productos disponibles</span><strong>3</strong>", html)
+        conn = database.conectar()
+        self.assertIsNone(conn.execute("PRAGMA foreign_key_check").fetchone())
+        conn.close()
 
 
 if __name__ == "__main__":
