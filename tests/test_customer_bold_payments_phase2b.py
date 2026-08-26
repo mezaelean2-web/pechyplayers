@@ -89,6 +89,17 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         self.assertEqual(one["checkout"]["integritySignature"],expected)
         self.assertEqual(len(self.rows("SELECT * FROM customer_bold_payment_intents")),1)
 
+    def test_checkout_bold_usa_total_con_descuento_acumulado_congelado(self):
+        conn=sqlite3.connect(self.path);conn.execute("UPDATE productos SET descuento_carrito_bps=200 WHERE id=1");conn.commit();conn.close()
+        payload={"customer":{"first_name":"Ana","last_name":"Perez","whatsapp":"3001234567","country_code":"+57"},
+                 "items":[{"plan_id":1,"quantity":1}],"idempotency_key":"bold-plan-discount-snapshot-0001"}
+        order,_=customer_orders.create_order(payload,guest_session_hash=self.session_hash)
+        response=self.client.post(f"/compras/pedidos/{order['id']}/pago/bold",json={},headers={"X-CSRF-Token":"csrf"})
+        self.assertEqual(response.status_code,200);checkout=response.get_json()["checkout"]
+        self.assertEqual(checkout["amount"],"9800")
+        expected=hashlib.sha256(f"{checkout['orderId']}9800COPsecret-test".encode()).hexdigest()
+        self.assertEqual(checkout["integritySignature"],expected)
+
     def test_frontend_cannot_supply_financial_fields_and_other_guest_is_blocked(self):
         bad=self.client.post(f"/compras/pedidos/{self.order['id']}/pago/bold",json={"amount":1},headers={"X-CSRF-Token":"csrf"})
         self.assertEqual(bad.status_code,400)
@@ -105,7 +116,9 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         checkout=self.checkout().get_json()["checkout"]
         payload=self.payload(checkout["orderId"])
         results=[]
-        for _ in range(20):results.append(self.post_webhook(payload).get_json()["status"])
+        with mock.patch("customer_fulfillment.fulfill_customer_order") as fulfill:
+            for _ in range(20):results.append(self.post_webhook(payload).get_json()["status"])
+        fulfill.assert_called_once()
         self.assertEqual(results[0],"processed");self.assertTrue(all(x=="duplicate" for x in results[1:]))
         intent=self.rows("SELECT * FROM customer_bold_payment_intents")[0]
         self.assertEqual(intent["status"],"approved");self.assertEqual(intent["external_transaction_id"],"TX-CUSTOMER-1")

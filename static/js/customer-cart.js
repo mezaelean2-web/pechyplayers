@@ -238,6 +238,7 @@
         const hasItems=preview.items.length>0;
         empty.hidden=hasItems; summary.hidden=!hasItems; cartStage.classList.toggle("is-empty",!hasItems); discountBanner.hidden=!hasItems||preview.discount_total<=0;
         summary.querySelector("[data-cart-subtotal]").textContent=money(preview.subtotal_bruto);
+        summary.querySelector("[data-cart-discount-percent]").textContent=`${(preview.discount_bps/100).toLocaleString("es-CO",{maximumFractionDigits:2})}%`;
         summary.querySelector("[data-cart-discount]").textContent=`− ${money(preview.discount_total)}`;
         summary.querySelector("[data-cart-total]").textContent=money(preview.total_final);
     }

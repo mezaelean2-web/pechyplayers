@@ -44,7 +44,7 @@ class CustomerCartPhase1Test(unittest.TestCase):
         conn.commit(); conn.close()
         customer_cart.initialize_schema()
         conn = sqlite3.connect(path)
-        conn.execute("UPDATE productos SET participa_descuento_carrito=1 WHERE id IN (1,2)")
+        conn.execute("UPDATE productos SET participa_descuento_carrito=1,descuento_carrito_bps=CASE id WHEN 1 THEN 200 ELSE 300 END WHERE id IN (1,2)")
         conn.executemany(
             "INSERT INTO customer_cart_discount_rules(minimum_eligible_services,discount_bps,active) VALUES(?,?,?)",
             [(2,500,1),(3,1000,1),(4,1200,0)],
@@ -83,12 +83,41 @@ class CustomerCartPhase1Test(unittest.TestCase):
 
     def test_umbrales_desactivados_sin_reglas_y_solo_excluidos(self):
         self.assertEqual(self.calc([])["discount_bps"],0)
-        self.assertEqual(self.calc([{"plan_id":1,"quantity":1}])["discount_total"],0)
+        self.assertEqual(self.calc([{"plan_id":1,"quantity":1}])["discount_total"],240)
         self.assertEqual(self.calc([{"plan_id":3,"quantity":3}])["eligible_item_count"],0)
         between = self.calc([{"plan_id":1,"quantity":2},{"plan_id":2,"quantity":2}])
         self.assertEqual(between["discount_bps"],1000)
         conn=sqlite3.connect(self.path); conn.execute("UPDATE customer_cart_discount_rules SET active=0"); conn.commit(); conn.close()
-        self.assertEqual(self.calc([{"plan_id":1,"quantity":2}])["discount_total"],0)
+        self.assertEqual(self.calc([{"plan_id":1,"quantity":2}])["discount_bps"],400)
+
+    def test_porcentajes_se_suman_por_unidad_y_respetan_participacion(self):
+        one=self.calc([{"plan_id":1,"quantity":1}]);self.assertEqual(one["discount_bps"],200)
+        two=self.calc([{"plan_id":1,"quantity":1},{"plan_id":2,"quantity":1}]);self.assertEqual(two["discount_bps"],500)
+        quantities=self.calc([{"plan_id":1,"quantity":3},{"plan_id":2,"quantity":1}]);self.assertEqual(quantities["discount_bps"],900)
+        conn=sqlite3.connect(self.path);conn.execute("UPDATE productos SET descuento_carrito_bps=9900 WHERE id=3");conn.commit();conn.close()
+        mixed=self.calc([{"plan_id":1,"quantity":1},{"plan_id":3,"quantity":1}])
+        self.assertEqual(mixed["discount_bps"],200);self.assertEqual(mixed["items"][1]["discount_contribution_bps"],0)
+
+    def test_cuatro_planes_y_dos_planes_del_mismo_producto(self):
+        conn=sqlite3.connect(self.path)
+        conn.execute("UPDATE productos SET nombre='Netflix',participa_descuento_carrito=1,descuento_carrito_bps=200 WHERE id IN (1,2)")
+        conn.commit();conn.close()
+        result=self.calc([{"plan_id":1,"quantity":2},{"plan_id":2,"quantity":2}])
+        self.assertEqual(result["discount_bps"],800);self.assertEqual(result["item_count"],4)
+
+    def test_suma_superior_a_cien_se_limita_y_regla_global_no_es_autoridad(self):
+        conn=sqlite3.connect(self.path)
+        conn.execute("UPDATE productos SET descuento_carrito_bps=6000 WHERE id=1")
+        conn.execute("UPDATE customer_cart_discount_rules SET discount_bps=1,active=1")
+        conn.commit();conn.close()
+        result=self.calc([{"plan_id":1,"quantity":2}])
+        self.assertEqual(result["discount_bps"],10000);self.assertEqual(result["discount_total"],result["subtotal_elegible"]);self.assertEqual(result["total_final"],0)
+
+    def test_configuracion_plan_valida_bps_estrictos(self):
+        for value in (-1,10001,True,False,1.5,"200",None,float("nan"),float("inf")):
+            with self.subTest(value=value),self.assertRaises(ValueError):customer_cart.set_plan_discount_configuration(1,True,value)
+        customer_cart.set_plan_discount_configuration(1,False,900)
+        self.assertEqual(self.calc([{"plan_id":1,"quantity":1}])["discount_bps"],0)
 
     def test_quantity_expansion_limit_and_payload_security(self):
         result=self.calc([{"plan_id":1,"quantity":2}])
@@ -115,7 +144,7 @@ class CustomerCartPhase1Test(unittest.TestCase):
         conn=sqlite3.connect(self.path)
         conn.execute("UPDATE productos SET precio='5', oferta_activa=0 WHERE id=1")
         conn.execute("UPDATE productos SET precio='5' WHERE id=2")
-        conn.execute("UPDATE customer_cart_discount_rules SET discount_bps=1000 WHERE minimum_eligible_services=2")
+        conn.execute("UPDATE productos SET descuento_carrito_bps=500 WHERE id IN (1,2)")
         conn.commit(); conn.close()
         result=self.calc([{"plan_id":1,"quantity":1},{"plan_id":2,"quantity":1}])
         self.assertEqual(result["discount_total"],1)
@@ -142,6 +171,7 @@ class CustomerCartPhase1Test(unittest.TestCase):
         conn=sqlite3.connect(self.path)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM productos").fetchone()[0],6)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM productos WHERE participa_descuento_carrito NOT IN (0,1)").fetchone()[0],0)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM productos WHERE descuento_carrito_bps NOT BETWEEN 0 AND 10000").fetchone()[0],0)
         with self.assertRaises(sqlite3.IntegrityError): conn.execute("INSERT INTO customer_cart_discount_rules(minimum_eligible_services,discount_bps,active) VALUES(1,500,1)")
         with self.assertRaises(sqlite3.IntegrityError): conn.execute("INSERT INTO customer_cart_discount_rules(minimum_eligible_services,discount_bps,active) VALUES(9,10001,1)")
         self.assertEqual(conn.execute("PRAGMA foreign_key_check").fetchall(), [])
@@ -149,7 +179,7 @@ class CustomerCartPhase1Test(unittest.TestCase):
 
     def test_preview_recalcula_y_no_acepta_autoridad_financiera(self):
         ok=self.client.post("/compras/carrito/preview",json={"items":[{"plan_id":1,"quantity":2}]})
-        self.assertEqual(ok.status_code,200); self.assertEqual(ok.get_json()["preview"]["total_final"],22800)
+        self.assertEqual(ok.status_code,200); self.assertEqual(ok.get_json()["preview"]["total_final"],23040)
         for extra in ("price","total","discount_bps","eligible"):
             response=self.client.post("/compras/carrito/preview",json={"items":[{"plan_id":1,"quantity":1,extra:1}]})
             self.assertEqual(response.status_code,400)
@@ -166,8 +196,8 @@ class CustomerCartPhase1Test(unittest.TestCase):
         self.assertEqual(self.client.post("/admin/productos/descuentos-carrito",json=payload,headers={"X-CSRF-Token":"token"}).status_code,409)
         payload["discount_bps"]=1600; payload["active"]=False
         self.assertEqual(self.client.put(f"/admin/productos/descuentos-carrito/{rule_id}",json=payload,headers={"X-CSRF-Token":"token"}).status_code,200)
-        self.assertEqual(self.client.patch("/admin/productos/3/descuento-carrito",json={"eligible":True},headers={"X-CSRF-Token":"token"}).status_code,200)
-        conn=sqlite3.connect(self.path); self.assertEqual(conn.execute("SELECT participa_descuento_carrito FROM productos WHERE id=3").fetchone()[0],1); conn.close()
+        self.assertEqual(self.client.patch("/admin/productos/3/descuento-carrito",json={"eligible":True,"discount_bps":250},headers={"X-CSRF-Token":"token"}).status_code,200)
+        conn=sqlite3.connect(self.path); self.assertEqual(conn.execute("SELECT participa_descuento_carrito,descuento_carrito_bps FROM productos WHERE id=3").fetchone(),(1,250)); conn.close()
         self.assertEqual(self.client.delete(f"/admin/productos/descuentos-carrito/{rule_id}",headers={"X-CSRF-Token":"token"}).status_code,200)
 
     def test_preview_no_crea_tablas_de_fases_posteriores(self):
@@ -188,10 +218,52 @@ class CustomerCartFrontendUxTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[1]
         cls.index = (root / "templates" / "index.html").read_text(encoding="utf-8")
         cls.cart_template = (root / "templates" / "_customer_cart.html").read_text(encoding="utf-8")
+        cls.admin_template = (root / "templates" / "admin" / "productos.html").read_text(encoding="utf-8")
+        cls.control_template = (root / "templates" / "admin" / "_producto_control.html").read_text(encoding="utf-8")
+        cls.admin_js = (root / "static" / "js" / "admin" / "productos.js").read_text(encoding="utf-8")
+        cls.admin_css = (root / "static" / "css" / "admin" / "productos.css").read_text(encoding="utf-8")
         cls.cart_js = (root / "static" / "js" / "customer-cart.js").read_text(encoding="utf-8")
         cls.mobile_js = (root / "static" / "js" / "mobile.js").read_text(encoding="utf-8")
         cls.css = (root / "static" / "css" / "style.css").read_text(encoding="utf-8")
         cls.modal_css = (root / "static" / "css" / "modal.css").read_text(encoding="utf-8")
+
+    def test_descuento_por_plan_reemplaza_modulo_global_sin_nuevo_amarillo(self):
+        self.assertNotIn("data-cart-discount-admin",self.admin_template)
+        self.assertNotIn("CONFIGURACIÓN COMERCIAL",self.admin_template)
+        self.assertIn("Descuento que aporta al carrito",self.control_template)
+        self.assertIn('name="percent"',self.control_template);self.assertIn("discount_bps",self.admin_js)
+        local_css=self.admin_css[self.admin_css.index(".producto-cart-discount-form"):]
+        self.assertNotIn("#eab308",local_css);self.assertNotIn("#f5c542",local_css)
+        self.assertIn("var(--admin-rojo,#ef2635)",local_css)
+
+    def test_guardado_descuento_restaura_loading_y_bloquea_doble_envio(self):
+        source=self.admin_js
+        self.assertIn('if (formulario.matches("[data-plan-discount-form]")) return;',source)
+        self.assertIn('if (planForm.dataset.saving === "1") return;',source)
+        self.assertIn('planForm.dataset.saving = "1";',source)
+        self.assertIn('button.textContent = "Guardando…";',source)
+        self.assertIn('planForm.dataset.saving = "0";',source)
+        self.assertIn("button.disabled = false;",source)
+        self.assertIn("button.textContent = originalText;",source)
+        self.assertIn('feedback.textContent = "Participación guardada.";',source)
+        handler=source.split('const planForm = evento.target.closest("[data-plan-discount-form]");',1)[1].split('document.addEventListener("change"',1)[0]
+        self.assertIn("finally {",handler);self.assertIn("catch (error)",handler)
+
+    def test_switch_descuento_mueve_knob_sin_opacar_el_modulo(self):
+        local_css=self.admin_css[self.admin_css.index(".producto-cart-discount-form"):]
+        self.assertIn("input[type=checkbox]+.producto-switch",local_css)
+        self.assertIn("background:#3b414b;opacity:1",local_css)
+        self.assertIn("input[type=checkbox]:checked+.producto-switch{background:var(--admin-rojo,#ef2635)}",local_css)
+        self.assertIn("input[type=checkbox]:checked+.producto-switch:after{transform:translateX(18px)}",local_css)
+        self.assertNotIn("input[type=checkbox]:not(:checked)+i{opacity",local_css)
+        self.assertNotIn(".producto-cart-discount-form{opacity",local_css)
+        self.assertIn(".producto-cart-discount-percent input:disabled{opacity:.45}",local_css)
+        self.assertIn("eligible.form.querySelector('[name=\"percent\"]').disabled = !eligible.checked;",self.admin_js)
+        self.assertIn("button.textContent = originalText;",self.admin_js)
+
+    def test_resumen_muestra_porcentaje_ahorro_y_total(self):
+        for text in ("Subtotal","Descuento acumulado","Ahorro","Total","data-cart-discount-percent"):
+            self.assertIn(text,self.cart_template)
 
     def test_tarjetas_no_agregan_directamente_y_ver_planes_permanece(self):
         self.assertNotIn('class="public-cart-add"', self.index)

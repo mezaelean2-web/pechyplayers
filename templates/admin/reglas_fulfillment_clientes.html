@@ -1,0 +1,26 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}Reglas clientes | PECHY ADMIN{% endblock %}
+{% block extra_css %}<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/reglas_reseller.css') }}">{% endblock %}
+{% block contenido %}
+<section class="rules-page" data-csrf-token="{{ csrf_token }}">
+  <header><div><span>CLIENTES · FULFILLMENT</span><h1>Reglas plan → inventario</h1><p>Autoridad independiente para cliente final. Configurar no reserva inventario ni procesa pedidos.</p></div></header>
+  <div class="rules-search" role="search"><label for="rulesSearch">Buscar reglas</label><div class="rules-search__control"><input id="rulesSearch" type="search" placeholder="Buscar producto, plan o ID..." autocomplete="off"><button id="rulesSearchClear" type="button" hidden>&times;</button></div></div>
+  {% if not plataformas %}<div class="rules-empty">Crea primero inventario Nube para disponer de plataformas controladas.</div>{% endif %}
+  <div class="rules-grid">
+  {% for item in reglas %}
+    <form class="rule-card" data-plan-id="{{ item.plan_id }}" data-producto="{{ item.producto|e }}" data-plan="{{ item.plan|e }}">
+      <div class="rule-title"><span>#{{ item.plan_id }}</span><h2>{{ item.producto }}</h2><p>{{ item.plan }}</p></div>
+      <label>Plataforma Nube<select name="plataforma" required><option value="">Seleccionar</option>{% for plataforma in plataformas %}<option value="{{ plataforma }}" {% if item.plataforma and item.plataforma|lower == plataforma|lower %}selected{% endif %}>{{ plataforma }}</option>{% endfor %}</select></label>
+      <label>Tipo de unidad<select name="tipo_unidad" required><option value="cuenta" {% if item.tipo_unidad == 'cuenta' %}selected{% endif %}>Cuenta completa</option><option value="perfil" {% if item.tipo_unidad == 'perfil' %}selected{% endif %}>Perfil</option></select></label>
+      <label>Duración (días)<input name="duracion_dias" type="number" min="1" max="3650" value="{{ item.duracion_dias or 30 }}" required></label>
+      <label class="rule-toggle"><input name="activo" type="checkbox" {% if item.activo %}checked{% endif %}><span>Regla activa</span></label>
+      <p>Disponibles actualmente: <strong>{{ item.disponibles if item.disponibles is not none else '—' }}</strong></p>
+      <button type="submit" {% if not plataformas %}disabled{% endif %}>Guardar configuración</button>
+      {% if item.reseller_plataforma %}<button class="copy-reseller" type="button" data-platform="{{ item.reseller_plataforma|e }}" data-unit="{{ item.reseller_tipo_unidad|e }}" data-days="{{ item.reseller_duracion_dias }}">Copiar configuración reseller</button><small>Copiará {{ item.reseller_plataforma }} · {{ 'Perfil' if item.reseller_tipo_unidad == 'perfil' else 'Cuenta completa' }} · {{ item.reseller_duracion_dias }} días y quedará inactiva.</small>{% endif %}
+      <small role="status"></small>
+    </form>
+  {% endfor %}
+  </div><div class="rules-no-results" id="rulesNoResults" role="status" hidden>Sin coincidencias.</div>
+</section>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/admin/reglas_clientes.js') }}"></script>{% endblock %}

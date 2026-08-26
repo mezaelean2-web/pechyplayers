@@ -9,25 +9,10 @@ import secrets
 import time
 from pathlib import Path
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+from dotenv import load_dotenv
 
 
-def _cargar_entorno_local():
-    """Carga .env sin sobrescribir variables definidas por el entorno real."""
-    ruta = Path(__file__).with_name(".env")
-    if not ruta.is_file():
-        return
-    for linea in ruta.read_text(encoding="utf-8-sig").splitlines():
-        linea = linea.strip()
-        if not linea or linea.startswith("#") or "=" not in linea:
-            continue
-        nombre, valor = linea.split("=", 1)
-        nombre = nombre.strip()
-        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", nombre):
-            if not os.environ.get(nombre):
-                os.environ[nombre] = valor.strip().strip("\"'")
-
-
-_cargar_entorno_local()
+load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
 
 from io import BytesIO
 from openpyxl import Workbook
@@ -45,6 +30,8 @@ import reseller_accounts
 import customer_cart
 import customer_orders
 import customer_bold_payments
+import customer_fulfillment_rules
+import customer_fulfillment
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -1269,7 +1256,6 @@ def admin_productos():
         "admin/productos.html",
         productos=productos,
         categorias=categorias,
-        reglas_descuento_carrito=customer_cart.list_discount_rules(),
         csrf_token=_csrf_revendedores_token()
     )
 
@@ -1326,10 +1312,10 @@ def elegibilidad_descuento_carrito_admin(plan_id):
     if not _validar_csrf_revendedores():
         return _error_revendedores("Token CSRF no válido.", 403)
     data = request.get_json(silent=True)
-    if not isinstance(data, dict) or set(data) != {"eligible"}:
+    if not isinstance(data, dict) or set(data) != {"eligible", "discount_bps"}:
         return _error_revendedores("Payload de elegibilidad no válido.")
     try:
-        customer_cart.set_plan_discount_eligibility(plan_id, data["eligible"])
+        customer_cart.set_plan_discount_configuration(plan_id, data["eligible"], data["discount_bps"])
     except LookupError as error:
         return _error_revendedores(error, 404)
     except ValueError as error:
@@ -1427,8 +1413,15 @@ def iniciar_pago_bold_cliente(public_order_id):
 @app.route("/compras/pago/resultado")
 def resultado_pago_bold_cliente():
     public_order_id = request.args.get("order", "")
-    return render_template("customer_payment_result.html", public_order_id=public_order_id,
-                           csrf_token=_csrf_customer_checkout_token())
+    response = app.make_response(render_template(
+        "customer_payment_result.html", public_order_id=public_order_id,
+        csrf_token=_csrf_customer_checkout_token()))
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @app.route("/compras/pedidos/<public_order_id>/estado")
@@ -1445,6 +1438,27 @@ def estado_pago_cliente(public_order_id):
     return response
 
 
+@app.route("/compras/pedidos/<public_order_id>/entrega")
+def entrega_pedido_cliente(public_order_id):
+    def secure(payload,status=200):
+        response=jsonify(payload);response.status_code=status
+        response.headers["Cache-Control"]="no-store, private"
+        response.headers["Pragma"]="no-cache"
+        response.headers["Expires"]="0"
+        response.headers["Referrer-Policy"]="no-referrer"
+        response.headers["X-Content-Type-Options"]="nosniff"
+        response.headers["Vary"]="Cookie"
+        return response
+    if not _validar_csrf_customer_checkout():
+        return secure({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
+    try:
+        delivery=customer_fulfillment.get_customer_delivery(
+            public_order_id,_customer_checkout_session_hash())
+    except customer_fulfillment.CustomerDeliveryNotFound:
+        return secure({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
+    return secure({"ok":True,"delivery":delivery})
+
+
 @app.route("/admin/pedidos-clientes")
 def admin_pedidos_clientes():
     if not session.get("admin"):
@@ -1452,7 +1466,10 @@ def admin_pedidos_clientes():
     filtro = request.args.get("estado", "pending")
     if filtro not in {"pending", "paid", "cancelled", "expired", "all"}:
         filtro = "pending"
-    return render_template("admin/pedidos_clientes.html", pedidos=customer_orders.list_orders_admin(filtro), filtro=filtro)
+    pedidos = customer_orders.list_orders_admin(filtro)
+    for pedido in pedidos:
+        pedido["fulfillment"] = customer_fulfillment.get_admin(pedido["internal_id"])
+    return render_template("admin/pedidos_clientes.html", pedidos=pedidos, filtro=filtro)
 
 
 @app.route("/admin/pedidos-clientes/<public_order_id>")
@@ -1463,7 +1480,8 @@ def admin_pedido_cliente_detalle(public_order_id):
     if pedido is None:
         return render_template("admin/pedido_cliente_detalle.html", pedido=None), 404
     return render_template("admin/pedido_cliente_detalle.html", pedido=pedido,
-                           pago=customer_bold_payments.get_payment_admin(pedido["internal_id"]))
+                           pago=customer_bold_payments.get_payment_admin(pedido["internal_id"]),
+                           fulfillment=customer_fulfillment.get_admin(pedido["internal_id"]))
 
 
 @app.route("/admin/reglas-inventario-reseller")
@@ -1505,6 +1523,59 @@ def guardar_regla_inventario_reseller_admin(plan_id):
     return jsonify({"ok": True, "regla": regla})
 
 
+@app.route("/admin/reglas-fulfillment-clientes")
+def admin_reglas_fulfillment_clientes():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    customer_fulfillment_rules.initialize_schema()
+    return render_template(
+        "admin/reglas_fulfillment_clientes.html",
+        reglas=customer_fulfillment_rules.listar_reglas_admin(),
+        plataformas=customer_fulfillment_rules.listar_plataformas_inventario(),
+        csrf_token=_csrf_admin_token(),
+    )
+
+
+@app.route("/admin/reglas-fulfillment-clientes/<int:plan_id>", methods=["POST"])
+def guardar_regla_fulfillment_cliente_admin(plan_id):
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_admin():
+        return _error_revendedores("Token CSRF no valido.", 403)
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict) or set(datos) != {
+            "plataforma", "tipo_unidad", "duracion_dias", "activo"}:
+        return _error_revendedores("Payload de regla no valido.")
+    try:
+        regla = customer_fulfillment_rules.guardar_regla(
+            plan_id, datos["plataforma"], datos["tipo_unidad"],
+            datos["duracion_dias"], datos["activo"])
+    except LookupError as error:
+        return _error_revendedores(error, 404)
+    except (TypeError, ValueError) as error:
+        return _error_revendedores(error)
+    registrar_historial(f"Regla cliente del plan #{plan_id} actualizada por {_actor_admin()}")
+    return jsonify({"ok": True, "regla": regla})
+
+
+@app.route("/admin/reglas-fulfillment-clientes/<int:plan_id>/copiar-reseller", methods=["POST"])
+def copiar_regla_reseller_a_cliente_admin(plan_id):
+    if not session.get("admin"):
+        return _error_revendedores("No autorizado", 401)
+    if not _validar_csrf_admin():
+        return _error_revendedores("Token CSRF no valido.", 403)
+    if not request.is_json or request.get_json(silent=True) != {}:
+        return _error_revendedores("La copia no acepta valores de inventario desde el navegador.")
+    try:
+        regla = customer_fulfillment_rules.copiar_desde_reseller(plan_id)
+    except LookupError as error:
+        return _error_revendedores(error, 404)
+    except (TypeError, ValueError) as error:
+        return _error_revendedores(error)
+    registrar_historial(f"Regla reseller copiada como regla cliente inactiva para plan #{plan_id} por {_actor_admin()}")
+    return jsonify({"ok": True, "regla": regla})
+
+
 def _obtener_producto_por_plan(id_plan):
     """Resuelve el grupo histórico de producto desde un ID real de plan."""
     conn = conectar()
@@ -1514,11 +1585,16 @@ def _obtener_producto_por_plan(id_plan):
             "p.participa_descuento_carrito"
             if "participa_descuento_carrito" in columnas_producto else "0"
         )
+        descuento_bps_sql = (
+            "p.descuento_carrito_bps"
+            if "descuento_carrito_bps" in columnas_producto else "0"
+        )
         filas = conn.execute(
             f"""
             SELECT p.id, p.nombre, p.imagen, p.plan, p.precio, p.oferta_precio,
                    oferta_activa, destacado, visible, estado, categoria,
                    orden_categoria, {elegibilidad_sql} AS participa_descuento_carrito,
+                   {descuento_bps_sql} AS descuento_carrito_bps,
                    g.precio AS precio_reseller_general,
                    g.activo AS precio_reseller_activo
             FROM productos AS p
@@ -1556,6 +1632,7 @@ def _obtener_producto_por_plan(id_plan):
                 "destacado": fila["destacado"],
                 "visible": fila["visible"]
                 ,"participa_descuento_carrito": fila["participa_descuento_carrito"]
+                ,"descuento_carrito_bps": fila["descuento_carrito_bps"]
             }
             for fila in filas
         ]

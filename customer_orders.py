@@ -207,7 +207,11 @@ def _cancel_current_in_cursor(conn, session_hash, now):
     checkout = conn.execute("SELECT current_order_id FROM customer_checkout_sessions WHERE session_hash=?", (session_hash,)).fetchone()
     if not checkout or checkout["current_order_id"] is None:
         return "none", None
-    order = conn.execute("SELECT id,public_order_id,status,guest_session_hash FROM customer_orders WHERE id=?", (checkout["current_order_id"],)).fetchone()
+    order = conn.execute("""SELECT o.id,o.public_order_id,o.status,o.guest_session_hash,
+        f.status AS fulfillment_status
+        FROM customer_orders o
+        LEFT JOIN customer_order_fulfillments f ON f.order_id=o.id
+        WHERE o.id=?""", (checkout["current_order_id"],)).fetchone()
     if not order or order["guest_session_hash"] != session_hash:
         return "ownership_mismatch", None
     if order["status"] == "pending_payment":
@@ -215,6 +219,10 @@ def _cancel_current_in_cursor(conn, session_hash, now):
         return "cancelled", order["public_order_id"]
     if order["status"] == "cancelled":
         return "already_cancelled", order["public_order_id"]
+    # Un pedido pagado solo deja de ser el checkout activo cuando su entrega
+    # completa ya hizo commit. El pedido historico y su autorizacion permanecen.
+    if order["status"] == "paid" and order["fulfillment_status"] == "fulfilled":
+        return "terminal_fulfilled", order["public_order_id"]
     return "not_cancellable", order["public_order_id"]
 
 
@@ -334,7 +342,7 @@ def list_orders_admin(filter_name="pending"):
         filter_name = "pending"
     conn = database.conectar()
     try:
-        base = "SELECT public_order_id,status,customer_first_name,customer_last_name,customer_whatsapp,subtotal,discount_total,total,currency,item_count,eligible_item_count,created_at,expires_at FROM customer_orders"
+        base = "SELECT id AS internal_id,public_order_id,status,customer_first_name,customer_last_name,customer_whatsapp,subtotal,discount_total,total,currency,item_count,eligible_item_count,created_at,expires_at FROM customer_orders"
         values = filters[filter_name]
         if values:
             base += " WHERE status=?"

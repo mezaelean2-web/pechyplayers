@@ -564,6 +564,10 @@ def inicializar_db():
     customer_orders.initialize_schema(conn)
     import customer_bold_payments
     customer_bold_payments.initialize_schema(conn)
+    import customer_fulfillment_rules
+    customer_fulfillment_rules.initialize_schema(conn)
+    import customer_fulfillment
+    customer_fulfillment.initialize_schema(conn)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS promociones (
@@ -1292,8 +1296,13 @@ CREATE TABLE IF NOT EXISTS cartelera_plataformas (
 def obtener_productos():
     conn = conectar()
     cursor = conn.cursor()
+    columnas_producto = {fila[1] for fila in cursor.execute("PRAGMA table_info(productos)")}
+    descuento_bps_sql = (
+        "descuento_carrito_bps"
+        if "descuento_carrito_bps" in columnas_producto else "0 AS descuento_carrito_bps"
+    )
 
-    cursor.execute("""
+    cursor.execute(f"""
 SELECT
     id,
     nombre,
@@ -1307,7 +1316,8 @@ SELECT
     estado,
     categoria,
     orden_categoria,
-    participa_descuento_carrito
+    participa_descuento_carrito,
+    {descuento_bps_sql}
 FROM productos
 ORDER BY
     CASE
@@ -1336,7 +1346,8 @@ ORDER BY
     estado,
     categoria,
     orden_categoria,
-    participa_descuento_carrito
+    participa_descuento_carrito,
+    descuento_carrito_bps
 ) in filas:
         if nombre not in productos:
             productos[nombre] = {
@@ -1359,6 +1370,7 @@ ORDER BY
             "destacado": destacado,
             "visible": visible
             ,"participa_descuento_carrito": participa_descuento_carrito
+            ,"descuento_carrito_bps": descuento_carrito_bps
         })
 
     return list(productos.values())
@@ -6334,6 +6346,7 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
         permitidas = {
             ("nube_cuentas", "plataforma"),
             ("reseller_plan_inventory_rules", "plataforma"),
+            ("customer_plan_fulfillment_rules", "plataforma"),
             ("cartelera_plataformas", "plataforma"),
         }
         encontradas = set()
@@ -6365,6 +6378,9 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
         reglas = cursor.execute(
             "SELECT id, plataforma FROM reseller_plan_inventory_rules"
         ).fetchall()
+        reglas_cliente = cursor.execute(
+            "SELECT id, plataforma FROM customer_plan_fulfillment_rules"
+        ).fetchall()
         cuentas_origen = [
             fila for fila in cuentas
             if _clave_plataforma_nube(fila["plataforma"]) == clave_actual
@@ -6373,13 +6389,17 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
             fila for fila in reglas
             if _clave_plataforma_nube(fila["plataforma"]) == clave_actual
         ]
+        reglas_cliente_origen = [
+            fila for fila in reglas_cliente
+            if _clave_plataforma_nube(fila["plataforma"]) == clave_actual
+        ]
         if not cuentas_origen:
             raise RenombrarPlataformaNubeError(
                 "plataforma_no_encontrada", "La plataforma no existe en Nube."
             )
         if any(
             _clave_plataforma_nube(fila["plataforma"]) == clave_nueva
-            for fila in [*cuentas, *reglas]
+            for fila in [*cuentas, *reglas, *reglas_cliente]
         ):
             raise RenombrarPlataformaNubeError(
                 "plataforma_existente",
@@ -6388,6 +6408,7 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
 
         ids_cuentas = [fila["id"] for fila in cuentas_origen]
         ids_reglas = [fila["id"] for fila in reglas_origen]
+        ids_reglas_cliente = [fila["id"] for fila in reglas_cliente_origen]
         cursor.executemany(
             "UPDATE nube_cuentas SET plataforma=? WHERE id=?",
             [(nuevo, cuenta_id) for cuenta_id in ids_cuentas],
@@ -6402,6 +6423,14 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
             )
             if cursor.rowcount != len(ids_reglas):
                 raise RuntimeError("No se actualizaron todas las reglas reseller.")
+        if ids_reglas_cliente:
+            cursor.executemany(
+                """UPDATE customer_plan_fulfillment_rules
+                   SET plataforma=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                [(nuevo, regla_id) for regla_id in ids_reglas_cliente],
+            )
+            if cursor.rowcount != len(ids_reglas_cliente):
+                raise RuntimeError("No se actualizaron todas las reglas de cliente final.")
 
         cuentas_finales = cursor.execute(
             "SELECT plataforma FROM nube_cuentas"
@@ -6409,9 +6438,12 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
         reglas_finales = cursor.execute(
             "SELECT plataforma FROM reseller_plan_inventory_rules"
         ).fetchall()
+        reglas_cliente_finales = cursor.execute(
+            "SELECT plataforma FROM customer_plan_fulfillment_rules"
+        ).fetchall()
         if any(
             _clave_plataforma_nube(fila["plataforma"]) == clave_actual
-            for fila in [*cuentas_finales, *reglas_finales]
+            for fila in [*cuentas_finales, *reglas_finales, *reglas_cliente_finales]
         ):
             raise RuntimeError("Quedaron referencias operativas con el nombre anterior.")
         if sum(
@@ -6427,6 +6459,7 @@ def renombrar_plataforma_nube(nombre_actual, nombre_nuevo):
             "nombre_nuevo": nuevo,
             "cuentas_actualizadas": len(ids_cuentas),
             "reglas_actualizadas": len(ids_reglas),
+            "reglas_cliente_actualizadas": len(ids_reglas_cliente),
         }
     except Exception:
         conn.rollback()

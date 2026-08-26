@@ -48,6 +48,11 @@ def initialize_schema(connection=None):
                 "ALTER TABLE productos ADD COLUMN participa_descuento_carrito "
                 "INTEGER NOT NULL DEFAULT 0 CHECK (participa_descuento_carrito IN (0,1))"
             )
+        if "descuento_carrito_bps" not in columns:
+            conn.execute(
+                "ALTER TABLE productos ADD COLUMN descuento_carrito_bps "
+                "INTEGER NOT NULL DEFAULT 0 CHECK (descuento_carrito_bps BETWEEN 0 AND 10000)"
+            )
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS customer_cart_discount_rules (
@@ -136,15 +141,19 @@ def delete_discount_rule(rule_id):
         conn.close()
 
 
-def set_plan_discount_eligibility(plan_id, eligible):
+def set_plan_discount_configuration(plan_id, eligible, discount_bps):
     if eligible is not True and eligible is not False:
         raise ValueError("La elegibilidad debe ser true o false.")
+    if isinstance(discount_bps, bool) or not isinstance(discount_bps, int):
+        raise ValueError("El porcentaje debe expresarse en puntos base enteros.")
+    if not 0 <= discount_bps <= 10000:
+        raise ValueError("El porcentaje debe estar entre 0% y 100%.")
     conn = database.conectar()
     try:
         conn.execute("BEGIN IMMEDIATE")
         cursor = conn.execute(
-            "UPDATE productos SET participa_descuento_carrito=? WHERE id=?",
-            (1 if eligible else 0, int(plan_id)),
+            "UPDATE productos SET participa_descuento_carrito=?,descuento_carrito_bps=? WHERE id=?",
+            (1 if eligible else 0, discount_bps, int(plan_id)),
         )
         if cursor.rowcount != 1:
             raise LookupError("El plan no existe.")
@@ -188,7 +197,7 @@ def calculate_cart(payload, connection=None):
         for plan_id, quantity in requested:
             row = conn.execute(
                 """SELECT id, nombre, plan, precio, oferta_precio, oferta_activa,
-                          visible, estado, participa_descuento_carrito
+                          visible, estado, participa_descuento_carrito,descuento_carrito_bps
                    FROM productos WHERE id=?""",
                 (plan_id,),
             ).fetchone()
@@ -209,19 +218,13 @@ def calculate_cart(payload, connection=None):
                     "precio_lista": list_price, "precio_efectivo": effective_price,
                     "oferta_aplicada": offer_applied,
                     "discount_eligible": row["participa_descuento_carrito"] == 1,
+                    "discount_contribution_bps": row["descuento_carrito_bps"] if row["participa_descuento_carrito"] == 1 else 0,
                 })
         eligible_count = sum(1 for line in lines if line["discount_eligible"])
-        rule = conn.execute(
-            """SELECT id, minimum_eligible_services, discount_bps
-               FROM customer_cart_discount_rules
-               WHERE active=1 AND minimum_eligible_services<=?
-               ORDER BY minimum_eligible_services DESC LIMIT 1""",
-            (eligible_count,),
-        ).fetchone()
     finally:
         if owns_connection:
             conn.close()
-    bps = rule["discount_bps"] if rule else 0
+    bps = min(sum(line["discount_contribution_bps"] for line in lines), 10000)
     eligible_subtotal = sum(line["precio_efectivo"] for line in lines if line["discount_eligible"])
     excluded_subtotal = sum(line["precio_efectivo"] for line in lines if not line["discount_eligible"])
     discount_total = (eligible_subtotal * bps + 5000) // 10000
@@ -243,8 +246,7 @@ def calculate_cart(payload, connection=None):
         "subtotal_lista": sum(line["precio_lista"] for line in lines),
         "subtotal_bruto": gross, "subtotal_elegible": eligible_subtotal,
         "subtotal_excluido": excluded_subtotal,
-        "discount_rule_id": rule["id"] if rule else None,
-        "discount_min_items": rule["minimum_eligible_services"] if rule else None,
+        "discount_rule_id": None, "discount_min_items": None,
         "discount_bps": bps, "discount_total": discount_total,
         "total_final": gross - discount_total, "currency": "COP",
     }

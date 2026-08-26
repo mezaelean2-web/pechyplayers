@@ -6,11 +6,13 @@ except ModuleNotFoundError:
 import os
 import sqlite3
 import tempfile
+import threading
 import unittest
 from datetime import datetime
 from pathlib import Path
 
 import customer_cart
+import customer_fulfillment
 import customer_orders
 import database
 from app import app
@@ -48,6 +50,8 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         conn.execute("INSERT INTO customer_cart_discount_rules(minimum_eligible_services,discount_bps,active) VALUES(2,500,1)")
         conn.commit(); conn.close()
         customer_orders.initialize_schema()
+        customer_fulfillment.initialize_schema()
+        conn=sqlite3.connect(path);conn.execute("UPDATE productos SET descuento_carrito_bps=250 WHERE id IN (1,2)");conn.commit();conn.close()
         app.config.update(TESTING=True)
         self.client = app.test_client()
         self.guest_hash = "1" * 64
@@ -99,6 +103,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         order,_=self.create(self.payload([{"plan_id":1,"quantity":2}],"c"*32))
         conn=sqlite3.connect(self.path)
         conn.execute("UPDATE productos SET precio='99.000',oferta_precio='88.000' WHERE id=1")
+        conn.execute("UPDATE productos SET descuento_carrito_bps=5000 WHERE id=1")
         conn.execute("UPDATE customer_cart_discount_rules SET discount_bps=4000")
         conn.commit();conn.close()
         saved=customer_orders.get_order_admin(order["id"])
@@ -126,6 +131,70 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         self.assertEqual((saved_a["subtotal"],len(saved_a["items"])),(12000,1))
         self.assertEqual(order_b["status"],"pending_payment")
         self.assertEqual((order_b["subtotal"],len(order_b["items"])),(22001,2))
+
+    def _set_order_and_fulfillment_status(self, public_id, order_status, fulfillment_status=None):
+        conn=sqlite3.connect(self.path)
+        order_id=conn.execute("SELECT id FROM customer_orders WHERE public_order_id=?",(public_id,)).fetchone()[0]
+        conn.execute("UPDATE customer_orders SET status=? WHERE id=?",(order_status,order_id))
+        if fulfillment_status is not None:
+            conn.execute("INSERT INTO customer_order_fulfillments(order_id,status) VALUES(?,?)",(order_id,fulfillment_status))
+        conn.commit();conn.close()
+        return order_id
+
+    def test_paid_fulfilled_es_terminal_y_nuevo_pedido_reemplaza_solo_el_puntero(self):
+        old,_=self.create(self.payload(key="q"*32))
+        old_id=self._set_order_and_fulfillment_status(old["id"],"paid","fulfilled")
+        conn=sqlite3.connect(self.path)
+        before_order=conn.execute("SELECT status,updated_at,guest_session_hash FROM customer_orders WHERE id=?",(old_id,)).fetchone()
+        before_fulfillment=conn.execute("SELECT * FROM customer_order_fulfillments WHERE order_id=?",(old_id,)).fetchone()
+        before_lines=conn.execute("SELECT * FROM customer_order_fulfillment_lines WHERE fulfillment_id=?",(before_fulfillment[0],)).fetchall()
+        conn.close()
+
+        new,created=self.create(self.payload([{"plan_id":2,"quantity":1}],key="r"*32))
+        retry,created_again=self.create(self.payload([{"plan_id":2,"quantity":1}],key="r"*32))
+
+        self.assertTrue(created);self.assertFalse(created_again);self.assertEqual(retry,new);self.assertEqual(new["status"],"pending_payment")
+        conn=sqlite3.connect(self.path)
+        self.assertEqual(conn.execute("SELECT COUNT(*) FROM customer_orders").fetchone()[0],2)
+        self.assertEqual(conn.execute("SELECT current_order_id FROM customer_checkout_sessions WHERE session_hash=?",(self.guest_hash,)).fetchone()[0],conn.execute("SELECT id FROM customer_orders WHERE public_order_id=?",(new["id"],)).fetchone()[0])
+        self.assertEqual(conn.execute("SELECT status,updated_at,guest_session_hash FROM customer_orders WHERE id=?",(old_id,)).fetchone(),before_order)
+        self.assertEqual(conn.execute("SELECT * FROM customer_order_fulfillments WHERE order_id=?",(old_id,)).fetchone(),before_fulfillment)
+        self.assertEqual(conn.execute("SELECT * FROM customer_order_fulfillment_lines WHERE fulfillment_id=?",(before_fulfillment[0],)).fetchall(),before_lines)
+        conn.close()
+
+    def test_paid_no_terminal_permanece_fail_closed(self):
+        for index,fulfillment_status in enumerate((None,"pending","processing","review")):
+            with self.subTest(fulfillment_status=fulfillment_status):
+                old,_=self.create(self.payload(key=(str(index)+"s")*16))
+                self._set_order_and_fulfillment_status(old["id"],"paid",fulfillment_status)
+                with self.assertRaises(customer_orders.OrderValidationError) as caught:
+                    self.create(self.payload([{"plan_id":2,"quantity":1}],key=(str(index)+"t")*16))
+                self.assertEqual(caught.exception.code,"current_order_not_cancellable")
+                conn=sqlite3.connect(self.path)
+                conn.execute("UPDATE customer_orders SET status='cancelled' WHERE public_order_id=?",(old["id"],));conn.commit();conn.close()
+
+    def test_concurrencia_desde_terminal_deja_un_solo_nuevo_pedido_activo(self):
+        old,_=self.create(self.payload(key="u"*32))
+        old_id=self._set_order_and_fulfillment_status(old["id"],"paid","fulfilled")
+        barrier=threading.Barrier(2);results=[];errors=[]
+        def create_new(key,plan_id):
+            try:
+                barrier.wait()
+                results.append(self.create(self.payload([{"plan_id":plan_id,"quantity":1}],key=key))[0])
+            except Exception as error:
+                errors.append(error)
+        threads=[threading.Thread(target=create_new,args=("v"*32,1)),threading.Thread(target=create_new,args=("w"*32,2))]
+        for thread in threads:thread.start()
+        for thread in threads:thread.join()
+        self.assertFalse(errors);self.assertEqual(len(results),2)
+        conn=sqlite3.connect(self.path)
+        active=conn.execute("SELECT id,public_order_id FROM customer_orders WHERE status='pending_payment'").fetchall()
+        current=conn.execute("SELECT current_order_id FROM customer_checkout_sessions WHERE session_hash=?",(self.guest_hash,)).fetchone()[0]
+        self.assertEqual(len(active),1);self.assertEqual(active[0][0],current)
+        self.assertIn(active[0][1],{result["id"] for result in results})
+        self.assertEqual(conn.execute("SELECT status FROM customer_orders WHERE id=?",(old_id,)).fetchone()[0],"paid")
+        self.assertEqual(conn.execute("SELECT status FROM customer_order_fulfillments WHERE order_id=?",(old_id,)).fetchone()[0],"fulfilled")
+        conn.close()
 
     def test_cancelar_actual_es_idempotente_y_aislado_por_sesion(self):
         order,_=self.create(self.payload(key="l"*32))
@@ -180,7 +249,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         response=self.client.post("/compras/pedidos",json=payload,headers={"X-CSRF-Token":"token"})
         self.assertEqual(response.status_code,201)
         self.assertNotIn("customer",response.get_json()["order"])
-        self.assertEqual(response.get_json()["order"]["total"],12000)
+        self.assertEqual(response.get_json()["order"]["total"],11700)
         retry=self.client.post("/compras/pedidos",json=payload,headers={"X-CSRF-Token":"token"})
         self.assertEqual(retry.status_code,200)
 

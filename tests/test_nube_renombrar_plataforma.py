@@ -10,6 +10,8 @@ import unittest
 from pathlib import Path
 
 import database
+import customer_fulfillment
+import customer_orders
 import reseller_accounts
 import resellers
 from app import app
@@ -71,10 +73,18 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
         )
         return cuenta_id
 
+    def _regla_cliente(self, plan_id, plataforma="YouTube Premium", tipo="cuenta", dias=30, activo=1):
+        conn=database.conectar()
+        cursor=conn.execute("""INSERT INTO customer_plan_fulfillment_rules
+            (plan_id,plataforma,tipo_unidad,duracion_dias,activo) VALUES(?,?,?,?,?)""",
+            (plan_id,plataforma,tipo,dias,activo))
+        conn.commit();conn.close();return cursor.lastrowid
+
     def test_renombra_cuentas_modalidades_y_reglas_sin_tocar_historial(self):
         cuenta = self._cuenta("completa@test.com", "cuenta_completa", 30)
         madre = self._cuenta("perfiles@test.com", "perfiles", 90, perfiles=2)
         planes = [self._plan("YouTube 30", 30), self._plan("YouTube 90", 90, "perfil")]
+        regla_cliente_id=self._regla_cliente(planes[0],activo=0)
         conn = database.conectar()
         conn.execute(
             "INSERT INTO nube_movimientos(cuenta_id,tipo,descripcion) VALUES (?,'alta','YouTube Premium original')",
@@ -83,6 +93,8 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
         perfiles_antes = [fila[0] for fila in conn.execute(
             "SELECT id FROM nube_perfiles WHERE cuenta_id=? ORDER BY id", (madre,)
         )]
+        regla_cliente_antes=conn.execute("""SELECT plan_id,tipo_unidad,duracion_dias,activo,created_at
+            FROM customer_plan_fulfillment_rules WHERE id=?""",(regla_cliente_id,)).fetchone()
         conn.commit()
         conn.close()
 
@@ -92,6 +104,7 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
 
         self.assertEqual(resultado["cuentas_actualizadas"], 2)
         self.assertEqual(resultado["reglas_actualizadas"], 2)
+        self.assertEqual(resultado["reglas_cliente_actualizadas"], 1)
         conn = database.conectar()
         self.assertEqual(
             [fila[0] for fila in conn.execute("SELECT DISTINCT plataforma FROM nube_cuentas")],
@@ -109,6 +122,10 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
             )],
             perfiles_antes,
         )
+        regla_cliente_despues=conn.execute("""SELECT plan_id,tipo_unidad,duracion_dias,activo,created_at,plataforma
+            FROM customer_plan_fulfillment_rules WHERE id=?""",(regla_cliente_id,)).fetchone()
+        self.assertEqual(tuple(regla_cliente_despues[:5]),tuple(regla_cliente_antes))
+        self.assertEqual(regla_cliente_despues[5],"YouTube Familiar")
         self.assertEqual(
             conn.execute(
                 "SELECT descripcion FROM nube_movimientos WHERE cuenta_id=? AND tipo='alta' ORDER BY id DESC LIMIT 1",
@@ -167,6 +184,41 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
         conn = database.conectar()
         self.assertEqual(conn.execute("SELECT plataforma FROM nube_cuentas").fetchone()[0], "YouTube Premium")
         self.assertEqual(conn.execute("SELECT plataforma FROM reseller_plan_inventory_rules").fetchone()[0], "YouTube Premium")
+        conn.close()
+
+    def test_rollback_total_si_falla_regla_cliente(self):
+        self._cuenta("rollback-cliente@test.com","cuenta_completa",30)
+        plan=self._plan("YouTube 30",30);self._regla_cliente(plan)
+        conn=database.conectar()
+        conn.execute("""CREATE TRIGGER bloquear_renombre_regla_cliente
+            BEFORE UPDATE OF plataforma ON customer_plan_fulfillment_rules
+            BEGIN SELECT RAISE(ABORT,'fallo cliente controlado'); END""")
+        conn.commit();conn.close()
+        with self.assertRaises(sqlite3.IntegrityError):
+            database.renombrar_plataforma_nube("YouTube Premium","YouTube Nuevo")
+        conn=database.conectar()
+        self.assertEqual(conn.execute("SELECT plataforma FROM nube_cuentas").fetchone()[0],"YouTube Premium")
+        self.assertEqual(conn.execute("SELECT plataforma FROM reseller_plan_inventory_rules").fetchone()[0],"YouTube Premium")
+        self.assertEqual(conn.execute("SELECT plataforma FROM customer_plan_fulfillment_rules").fetchone()[0],"YouTube Premium")
+        conn.close()
+
+    def test_fulfillment_cliente_funciona_despues_del_rename(self):
+        self._cuenta("fulfillment@test.com","cuenta_completa",30)
+        plan=self._plan("YouTube Cliente",30);self._regla_cliente(plan,activo=1)
+        resultado=database.renombrar_plataforma_nube("YouTube Premium","YouTube Plus")
+        self.assertEqual(resultado["reglas_cliente_actualizadas"],1)
+        payload={"customer":{"first_name":"Ana","last_name":"Pérez","whatsapp":"3001234567","country_code":"+57"},
+            "items":[{"plan_id":plan,"quantity":1}],"idempotency_key":"rename-fulfillment-customer-0001"}
+        order,_=customer_orders.create_order(payload,guest_session_hash="8"*64)
+        conn=database.conectar();order_id=conn.execute("SELECT id FROM customer_orders WHERE public_order_id=?",(order["id"],)).fetchone()[0]
+        conn.execute("UPDATE customer_orders SET status='paid' WHERE id=?",(order_id,));conn.commit();conn.close()
+        fulfilled=customer_fulfillment.fulfill_customer_order(order_id)
+        self.assertEqual(fulfilled["status"],"fulfilled")
+        conn=database.conectar()
+        self.assertEqual(conn.execute("SELECT plataforma FROM customer_plan_fulfillment_rules WHERE plan_id=?",(plan,)).fetchone()[0],"YouTube Plus")
+        self.assertEqual(conn.execute("""SELECT c.plataforma FROM customer_order_fulfillment_lines fl
+            JOIN customer_order_fulfillments f ON f.id=fl.fulfillment_id
+            JOIN nube_cuentas c ON c.id=fl.nube_account_id WHERE f.order_id=?""",(order_id,)).fetchone()[0],"YouTube Plus")
         conn.close()
 
     def test_fail_closed_ante_referencia_de_plataforma_no_reconocida(self):

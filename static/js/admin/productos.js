@@ -283,6 +283,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (titulo?.id) modal?.setAttribute("aria-labelledby", titulo.id);
 
         modalContent.querySelectorAll("form").forEach(function (formulario) {
+            if (formulario.matches("[data-plan-discount-form]")) return;
             formulario.addEventListener("submit", function () {
                 const boton = formulario.querySelector('button[type="submit"]');
                 if (!boton) return;
@@ -506,18 +507,32 @@ document.addEventListener("submit", async function (evento) {
     evento.preventDefault();
     const button = planForm.querySelector('button[type="submit"]');
     const feedback = planForm.querySelector("[data-plan-discount-feedback]");
+    if (planForm.dataset.saving === "1") return;
+    planForm.dataset.saving = "1";
+    const originalText = button.textContent;
     button.disabled = true;
+    button.textContent = "Guardando…";
     try {
         const response = await fetch(`/admin/productos/${encodeURIComponent(planForm.dataset.planId)}/descuento-carrito`, {
             method: "PATCH",
             headers: {"Content-Type": "application/json", "X-CSRF-Token": planForm.querySelector('[name="csrf_token"]').value},
-            body: JSON.stringify({eligible: planForm.querySelector('[name="eligible"]').checked})
+            body: JSON.stringify({eligible: planForm.querySelector('[name="eligible"]').checked, discount_bps: Math.round(Number(planForm.querySelector('[name="percent"]').value) * 100)})
         });
         const data = await response.json().catch(function () { return {}; });
         if (!response.ok) throw new Error(data.mensaje || "No fue posible guardar.");
         feedback.textContent = "Participación guardada.";
     } catch (error) { feedback.textContent = error.message; }
-    finally { button.disabled = false; }
+    finally {
+        planForm.dataset.saving = "0";
+        button.disabled = false;
+        button.textContent = originalText;
+    }
+});
+
+document.addEventListener("change", function (evento) {
+    const eligible = evento.target.closest('[data-plan-discount-form] [name="eligible"]');
+    if (!eligible) return;
+    eligible.form.querySelector('[name="percent"]').disabled = !eligible.checked;
 });
 
 document.addEventListener("DOMContentLoaded", function () {

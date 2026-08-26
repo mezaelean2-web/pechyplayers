@@ -70,7 +70,8 @@
                         <form class="producto-cart-discount-form" data-plan-discount-form data-plan-id="{{ plan.id }}">
                             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <label for="modalCartDiscount-{{ plan.id }}"><span><strong>Participa en descuentos del carrito</strong><small>Este ajuste afecta únicamente a este plan.</small></span><input id="modalCartDiscount-{{ plan.id }}" type="checkbox" name="eligible" {% if plan.participa_descuento_carrito == 1 %}checked{% endif %}><i class="producto-switch"></i></label>
-                            <button type="submit">Guardar participación</button><small data-plan-discount-feedback aria-live="polite"></small>
+                            <label class="producto-cart-discount-percent" for="modalCartDiscountPercent-{{ plan.id }}"><span>Descuento que aporta al carrito</span><span><input id="modalCartDiscountPercent-{{ plan.id }}" name="percent" type="number" min="0" max="100" step="0.01" value="{{ plan.descuento_carrito_bps / 100 }}" {% if plan.participa_descuento_carrito != 1 %}disabled{% endif %} required><b>%</b></span></label>
+                            <button type="submit">Guardar participación y descuento</button><small data-plan-discount-feedback aria-live="polite"></small>
                         </form>
                         <form action="/eliminar-plan" method="POST" onsubmit="return confirm('¿Seguro que quieres eliminar este plan?')" class="producto-danger-form"><input type="hidden" name="id" value="{{ plan.id }}"><button type="submit">Eliminar plan</button></form>
                     </article>

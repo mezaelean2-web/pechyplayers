@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 
 import bold_recharges
 import database
+import customer_fulfillment
 
 PROVIDER = "bold"
 CURRENCY = "COP"
@@ -281,6 +282,13 @@ def _confirm(intent_id, *, reference, transaction_id, amount, currency, official
                official_status=official_status, source=source, result="processed", http_status=http_status,
                evidence_sha256=evidence_sha256, detail="currency_confirmed_by_webhook" if currency else "currency_from_signed_local_checkout_not_returned_by_voucher")
         conn.commit()
+        # Transaccion separada: un fallo de inventario nunca revierte ni desacredita el pago.
+        try:
+            customer_fulfillment.fulfill_customer_order(order["id"])
+        except Exception:
+            # El proveedor debe recibir confirmacion financiera aunque el subsistema
+            # de fulfillment no pueda ni siquiera registrar su estado de revision.
+            pass
         return {"status": "processed", "reason": "payment_confirmed"}
     except Exception:
         conn.rollback()
@@ -408,7 +416,15 @@ def get_status(public_order_id, guest_session_hash, *, reconcile=False):
             should_reconcile = not last or (_now()-last).total_seconds() >= RECONCILE_COOLDOWN_SECONDS
             if should_reconcile:
                 conn.execute("UPDATE customer_bold_payment_intents SET last_checked_at=CURRENT_TIMESTAMP WHERE id=?", (intent["id"],)); conn.commit()
-        result = {"order_id": public_order_id, "status": order["status"], "payment_status": intent["status"] if intent else None}
+        fulfillment = None
+        if conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='customer_order_fulfillments'").fetchone():
+            fulfillment = conn.execute(
+                "SELECT status FROM customer_order_fulfillments WHERE order_id=?", (order["id"],)).fetchone()
+        fulfillment_status = fulfillment["status"] if fulfillment else None
+        result = {"order_id": public_order_id, "status": order["status"],
+                  "payment_status": intent["status"] if intent else None,
+                  "fulfillment_status": fulfillment_status,
+                  "fulfilled": fulfillment_status == "fulfilled"}
     finally: conn.close()
     if should_reconcile:
         try: reconcile_customer_pending_from_bold(intent["id"])
