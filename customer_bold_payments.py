@@ -385,10 +385,18 @@ def reconcile_customer_pending_from_bold(intent_id):
         amount = bold_recharges._normalize_bold_total(voucher.get("total"))
         if status != "APPROVED":
             raise CustomerPaymentError("official_status_not_approved")
-        return _confirm(intent["id"], reference=voucher.get("reference_id"), transaction_id=transaction_id,
-                        amount=amount, currency=None, official_status=status,
-                        source="payment_voucher_reconciliation", http_status=http_status,
-                        evidence_sha256=evidence_hash)
+        result = _confirm(intent["id"], reference=voucher.get("reference_id"), transaction_id=transaction_id,
+                          amount=amount, currency=None, official_status=status,
+                          source="payment_voucher_reconciliation", http_status=http_status,
+                          evidence_sha256=evidence_hash)
+        if result["status"] == "processed":
+            try:
+                customer_order_email.send_payment_confirmation(intent["customer_order_id"])
+            except Exception:
+                # El pago y el fulfillment ya quedaron comprometidos. Un fallo de
+                # notificación no puede revertir ni desacreditar esa confirmación.
+                pass
+        return result
     except (bold_recharges.RemoteReconciliationError, CustomerPaymentError, ValueError) as error:
         reason = getattr(error, "reason", "official_incomplete_response")
         _record_rejection(intent["id"], source="payment_voucher_reconciliation", reason=reason,

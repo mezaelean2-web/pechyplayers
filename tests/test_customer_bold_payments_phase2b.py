@@ -143,8 +143,50 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"a"*64)), mock.patch("customer_order_email.send_payment_confirmation") as notify:
             first=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
             second=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
-        notify.assert_not_called()
+        notify.assert_called_once_with(self.rows("SELECT id FROM customer_orders")[0]["id"])
         self.assertEqual(first["status"],"processed");self.assertEqual(second["reason"],"already_reconciled")
+        self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"paid")
+
+    def test_reconcile_resultado_no_processed_no_notifica(self):
+        checkout=self.checkout().get_json();reference=checkout["checkout"]["orderId"]
+        voucher={"reference_id":reference,"transaction_id":"TX-REC-DUP","payment_status":"APPROVED","total":10000}
+        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"b"*64)), \
+             mock.patch.object(payments,"_confirm",return_value={"status":"duplicate","reason":"already_processed"}), \
+             mock.patch("customer_order_email.send_payment_confirmation") as notify:
+            result=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
+        self.assertEqual(result["status"],"duplicate");notify.assert_not_called()
+
+    def test_reconcile_primero_y_webhook_posterior_notifican_una_vez(self):
+        checkout=self.checkout().get_json();reference=checkout["checkout"]["orderId"]
+        voucher={"reference_id":reference,"transaction_id":"TX-REC-WEBHOOK","payment_status":"APPROVED","total":10000}
+        payload=self.payload(reference,transaction="TX-REC-WEBHOOK",event_id="evt-after-reconcile")
+        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"c"*64)), \
+             mock.patch("customer_order_email.send_payment_confirmation") as notify:
+            reconciled=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
+            webhook=self.post_webhook(payload).get_json()
+        self.assertEqual(reconciled["status"],"processed")
+        self.assertEqual(webhook["status"],"duplicate")
+        notify.assert_called_once_with(self.rows("SELECT id FROM customer_orders")[0]["id"])
+
+    def test_reconcile_fallo_email_preserva_pago_y_resultado(self):
+        checkout=self.checkout().get_json();reference=checkout["checkout"]["orderId"]
+        voucher={"reference_id":reference,"transaction_id":"TX-REC-EMAIL-FAIL","payment_status":"APPROVED","total":10000}
+        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"d"*64)), \
+             mock.patch("customer_order_email.send_payment_confirmation",side_effect=RuntimeError("provider unavailable")) as notify:
+            result=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
+        self.assertEqual(result,{"status":"processed","reason":"payment_confirmed"})
+        notify.assert_called_once_with(self.rows("SELECT id FROM customer_orders")[0]["id"])
+        self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"paid")
+
+    def test_reconcile_fulfillment_independiente_del_fallo_email(self):
+        checkout=self.checkout().get_json();reference=checkout["checkout"]["orderId"]
+        voucher={"reference_id":reference,"transaction_id":"TX-REC-FULFILL","payment_status":"APPROVED","total":10000}
+        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"e"*64)), \
+             mock.patch("customer_fulfillment.fulfill_customer_order") as fulfill, \
+             mock.patch("customer_order_email.send_payment_confirmation",side_effect=RuntimeError("provider unavailable")):
+            result=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
+        self.assertEqual(result["status"],"processed")
+        fulfill.assert_called_once_with(self.rows("SELECT id FROM customer_orders")[0]["id"])
         self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"paid")
 
     def test_fallo_inesperado_email_no_cambia_paid_ni_respuesta_bold(self):
