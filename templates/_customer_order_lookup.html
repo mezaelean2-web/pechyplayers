@@ -1,0 +1,20 @@
+<div data-customer-order-lookup data-checkout-csrf="{{ csrf_customer_checkout_token }}">
+  <button class="customer-order-lookup-floating" type="button" data-customer-order-lookup-open aria-controls="customerOrderLookupModal" aria-expanded="false" aria-label="Consultar mi pedido">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5a7.5 7.5 0 0 1-8 7.5 9 9 0 0 1-3.7-.8L4 20l1.4-3.5A7.2 7.2 0 0 1 4 12a7.5 7.5 0 0 1 8-7.5 7.5 7.5 0 0 1 8 7Z"/><path d="M8.5 12h.01M12 12h.01M15.5 12h.01"/></svg>
+  </button>
+  <div class="customer-order-lookup-modal" id="customerOrderLookupModal" data-customer-order-lookup-modal hidden aria-hidden="true">
+    <button class="customer-order-lookup-backdrop" type="button" data-customer-order-lookup-close aria-label="Cerrar consulta de pedido"></button>
+    <section class="customer-order-lookup" role="dialog" aria-modal="true" aria-labelledby="customerOrderLookupTitle" aria-describedby="customerOrderLookupDescription" tabindex="-1">
+      <header><div><small>ENTREGA SEGURA</small><h2 id="customerOrderLookupTitle">Consultar mi pedido</h2></div><button type="button" data-customer-order-lookup-close aria-label="Cerrar">×</button></header>
+      <p id="customerOrderLookupDescription">Ingresa el número de pedido que recibiste al realizar tu compra.</p>
+      <form data-customer-order-lookup-form>
+        <label for="customerOrderLookupId">ID del pedido</label>
+        <input id="customerOrderLookupId" name="public_order_id" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="ORD-..." maxlength="76" required>
+        <button type="submit">Consultar pedido</button>
+      </form>
+      <div class="customer-order-lookup__result" data-customer-order-lookup-result hidden aria-live="polite">
+        <small data-customer-order-lookup-id></small><strong data-customer-order-lookup-state></strong><p data-customer-order-lookup-message></p><a data-customer-order-delivery-link hidden>Ver mi entrega</a>
+      </div>
+    </section>
+  </div>
+</div>

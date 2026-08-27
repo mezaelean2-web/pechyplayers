@@ -568,6 +568,8 @@ def inicializar_db():
     customer_fulfillment_rules.initialize_schema(conn)
     import customer_fulfillment
     customer_fulfillment.initialize_schema(conn)
+    import customer_delivery_access
+    customer_delivery_access.initialize_schema(conn)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS promociones (

@@ -32,6 +32,8 @@ import customer_orders
 import customer_bold_payments
 import customer_fulfillment_rules
 import customer_fulfillment
+import customer_delivery_access
+import customer_order_email
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -442,6 +444,35 @@ def _customer_checkout_session_hash():
         token = secrets.token_urlsafe(32)
         session["customer_checkout_guest_token"] = token
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _customer_delivery_telemetry_context():
+    guest_hash = _customer_checkout_session_hash()
+    fingerprint = customer_delivery_access.session_fingerprint(guest_hash, app.secret_key)
+    return guest_hash, fingerprint
+
+
+def _record_customer_delivery_event(order_id, event_type, source, http_status, safe_code, fingerprint):
+    try:
+        customer_delivery_access.record_event(
+            order_id=order_id, event_type=event_type, source=source,
+            http_status=http_status, safe_code=safe_code,
+            session_fingerprint_value=fingerprint)
+    except Exception:
+        # La telemetria nunca debe bloquear pagos, consultas ni entregas.
+        pass
+
+
+def _customer_delivery_secure_response(payload, status=200):
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Vary"] = "Cookie"
+    return response
 
 
 def _validar_csrf_admin():
@@ -1426,37 +1457,96 @@ def resultado_pago_bold_cliente():
 
 @app.route("/compras/pedidos/<public_order_id>/estado")
 def estado_pago_cliente(public_order_id):
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
     if not _validar_csrf_customer_checkout():
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 403, "invalid_csrf", fingerprint)
         return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
     try:
         result = customer_bold_payments.get_status(
-            public_order_id, _customer_checkout_session_hash(), reconcile=True)
+            public_order_id, guest_hash, reconcile=True)
     except customer_bold_payments.CustomerPaymentError as error:
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", error.status, "order_not_found", fingerprint)
         return jsonify({"ok": False, "code": error.reason, "message": str(error)}), error.status
+    order_id = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)["internal_id"]
+    _record_customer_delivery_event(order_id, "delivery_status_checked", "server", 200, result["status"], fingerprint)
+    if result["fulfilled"]:
+        _record_customer_delivery_event(order_id, "delivery_fulfilled_observed", "server", 200, "fulfilled", fingerprint)
     response = jsonify({"ok": True, **result})
     response.headers["Cache-Control"] = "no-store, private"
     return response
 
 
+@app.route("/compras/pedidos/consultar", methods=["POST"])
+def consultar_pedido_cliente():
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
+    if not _validar_csrf_customer_checkout():
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response(
+            {"ok": False, "code": "not_found", "message": "No encontramos un pedido disponible para esta sesión."}, 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"public_order_id"}:
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response(
+            {"ok": False, "code": "not_found", "message": "No encontramos un pedido disponible para esta sesión."}, 404)
+    try:
+        result = customer_delivery_access.lookup_owned_order(data["public_order_id"], guest_hash)
+    except customer_delivery_access.CustomerOrderLookupNotFound:
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response(
+            {"ok": False, "code": "not_found", "message": "No encontramos un pedido disponible para esta sesión."}, 404)
+    _record_customer_delivery_event(result["internal_id"], "delivery_status_checked", "server", 200, result["state"], fingerprint)
+    if result["delivery_available"]:
+        _record_customer_delivery_event(result["internal_id"], "delivery_fulfilled_observed", "server", 200, "fulfilled", fingerprint)
+    public_result = {key: result[key] for key in (
+        "public_order_id", "state", "payment_status", "delivery_available", "message")}
+    public_result["delivery_url"] = url_for("resultado_pago_bold_cliente", order=result["public_order_id"])
+    return _customer_delivery_secure_response({"ok": True, "order": public_result})
+
+
+@app.route("/compras/pedidos/<public_order_id>/telemetria-entrega", methods=["POST"])
+def telemetria_entrega_cliente(public_order_id):
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
+    if not _validar_csrf_customer_checkout():
+        return _customer_delivery_secure_response({"ok": False, "code": "not_found"}, 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"event", "safe_code"}:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_event"}, 400)
+    try:
+        event_type, safe_code = customer_delivery_access.validate_client_event(
+            data["event"], data["safe_code"])
+        order = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)
+    except customer_delivery_access.CustomerOrderLookupNotFound:
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response({"ok": False, "code": "not_found"}, 404)
+    except ValueError:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_event"}, 400)
+    _record_customer_delivery_event(order["internal_id"], event_type, "client", 204, safe_code, fingerprint)
+    return _customer_delivery_secure_response({}, 204)
+
+
 @app.route("/compras/pedidos/<public_order_id>/entrega")
 def entrega_pedido_cliente(public_order_id):
-    def secure(payload,status=200):
-        response=jsonify(payload);response.status_code=status
-        response.headers["Cache-Control"]="no-store, private"
-        response.headers["Pragma"]="no-cache"
-        response.headers["Expires"]="0"
-        response.headers["Referrer-Policy"]="no-referrer"
-        response.headers["X-Content-Type-Options"]="nosniff"
-        response.headers["Vary"]="Cookie"
-        return response
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
+    order_id = None
+    try:
+        order_id = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)["internal_id"]
+    except customer_delivery_access.CustomerOrderLookupNotFound:
+        pass
+    _record_customer_delivery_event(order_id, "delivery_request_started", "server", None, "started", fingerprint)
     if not _validar_csrf_customer_checkout():
-        return secure({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
     try:
         delivery=customer_fulfillment.get_customer_delivery(
-            public_order_id,_customer_checkout_session_hash())
+            public_order_id,guest_hash)
     except customer_fulfillment.CustomerDeliveryNotFound:
-        return secure({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
-    return secure({"ok":True,"delivery":delivery})
+        _record_customer_delivery_event(order_id, "delivery_request_denied", "server", 404, "not_found", fingerprint)
+        return _customer_delivery_secure_response({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
+    except Exception:
+        _record_customer_delivery_event(order_id, "delivery_request_failed", "server", 500, "internal_error", fingerprint)
+        return _customer_delivery_secure_response({"ok":False,"code":"delivery_unavailable","message":"No pudimos abrir la entrega segura."},500)
+    _record_customer_delivery_event(order_id, "delivery_request_success", "server", 200, "fulfilled", fingerprint)
+    return _customer_delivery_secure_response({"ok":True,"delivery":delivery})
 
 
 @app.route("/admin/pedidos-clientes")
@@ -1481,7 +1571,8 @@ def admin_pedido_cliente_detalle(public_order_id):
         return render_template("admin/pedido_cliente_detalle.html", pedido=None), 404
     return render_template("admin/pedido_cliente_detalle.html", pedido=pedido,
                            pago=customer_bold_payments.get_payment_admin(pedido["internal_id"]),
-                           fulfillment=customer_fulfillment.get_admin(pedido["internal_id"]))
+                           fulfillment=customer_fulfillment.get_admin(pedido["internal_id"]),
+                           notificacion=customer_order_email.get_admin(pedido["internal_id"]))
 
 
 @app.route("/admin/reglas-inventario-reseller")

@@ -30,6 +30,7 @@
         <label>Apellido<input name="last_name" type="text" minlength="2" maxlength="80" autocomplete="family-name" required></label>
         <label>Código de país<input name="country_code" type="text" value="+57" inputmode="tel" maxlength="4" aria-describedby="checkoutPhoneHelp" required></label>
         <label>WhatsApp<input name="whatsapp" type="tel" inputmode="tel" autocomplete="tel-national" maxlength="24" aria-describedby="checkoutPhoneHelp" required></label>
+        <label class="customer-checkout__email">Correo electrónico<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
       </div>
       <small id="checkoutPhoneHelp">Para Colombia usa +57 y escribe un celular de 10 dígitos. Si escribes el número completo con +, conservaremos ese país.</small>
       <footer><button type="button" data-customer-checkout-back>← Volver al carrito</button><button type="submit" data-customer-checkout-submit>Continuar</button></footer>

@@ -8,6 +8,7 @@ import sqlite3
 import tempfile
 import threading
 import unittest
+from unittest import mock
 from datetime import datetime
 from pathlib import Path
 
@@ -63,7 +64,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
             except FileNotFoundError: pass
 
     def payload(self, items=None, key="a" * 32, **customer):
-        data = {"first_name":"José", "last_name":"O'Connor", "whatsapp":"300 123 4567", "country_code":"+57"}
+        data = {"first_name":"José", "last_name":"O'Connor", "whatsapp":"300 123 4567", "country_code":"+57", "email":"Cliente@Example.COM"}
         data.update(customer)
         return {"customer":data, "items":items if items is not None else [{"plan_id":1,"quantity":1}], "idempotency_key":key}
 
@@ -80,7 +81,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         order,created=self.create(self.payload())
         self.assertTrue(created)
         self.assertEqual(order["status"],"pending_payment")
-        self.assertEqual(order["customer"],{"first_name":"José","last_name":"O'Connor","whatsapp":"+573001234567"})
+        self.assertEqual(order["customer"],{"first_name":"José","last_name":"O'Connor","whatsapp":"+573001234567","email":"Cliente@example.com"})
         self.assertRegex(order["id"],r"^ORD-[A-Za-z0-9_-]{20,}$")
         delta=(datetime.fromisoformat(order["expires_at"].replace("Z","+00:00"))-datetime.fromisoformat(order["created_at"].replace("Z","+00:00"))).total_seconds()
         self.assertEqual(delta,900)
@@ -121,6 +122,44 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         conn=sqlite3.connect(self.path)
         self.assertEqual(conn.execute("SELECT COUNT(*) FROM customer_orders").fetchone()[0],1)
         conn.close()
+
+    def test_email_obligatorio_valido_normalizado_y_congelado(self):
+        order,_=self.create(self.payload(email="  Compras+uno@EXAMPLE.COM  ",key="1"*32))
+        self.assertEqual(order["customer"]["email"],"Compras+uno@example.com")
+        conn=sqlite3.connect(self.path)
+        self.assertEqual(conn.execute("SELECT customer_email FROM customer_orders WHERE public_order_id=?",(order["id"],)).fetchone()[0],"Compras+uno@example.com")
+        conn.close()
+
+    def test_email_invalido_vacio_largo_y_tipo_inesperado(self):
+        cases=(None,"","   ","sin-arroba","a@@example.com","a b@example.com",".a@example.com","a..b@example.com","a@example","a@-example.com","a"*65+"@example.com","a@"+"b"*250+".com")
+        for index,email in enumerate(cases):
+            with self.subTest(email=email),self.assertRaises(customer_orders.OrderValidationError) as caught:
+                self.create(self.payload(email=email,key=(str(index%10)+"e")*16))
+            self.assertEqual(caught.exception.code,"invalid_email")
+
+    def test_retry_email_distinto_falla_cerrado_sin_mutar_snapshot_ni_fingerprint_con_pii(self):
+        key="2"*32
+        original,_=self.create(self.payload(email="original@example.com",key=key))
+        conn=sqlite3.connect(self.path)
+        before=conn.execute("SELECT customer_email,request_fingerprint FROM customer_orders WHERE public_order_id=?",(original["id"],)).fetchone()
+        conn.close()
+        self.assertNotIn("original",before[1]);self.assertNotIn("example.com",before[1])
+        with self.assertRaises(customer_orders.OrderValidationError) as caught:
+            self.create(self.payload(email="otro@example.com",key=key))
+        self.assertEqual(caught.exception.code,"idempotency_conflict")
+        conn=sqlite3.connect(self.path)
+        after=conn.execute("SELECT customer_email,request_fingerprint FROM customer_orders WHERE public_order_id=?",(original["id"],)).fetchone()
+        self.assertEqual(before,after);self.assertEqual(conn.execute("SELECT COUNT(*) FROM customer_orders").fetchone()[0],1)
+        conn.close()
+
+    def test_historico_email_null_sigue_leyendose_y_migracion_es_idempotente(self):
+        order,_=self.create(self.payload(key="3"*32))
+        conn=sqlite3.connect(self.path);conn.execute("UPDATE customer_orders SET customer_email=NULL WHERE public_order_id=?",(order["id"],));conn.commit();conn.close()
+        customer_orders.initialize_schema();customer_orders.initialize_schema()
+        saved=customer_orders.get_order_admin(order["id"])
+        self.assertIsNone(saved["customer"]["email"])
+        with self.client.session_transaction() as session:session["admin"]=True
+        self.assertIn("Sin correo (pedido histórico)".encode(),self.client.get(f"/admin/pedidos-clientes/{order['id']}").data)
 
     def test_cambio_material_cancela_a_crea_b_y_preserva_snapshots(self):
         order_a,_=self.create(self.payload(key="j"*32))
@@ -230,7 +269,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
                 self.create(self.payload(key=(str(index)+"x")*16,**change))
         payload=self.payload(key="f"*32);payload["total"]=1
         with self.assertRaises(customer_orders.OrderValidationError):self.create(payload)
-        payload=self.payload(key="g"*32);payload["customer"]["email"]="x@y.co"
+        payload=self.payload(key="g"*32);payload["customer"]["address"]="inesperado"
         with self.assertRaises(customer_orders.OrderValidationError):self.create(payload)
 
     def test_carrito_vacio_limite_y_planes_fail_closed(self):
@@ -252,6 +291,23 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         self.assertEqual(response.get_json()["order"]["total"],11700)
         retry=self.client.post("/compras/pedidos",json=payload,headers={"X-CSRF-Token":"token"})
         self.assertEqual(retry.status_code,200)
+
+    def test_contrato_real_navegador_acepta_checkout_colombiano_con_gmail(self):
+        payload={"customer":{"first_name":"Carlos","last_name":"Prueba","country_code":"+57",
+                 "whatsapp":"3001234567","email":"pechy.checkout.test@GMAIL.COM"},
+                 "items":[{"plan_id":1,"quantity":1}],"idempotency_key":"browser-contract-email-0000000001"}
+        with self.client.session_transaction() as session:session["csrf_customer_checkout"]="token"
+        with mock.patch("customer_bold_payments.create_or_reuse_checkout") as bold, mock.patch("customer_order_email.send_payment_confirmation") as email, mock.patch("customer_fulfillment.fulfill_customer_order") as fulfillment:
+            response=self.client.post("/compras/pedidos",json=payload,headers={"X-CSRF-Token":"token"})
+        self.assertEqual(response.status_code,201);bold.assert_not_called();email.assert_not_called();fulfillment.assert_not_called()
+        saved=customer_orders.get_order_admin(response.get_json()["order"]["id"])
+        self.assertEqual(saved["customer"]["email"],"pechy.checkout.test@gmail.com")
+
+    def test_payload_js_cacheado_sin_email_reproduce_error_de_formato(self):
+        payload=self.payload(key="stale-browser-payload-0000000001");del payload["customer"]["email"]
+        with self.assertRaises(customer_orders.OrderValidationError) as caught:self.create(payload)
+        self.assertEqual(caught.exception.code,"invalid_customer")
+        self.assertEqual(str(caught.exception),"Los datos del cliente no tienen el formato esperado.")
 
     def test_endpoint_cancelacion_no_acepta_order_id_y_profile_no_cache(self):
         with self.client.session_transaction() as session:
@@ -277,6 +333,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         detail=self.client.get(f"/admin/pedidos-clientes/{order['id']}")
         self.assertEqual(listing.status_code,200);self.assertEqual(detail.status_code,200)
         self.assertIn(order["id"].encode(),listing.data);self.assertIn("Pendiente de pago".encode(),detail.data)
+        self.assertNotIn(b"Cliente@example.com",listing.data);self.assertIn(b"Cliente@example.com",detail.data)
         self.assertNotIn(b"Marcar pagado",detail.data);self.assertNotIn(b"Entregar",detail.data)
 
     def test_admin_pendientes_cancelados_todos_y_detalle(self):
@@ -302,6 +359,7 @@ class CustomerOrdersPhase2ATest(unittest.TestCase):
         self.assertIn("ON DELETE RESTRICT",line_sql)
         self.assertIn("pending_payment",order_sql)
         self.assertIn("guest_session_hash",order_sql)
+        self.assertIn("customer_email TEXT",order_sql)
         self.assertIsNotNone(conn.execute("SELECT 1 FROM sqlite_master WHERE name='customer_checkout_sessions'").fetchone())
         conn.close()
 
@@ -328,12 +386,18 @@ class CustomerOrdersFrontendStaticTest(unittest.TestCase):
         self.assertTrue(any("FAB_POSITION_KEY" in line for line in storage_calls))
         self.assertTrue(any("STORAGE_KEY" in line and "JSON.stringify(cart)" in line for line in storage_calls))
         self.assertFalse(any("customer" in line.lower() for line in storage_calls))
+        self.assertFalse(any("email" in line.lower() for line in storage_calls))
+
+    def test_email_checkout_requerido_y_sin_cambios_de_paleta(self):
+        self.assertIn('name="email"',self.html);self.assertIn('type="email"',self.html)
+        self.assertIn('maxlength="254"',self.html);self.assertIn('autocomplete="email"',self.html)
+        self.assertIn('fields.get("email")',self.js)
 
     def test_loading_retry_no_borra_carrito_y_cache_busting(self):
         self.assertIn('submit.disabled=true',self.js)
         self.assertIn('checkoutFingerprint!==fingerprint',self.js)
         self.assertNotIn('localStorage.removeItem(STORAGE_KEY)',self.js)
-        self.assertIn("customer-cart.js') }}?v=7",self.index)
+        self.assertIn("customer-cart.js') }}?v=8",self.index)
         self.assertIn("css/style.css') }}?v=6",self.index)
 
     def test_precarga_cancelacion_feedback_empty_y_privacidad(self):

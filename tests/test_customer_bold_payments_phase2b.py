@@ -41,7 +41,7 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         conn.commit();conn.close()
         customer_cart.initialize_schema(); customer_orders.initialize_schema(); payments.initialize_schema()
         self.guest="a"*64; self.other="b"*64
-        payload={"customer":{"first_name":"Ana","last_name":"Pérez","whatsapp":"3001234567","country_code":"+57"},
+        payload={"customer":{"first_name":"Ana","last_name":"Pérez","whatsapp":"3001234567","country_code":"+57","email":"ana@example.com"},
                  "items":[{"plan_id":1,"quantity":1}],"idempotency_key":"k"*32}
         self.order,_=customer_orders.create_order(payload,guest_session_hash=self.guest)
         app.config.update(TESTING=True,SECRET_KEY="customer-bold-tests")
@@ -91,7 +91,7 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
 
     def test_checkout_bold_usa_total_con_descuento_acumulado_congelado(self):
         conn=sqlite3.connect(self.path);conn.execute("UPDATE productos SET descuento_carrito_bps=200 WHERE id=1");conn.commit();conn.close()
-        payload={"customer":{"first_name":"Ana","last_name":"Perez","whatsapp":"3001234567","country_code":"+57"},
+        payload={"customer":{"first_name":"Ana","last_name":"Perez","whatsapp":"3001234567","country_code":"+57","email":"ana@example.com"},
                  "items":[{"plan_id":1,"quantity":1}],"idempotency_key":"bold-plan-discount-snapshot-0001"}
         order,_=customer_orders.create_order(payload,guest_session_hash=self.session_hash)
         response=self.client.post(f"/compras/pedidos/{order['id']}/pago/bold",json={},headers={"X-CSRF-Token":"csrf"})
@@ -116,9 +116,10 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         checkout=self.checkout().get_json()["checkout"]
         payload=self.payload(checkout["orderId"])
         results=[]
-        with mock.patch("customer_fulfillment.fulfill_customer_order") as fulfill:
+        with mock.patch("customer_fulfillment.fulfill_customer_order") as fulfill, mock.patch("customer_order_email.send_payment_confirmation") as notify:
             for _ in range(20):results.append(self.post_webhook(payload).get_json()["status"])
         fulfill.assert_called_once()
+        notify.assert_called_once()
         self.assertEqual(results[0],"processed");self.assertTrue(all(x=="duplicate" for x in results[1:]))
         intent=self.rows("SELECT * FROM customer_bold_payment_intents")[0]
         self.assertEqual(intent["status"],"approved");self.assertEqual(intent["external_transaction_id"],"TX-CUSTOMER-1")
@@ -139,11 +140,24 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
     def test_reconcile_official_voucher_and_repeat(self):
         checkout=self.checkout().get_json();reference=checkout["checkout"]["orderId"]
         voucher={"reference_id":reference,"transaction_id":"TX-REC-1","payment_status":"APPROVED","total":10000}
-        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"a"*64)):
+        with mock.patch.object(bold_recharges,"fetch_official_voucher",return_value=(voucher,200,"a"*64)), mock.patch("customer_order_email.send_payment_confirmation") as notify:
             first=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
             second=payments.reconcile_customer_pending_from_bold(checkout["intent_id"])
+        notify.assert_not_called()
         self.assertEqual(first["status"],"processed");self.assertEqual(second["reason"],"already_reconciled")
         self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"paid")
+
+    def test_fallo_inesperado_email_no_cambia_paid_ni_respuesta_bold(self):
+        checkout=self.checkout().get_json()["checkout"]
+        with mock.patch("customer_fulfillment.fulfill_customer_order"), mock.patch("customer_order_email.send_payment_confirmation",side_effect=RuntimeError("provider unavailable")):
+            response=self.post_webhook(self.payload(checkout["orderId"],event_id="evt-email-failure"))
+        self.assertEqual(response.status_code,200);self.assertEqual(response.get_json()["status"],"processed")
+        self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"paid")
+
+    def test_get_estado_no_dispara_email(self):
+        with mock.patch("customer_order_email.send_payment_confirmation") as notify:
+            response=self.client.get(f"/compras/pedidos/{self.order['id']}/estado",headers={"X-CSRF-Token":"csrf"})
+        self.assertEqual(response.status_code,200);notify.assert_not_called()
 
     def test_reseller_transaction_collision_is_fail_closed(self):
         checkout=self.checkout().get_json()["checkout"]
@@ -158,7 +172,7 @@ class CustomerBoldPaymentsPhase2BTest(unittest.TestCase):
         self.assertEqual(response.status_code,200)
         self.assertEqual(self.rows("SELECT status FROM customer_orders")[0]["status"],"pending_payment")
         status=self.client.get(f"/compras/pedidos/{self.order['id']}/estado",headers={"X-CSRF-Token":"csrf"})
-        self.assertNotIn("whatsapp",status.get_json());self.assertNotIn("customer",status.get_json())
+        self.assertNotIn("whatsapp",status.get_json());self.assertNotIn("email",status.get_json());self.assertNotIn("customer",status.get_json())
 
     def test_late_approved_goes_to_review_not_paid(self):
         checkout=self.checkout().get_json()["checkout"]

@@ -116,7 +116,7 @@ class CustomerDeliveryPhase2C4Test(unittest.TestCase):
 
     def test_status_contains_fulfilled_but_never_credentials(self):
         self._set_hash(self.full_order,"guest-a");response=self.client.get("/compras/pedidos/ORD-FULL/estado",headers=self._auth());body=response.get_data(as_text=True)
-        self.assertTrue(response.get_json()["fulfilled"]);self.assertNotIn("apple@test",body);self.assertNotIn("pass-a",body);self.assertNotIn("9876",body)
+        self.assertTrue(response.get_json()["fulfilled"]);self.assertNotIn("customer_email",body);self.assertNotIn("apple@test",body);self.assertNotIn("pass-a",body);self.assertNotIn("9876",body)
 
     def test_two_buyers_cannot_cross_access(self):
         self._set_hash(self.full_order,"guest-a");self._set_hash(self.profile_order,"guest-b")

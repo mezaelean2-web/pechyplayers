@@ -25,6 +25,7 @@
     let scrollBeforeOpen = {left:0, top:0};
     let checkoutKey = null;
     let checkoutFingerprint = null;
+    let checkoutSnapshotEmail = null;
     let cancellationRequest = Promise.resolve();
     let preparedOrderId = null;
 
@@ -156,7 +157,7 @@
         }catch(_){/* El formulario continúa disponible sin precarga. */}
     }
     function invalidatePreparedOrder() {
-        checkoutKey=null;checkoutFingerprint=null;showStage("cart");
+        checkoutKey=null;checkoutFingerprint=null;checkoutSnapshotEmail=null;showStage("cart");
         cancellationRequest=cancellationRequest.then(async()=>{
             const response=await fetch("/compras/pedidos/cancelar-actual",{method:"POST",headers:{"Content-Type":"application/json","X-CSRF-Token":dialog.dataset.checkoutCsrf||""},body:"{}"});
             if(!response.ok){const data=await response.json();throw new Error(data.message||"No pudimos actualizar el pedido preparado.");}
@@ -175,9 +176,10 @@
         if(!checkoutForm.reportValidity())return;
         await cancellationRequest;
         const fields=new FormData(checkoutForm);
-        const customer={first_name:String(fields.get("first_name")||""),last_name:String(fields.get("last_name")||""),whatsapp:String(fields.get("whatsapp")||""),country_code:String(fields.get("country_code")||"")};
-        const fingerprint=JSON.stringify({customer,items:cart});
-        if(!checkoutKey||checkoutFingerprint!==fingerprint){checkoutKey=newCheckoutKey();checkoutFingerprint=fingerprint;}
+        const customer={first_name:String(fields.get("first_name")||""),last_name:String(fields.get("last_name")||""),whatsapp:String(fields.get("whatsapp")||""),country_code:String(fields.get("country_code")||""),email:String(fields.get("email")||"")};
+        const fingerprint=JSON.stringify({customer:{first_name:customer.first_name,last_name:customer.last_name,whatsapp:customer.whatsapp,country_code:customer.country_code},items:cart});
+        const snapshotEmail=customer.email.trim();
+        if(!checkoutKey||checkoutFingerprint!==fingerprint||checkoutSnapshotEmail!==snapshotEmail){checkoutKey=newCheckoutKey();checkoutFingerprint=fingerprint;checkoutSnapshotEmail=snapshotEmail;}
         const submit=checkoutForm.querySelector("[data-customer-checkout-submit]");
         submit.disabled=true;submit.textContent="Preparando pedido…";errorBox.hidden=true;
         try{
@@ -194,7 +196,7 @@
     document.querySelectorAll("[data-customer-cart-open]:not([data-customer-cart-floating])").forEach(button=>button.addEventListener("click",event=>{event.preventDefault();openCustomerCart();}));
     setupFloatingAccess();
     checkoutNext?.addEventListener("click",async()=>{if(cart.length){errorBox.hidden=true;await loadCheckoutCustomer();showStage("customer");}});
-    dialog.querySelector("[data-customer-checkout-back]")?.addEventListener("click",()=>{checkoutKey=null;checkoutFingerprint=null;errorBox.hidden=true;showStage("cart");});
+    dialog.querySelector("[data-customer-checkout-back]")?.addEventListener("click",()=>{checkoutKey=null;checkoutFingerprint=null;checkoutSnapshotEmail=null;errorBox.hidden=true;showStage("cart");});
     checkoutForm?.addEventListener("submit",event=>{event.preventDefault();submitCheckout();});
     payBold?.addEventListener("click",async()=>{
         if(!preparedOrderId||payBold.disabled)return;

@@ -17,6 +17,8 @@ ORDER_STATUSES = ("pending_payment", "paid", "processing", "delivered", "failed"
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9_-]{32,100}$")
 _COUNTRY_CODE_RE = re.compile(r"^\+[1-9][0-9]{0,2}$")
 _SESSION_HASH_RE = re.compile(r"^[a-f0-9]{64}$")
+_EMAIL_LOCAL_RE = re.compile(r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$")
+_EMAIL_DOMAIN_LABEL_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?$")
 
 
 class OrderValidationError(ValueError):
@@ -71,11 +73,28 @@ def normalize_whatsapp(value, country_code):
     return canonical
 
 
+def normalize_email(value):
+    if not isinstance(value, str):
+        raise OrderValidationError("El correo electrónico es obligatorio.", "invalid_email")
+    email = value.strip()
+    if not email or len(email) > 254 or email.count("@") != 1:
+        raise OrderValidationError("El correo electrónico no es válido.", "invalid_email")
+    if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in email):
+        raise OrderValidationError("El correo electrónico no es válido.", "invalid_email")
+    local, domain = email.rsplit("@", 1)
+    labels = domain.split(".")
+    if (not local or len(local) > 64 or local.startswith(".") or local.endswith(".") or ".." in local
+            or not _EMAIL_LOCAL_RE.fullmatch(local) or len(domain) > 253 or len(labels) < 2
+            or any(not _EMAIL_DOMAIN_LABEL_RE.fullmatch(label) for label in labels)):
+        raise OrderValidationError("El correo electrónico no es válido.", "invalid_email")
+    return f"{local}@{domain.lower()}"
+
+
 def _validate_request(payload):
     if not isinstance(payload, dict) or set(payload) != {"customer", "items", "idempotency_key"}:
         raise OrderValidationError("El payload solo admite customer, items e idempotency_key.")
     customer = payload["customer"]
-    if not isinstance(customer, dict) or set(customer) != {"first_name", "last_name", "whatsapp", "country_code"}:
+    if not isinstance(customer, dict) or set(customer) != {"first_name", "last_name", "whatsapp", "country_code", "email"}:
         raise OrderValidationError("Los datos del cliente no tienen el formato esperado.", "invalid_customer")
     key = payload["idempotency_key"]
     if not isinstance(key, str) or not _IDEMPOTENCY_RE.fullmatch(key):
@@ -83,12 +102,17 @@ def _validate_request(payload):
     first_name = normalize_name(customer["first_name"], "Nombre")
     last_name = normalize_name(customer["last_name"], "Apellido")
     whatsapp = normalize_whatsapp(customer["whatsapp"], customer["country_code"])
+    email = normalize_email(customer["email"])
     items = customer_cart._validated_items({"items": payload["items"]})
     if not items:
         raise OrderValidationError("El carrito está vacío.", "empty_cart")
     normalized_items = [{"plan_id": plan_id, "quantity": quantity} for plan_id, quantity in items]
-    normalized = {"customer": {"first_name": first_name, "last_name": last_name, "whatsapp": whatsapp}, "items": normalized_items}
-    fingerprint = hashlib.sha256(json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    normalized = {"customer": {"first_name": first_name, "last_name": last_name, "whatsapp": whatsapp, "email": email}, "items": normalized_items}
+    fingerprint_payload = {
+        "customer": {key: value for key, value in normalized["customer"].items() if key != "email"},
+        "items": normalized_items,
+    }
+    fingerprint = hashlib.sha256(json.dumps(fingerprint_payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return normalized, key, fingerprint
 
 
@@ -105,6 +129,7 @@ def initialize_schema(connection=None):
             customer_first_name TEXT NOT NULL,
             customer_last_name TEXT NOT NULL,
             customer_whatsapp TEXT NOT NULL,
+            customer_email TEXT,
             subtotal INTEGER NOT NULL CHECK (subtotal >= 0),
             discount_total INTEGER NOT NULL CHECK (discount_total >= 0),
             total INTEGER NOT NULL CHECK (total >= 0 AND total = subtotal - discount_total),
@@ -124,6 +149,8 @@ def initialize_schema(connection=None):
         columns = {row[1] for row in conn.execute("PRAGMA table_info(customer_orders)")}
         if "guest_session_hash" not in columns:
             conn.execute("ALTER TABLE customer_orders ADD COLUMN guest_session_hash TEXT")
+        if "customer_email" not in columns:
+            conn.execute("ALTER TABLE customer_orders ADD COLUMN customer_email TEXT")
         conn.execute("""CREATE TABLE IF NOT EXISTS customer_order_lines (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             order_id INTEGER NOT NULL,
@@ -173,7 +200,8 @@ def _new_public_id():
 def _serialize(order, lines):
     return {
         "id": order["public_order_id"], "status": order["status"],
-        "customer": {"first_name": order["customer_first_name"], "last_name": order["customer_last_name"], "whatsapp": order["customer_whatsapp"]},
+        "customer": {"first_name": order["customer_first_name"], "last_name": order["customer_last_name"], "whatsapp": order["customer_whatsapp"],
+                     "email": order["customer_email"] if "customer_email" in order.keys() else None},
         "subtotal": order["subtotal"], "discount_total": order["discount_total"], "total": order["total"],
         "currency": order["currency"], "item_count": order["item_count"], "eligible_item_count": order["eligible_item_count"],
         "discount_min_items": order["discount_min_items"], "discount_bps": order["discount_bps"],
@@ -245,11 +273,13 @@ def create_order(payload, *, guest_session_hash, before_line_insert=None):
     try:
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("BEGIN IMMEDIATE")
-        existing = conn.execute("SELECT id,request_fingerprint,guest_session_hash,status FROM customer_orders WHERE idempotency_key=?", (key,)).fetchone()
+        existing = conn.execute("SELECT id,request_fingerprint,guest_session_hash,status,customer_email FROM customer_orders WHERE idempotency_key=?", (key,)).fetchone()
         if existing:
             if existing["guest_session_hash"] != guest_session_hash:
                 raise OrderValidationError("La clave de idempotencia no pertenece a esta sesión.", "idempotency_conflict", 409)
             if existing["request_fingerprint"] != fingerprint:
+                raise OrderValidationError("La clave de idempotencia ya pertenece a otra compra.", "idempotency_conflict", 409)
+            if existing["customer_email"] != normalized["customer"]["email"]:
                 raise OrderValidationError("La clave de idempotencia ya pertenece a otra compra.", "idempotency_conflict", 409)
             result = _read_order(conn, "idempotency_key", key)
             if existing["status"] == "pending_payment":
@@ -267,12 +297,12 @@ def create_order(payload, *, guest_session_hash, before_line_insert=None):
         for _ in range(5):
             try:
                 cursor = conn.execute("""INSERT INTO customer_orders (
-                    public_order_id,status,customer_first_name,customer_last_name,customer_whatsapp,
+                    public_order_id,status,customer_first_name,customer_last_name,customer_whatsapp,customer_email,
                     subtotal,discount_total,total,currency,item_count,eligible_item_count,discount_rule_id,
                     discount_min_items,discount_bps,idempotency_key,request_fingerprint,guest_session_hash,created_at,updated_at,expires_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (_new_public_id(), "pending_payment", normalized["customer"]["first_name"], normalized["customer"]["last_name"],
-                 normalized["customer"]["whatsapp"], preview["subtotal_bruto"], preview["discount_total"], preview["total_final"],
+                 normalized["customer"]["whatsapp"], normalized["customer"]["email"], preview["subtotal_bruto"], preview["discount_total"], preview["total_final"],
                  preview["currency"], preview["item_count"], preview["eligible_item_count"], preview["discount_rule_id"],
                  preview["discount_min_items"], preview["discount_bps"], key, fingerprint, guest_session_hash, created_at, created_at, expires_at))
                 order_id = cursor.lastrowid

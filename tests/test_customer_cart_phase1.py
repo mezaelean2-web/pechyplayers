@@ -365,7 +365,7 @@ class CustomerCartFrontendUxTest(unittest.TestCase):
         self.assertIn("function openCustomerCart()", self.cart_js)
         self.assertIn("function closeCustomerCart()", self.cart_js)
         self.assertIn("if (!modal.hidden) return", self.cart_js)
-        self.assertIn("customer-cart.js') }}?v=7", self.index)
+        self.assertIn("customer-cart.js') }}?v=8", self.index)
         self.assertIn("css/style.css') }}?v=6", self.index)
 
     def test_estado_persistido_y_preview_siguen_siendo_minimos(self):

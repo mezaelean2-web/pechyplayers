@@ -207,7 +207,7 @@ class NubeRenombrarPlataformaTest(unittest.TestCase):
         plan=self._plan("YouTube Cliente",30);self._regla_cliente(plan,activo=1)
         resultado=database.renombrar_plataforma_nube("YouTube Premium","YouTube Plus")
         self.assertEqual(resultado["reglas_cliente_actualizadas"],1)
-        payload={"customer":{"first_name":"Ana","last_name":"Pérez","whatsapp":"3001234567","country_code":"+57"},
+        payload={"customer":{"first_name":"Ana","last_name":"Pérez","whatsapp":"3001234567","country_code":"+57","email":"ana@example.com"},
             "items":[{"plan_id":plan,"quantity":1}],"idempotency_key":"rename-fulfillment-customer-0001"}
         order,_=customer_orders.create_order(payload,guest_session_hash="8"*64)
         conn=database.conectar();order_id=conn.execute("SELECT id FROM customer_orders WHERE public_order_id=?",(order["id"],)).fetchone()[0]

@@ -1,7 +1,7 @@
 try:
-    from tests._bootstrap import ROOT, TEST_DB
+    from tests._bootstrap import ROOT, TEST_DB, subprocess_test_environment
 except ModuleNotFoundError:
-    from _bootstrap import ROOT, TEST_DB
+    from _bootstrap import ROOT, TEST_DB, subprocess_test_environment
 
 import hashlib
 import os
@@ -75,6 +75,44 @@ class DatabaseIsolationTest(unittest.TestCase):
                 os.environ.pop(nombre, None)
             else:
                 os.environ[nombre] = valor
+
+    def test_entorno_de_subprocess_python_hereda_aislamiento_explicito(self):
+        environment = subprocess_test_environment({
+            "PECHY_TESTING": "0",
+            "PECHY_DB": str(database.REAL_DB),
+            "PECHY_SUBPROCESS_MARKER": "safe",
+        })
+        self.assertEqual(environment["PECHY_TESTING"], "1")
+        self.assertEqual(Path(environment["PECHY_DB"]).resolve(), TEST_DB)
+        self.assertNotEqual(Path(environment["PECHY_DB"]).resolve(), database.REAL_DB)
+        self.assertEqual(environment["PECHY_SUBPROCESS_MARKER"], "safe")
+
+    def test_detector_global_rechaza_rutas_equivalentes_sin_abrir_sqlite(self):
+        import conftest
+
+        equivalents = (
+            database.REAL_DB,
+            str(database.REAL_DB),
+            str(database.REAL_DB.parent / "." / "pechy.db"),
+            str(database.REAL_DB.parent / "tests" / ".." / "pechy.db"),
+        )
+        for equivalent in equivalents:
+            with self.subTest(path=equivalent):
+                with self.assertRaises(conftest.UnsafeTestSqliteConnectionError):
+                    conftest.guarded_test_sqlite_connect(equivalent)
+
+    def test_detector_global_permite_sqlite_temporal(self):
+        import conftest
+
+        descriptor, ruta = tempfile.mkstemp(suffix=".db")
+        os.close(descriptor)
+        try:
+            conn = conftest.guarded_test_sqlite_connect(ruta)
+            conn.execute("CREATE TABLE detector(id INTEGER PRIMARY KEY)")
+            conn.commit()
+            conn.close()
+        finally:
+            os.remove(ruta)
 
     def test_app_backup_tambien_rechaza_la_base_real(self):
         import app_backup

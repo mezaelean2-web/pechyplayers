@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import bold_recharges
 import database
 import customer_fulfillment
+import customer_order_email
 
 PROVIDER = "bold"
 CURRENCY = "COP"
@@ -341,6 +342,13 @@ def process_webhook(payload):
         currency = amount_data.get("currency") if isinstance(amount_data,dict) else None
         result = _confirm(intent["id"], reference=reference, transaction_id=transaction_id, amount=total,
                           currency=currency, official_status="APPROVED", source="webhook")
+        if result["status"] == "processed":
+            try:
+                customer_order_email.send_payment_confirmation(intent["customer_order_id"])
+            except Exception:
+                # La notificación ocurre después del commit financiero y nunca
+                # cambia la respuesta autoritativa entregada a Bold.
+                pass
         event_status = "duplicate" if result["status"] == "duplicate" else "processed"
         reason = result["reason"]
     except (ValueError, CustomerPaymentError) as error:
