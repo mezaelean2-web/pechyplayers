@@ -6,6 +6,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import database
 import reseller_accounts
+import reseller_mailbox_persistence
 
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -149,6 +150,7 @@ def inicializar_revendedores():
                 SELECT id, 0 FROM revendedores;
         """)
         reseller_accounts.inicializar_esquema(cursor=conn.cursor())
+        reseller_mailbox_persistence.initialize_schema(conn)
         columnas = {fila[1] for fila in conn.execute("PRAGMA table_info(revendedores)")}
         if "auth_version" not in columnas:
             conn.execute("ALTER TABLE revendedores ADD COLUMN auth_version INTEGER NOT NULL DEFAULT 1")

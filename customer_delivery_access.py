@@ -131,6 +131,43 @@ def lookup_owned_order(public_order_id, guest_session_hash):
         conn.close()
 
 
+def lookup_recovered_order(public_order_id, order_id):
+    """Consulta estado seguro por una autorizacion OTP ya validada por la ruta."""
+    public_order_id = normalize_public_order_id(public_order_id)
+    conn = _connect()
+    try:
+        has_fulfillment = conn.execute("""SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='customer_order_fulfillments'""").fetchone()
+        if has_fulfillment:
+            row = conn.execute("""SELECT o.id,o.public_order_id,o.status,
+                    f.status AS fulfillment_status
+                FROM customer_orders o
+                LEFT JOIN customer_order_fulfillments f ON f.order_id=o.id
+                WHERE o.id=? AND o.public_order_id=?""", (int(order_id), public_order_id)).fetchone()
+        else:
+            row = conn.execute("""SELECT id,public_order_id,status,NULL AS fulfillment_status
+                FROM customer_orders WHERE id=? AND public_order_id=?""",
+                (int(order_id), public_order_id)).fetchone()
+        if not row:
+            raise CustomerOrderLookupNotFound()
+        status, fulfillment = row["status"], row["fulfillment_status"]
+        if status == "pending_payment":
+            state, message = "pending_payment", "Este pedido todavia no registra un pago confirmado."
+        elif status == "paid" and fulfillment == "fulfilled":
+            state, message = "fulfilled", "Tu pago y tu entrega estan confirmados."
+        elif status == "paid" and fulfillment in {None, "pending", "processing"}:
+            state, message = "preparing", "Tu pago esta confirmado y estamos preparando tu pedido."
+        elif status == "paid" and fulfillment == "review":
+            state, message = "review", "Tu pago esta confirmado, pero necesitamos revisar la entrega. Comunicate con soporte."
+        else:
+            state, message = "unavailable", "Este pedido no tiene una entrega disponible."
+        return {"internal_id": row["id"], "public_order_id": row["public_order_id"],
+                "state": state, "payment_status": "paid" if status == "paid" else status,
+                "delivery_available": state == "fulfilled", "message": message}
+    finally:
+        conn.close()
+
+
 def record_event(*, order_id, event_type, source, http_status, safe_code, session_fingerprint_value):
     if event_type not in EVENT_TYPES or source not in {"server", "client"}:
         raise ValueError("Evento de entrega no permitido.")

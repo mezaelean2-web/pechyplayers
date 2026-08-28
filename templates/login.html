@@ -1,254 +1,32 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-  <title>Login Admin - Pechy Players</title>
-
-  <style>
-    *{
-      box-sizing:border-box;
-      margin:0;
-      padding:0;
-      font-family:Arial,sans-serif;
-    }
-
-    body{
-      min-height:100vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding:20px;
-      color:white;
-
-      background:
-        radial-gradient(circle at 15% 20%, rgba(255,45,45,.25), transparent 30%),
-        radial-gradient(circle at 85% 80%, rgba(37,211,102,.15), transparent 28%),
-        linear-gradient(135deg,#02050a,#07101c 50%,#03060b);
-
-      overflow:hidden;
-      position:relative;
-    }
-
-    body::before{
-      content:"";
-      position:absolute;
-      inset:0;
-      background:
-        linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
-      background-size:35px 35px;
-      mask-image:linear-gradient(to bottom,rgba(0,0,0,.8),transparent);
-    }
-
-    .login-container{
-      width:100%;
-      max-width:440px;
-      position:relative;
-      z-index:2;
-    }
-
-    .login-logo{
-      text-align:center;
-      margin-bottom:22px;
-    }
-
-    .login-logo img{
-      width:88px;
-      height:88px;
-      object-fit:cover;
-      border-radius:24px;
-      border:2px solid rgba(255,255,255,.15);
-      box-shadow:
-        0 0 35px rgba(255,45,45,.30),
-        0 16px 45px rgba(0,0,0,.60);
-    }
-
-    .login-logo h1{
-      margin-top:15px;
-      font-size:25px;
-      letter-spacing:1px;
-    }
-
-    .login-logo span{
-      color:#ff2d2d;
-    }
-
-    .login-card{
-      background:linear-gradient(
-        145deg,
-        rgba(13,23,38,.94),
-        rgba(5,11,20,.94)
-      );
-
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:26px;
-      padding:34px;
-      box-shadow:0 30px 80px rgba(0,0,0,.65);
-      backdrop-filter:blur(16px);
-    }
-
-    .login-card h2{
-      font-size:28px;
-      margin-bottom:7px;
-    }
-
-    .login-card .subtitulo{
-      color:#9ca3af;
-      margin-bottom:25px;
-    }
-
-    .campo{
-      margin-bottom:16px;
-    }
-
-    .campo label{
-      display:block;
-      margin-bottom:8px;
-      color:#d1d5db;
-      font-size:14px;
-      font-weight:bold;
-    }
-
-    .campo input{
-      width:100%;
-      border:1px solid rgba(255,255,255,.10);
-      background:#070d17;
-      color:white;
-      padding:15px;
-      border-radius:13px;
-      outline:none;
-      font-size:15px;
-      transition:.2s;
-    }
-
-    .campo input:focus{
-      border-color:#ff2d2d;
-      box-shadow:0 0 0 4px rgba(255,45,45,.10);
-    }
-
-    .btn-login{
-      width:100%;
-      border:none;
-      border-radius:13px;
-      padding:15px;
-      margin-top:6px;
-      cursor:pointer;
-
-      background:linear-gradient(135deg,#ff2d2d,#ff5b37);
-      color:white;
-      font-size:16px;
-      font-weight:900;
-
-      box-shadow:0 12px 30px rgba(255,45,45,.28);
-      transition:.25s;
-    }
-
-    .btn-login:hover{
-      transform:translateY(-2px);
-      box-shadow:0 16px 38px rgba(255,45,45,.40);
-    }
-
-    .error{
-      margin-bottom:18px;
-      background:rgba(255,45,45,.12);
-      border:1px solid rgba(255,45,45,.35);
-      color:#ff9a9a;
-      padding:12px;
-      border-radius:12px;
-      text-align:center;
-      font-size:14px;
-    }
-
-    .volver{
-      display:block;
-      margin-top:20px;
-      text-align:center;
-      color:#25d366;
-      text-decoration:none;
-      font-weight:bold;
-    }
-
-    .volver:hover{
-      text-decoration:underline;
-    }
-
-    @media(max-width:500px){
-      .login-card{
-        padding:26px 20px;
-        border-radius:22px;
-      }
-
-      .login-logo img{
-        width:72px;
-        height:72px;
-      }
-
-      .login-card h2{
-        font-size:24px;
-      }
-    }
-  </style>
-</head>
-
-<body>
-
-  <div class="login-container">
-
-    <div class="login-logo">
-      <img src="{{ url_for('static', filename='img/logo.jpg') }}" alt="Pechy Players">
-      <h1>PECHY <span>PLAYERS</span></h1>
-    </div>
-
-    <div class="login-card">
-
-      <h2>Panel administrativo</h2>
-      <p class="subtitulo">Ingresa tus credenciales para continuar.</p>
-
-      {% if error %}
-        <div class="error">
-          {{ error }}
-        </div>
-      {% endif %}
-
-      <form method="POST">
-
-        <div class="campo">
-          <label>Usuario</label>
-          <input
-            type="text"
-            name="usuario"
-            placeholder="Escribe tu usuario"
-            autocomplete="username"
-            required
-          >
-        </div>
-
-        <div class="campo">
-          <label>Contraseña</label>
-          <input
-            type="password"
-            name="password"
-            placeholder="Escribe tu contraseña"
-            autocomplete="current-password"
-            required
-          >
-        </div>
-
-        <button class="btn-login" type="submit">
-          Entrar al panel →
-        </button>
-
-      </form>
-
-      <a class="volver" href="/">
-        ← Volver a la página principal
-      </a>
-
-    </div>
-
-  </div>
-
-</body>
-</html>
+{% extends "resellers/_base.html" %}
+{% block title %}Acceso administrativo{% endblock %}
+{% block body_class %}reseller-cyber-login{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-login.css') }}?v=1">{% endblock %}
+{% block content %}
+<div class="cyber-circuit" aria-hidden="true"><span class="circuit-trace trace-a"></span><span class="circuit-trace trace-b"></span><span class="circuit-trace trace-c"></span><span class="circuit-trace trace-d"></span><i class="circuit-node node-a"></i><i class="circuit-node node-b"></i><i class="circuit-node node-c"></i><i class="circuit-node node-d"></i></div>
+<svg class="cyber-energy-map" viewBox="0 0 1600 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  <defs><linearGradient id="energy-red" x1="0" x2="1"><stop offset="0" stop-color="#550008"/><stop offset=".45" stop-color="#ff1827"/><stop offset="1" stop-color="#5b0008"/></linearGradient></defs>
+  <g class="energy-tracks"><path d="M0 118H142l52 52h178l45 45h102"/><path d="M0 306h115l64 64h190l70 70h85"/><path d="M0 706h160l55-55h155l68-68h88"/><path d="M1600 118h-142l-52 52h-178l-45 45h-102"/><path d="M1600 306h-115l-64 64h-190l-70 70h-85"/><path d="M1600 706h-160l-55-55h-155l-68-68h-88"/></g>
+  <g class="energy-pulses"><path class="pulse pulse-a" d="M0 118H142l52 52h178l45 45h102"/><path class="pulse pulse-b" d="M0 306h115l64 64h190l70 70h85"/><path class="pulse pulse-c" d="M0 706h160l55-55h155l68-68h88"/><path class="pulse pulse-d" d="M1600 118h-142l-52 52h-178l-45 45h-102"/><path class="pulse pulse-e" d="M1600 306h-115l-64 64h-190l-70 70h-85"/><path class="pulse pulse-f" d="M1600 706h-160l-55-55h-155l-68-68h-88"/></g>
+</svg>
+<div class="cyber-plates" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<header class="cyber-brand"><span class="cyber-emblem"><img src="{{ url_for('static', filename='img/logo.jpg') }}" alt=""></span><div><strong>PECHY</strong><span>PLAYERS</span></div><p>TU EXPERIENCIA GAMER</p></header>
+<section class="cyber-login-frame" aria-labelledby="admin-login-title">
+  <div class="frame-hardware frame-hardware-top" aria-hidden="true"><i></i><span></span><b></b></div>
+  <div class="frame-hardware frame-hardware-bottom" aria-hidden="true"><i></i><span></span><b></b></div>
+  <div class="frame-rail frame-rail-left" aria-hidden="true"><i></i><i></i><i></i></div><div class="frame-rail frame-rail-right" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="cyber-login-card">
+  <span class="cyber-lock" aria-hidden="true">▣</span><h1 id="admin-login-title">Bienvenido de vuelta</h1><p>Accede al panel administrativo de PECHY PLAYERS</p>
+  {% if error %}<div class="reseller-auth-message" role="alert">{{ error }}</div>{% endif %}
+  <form method="POST">
+    <label for="admin-user">Usuario</label><div class="cyber-field"><span aria-hidden="true">♙</span><input id="admin-user" name="usuario" type="text" autocomplete="username" placeholder="Ingresa tu usuario" required autofocus></div>
+    <label for="reseller-password">Contraseña</label><div class="cyber-field"><span aria-hidden="true">▣</span><input id="reseller-password" name="password" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required><button type="button" aria-label="Mostrar contraseña" aria-pressed="false" data-password-toggle><span aria-hidden="true">◉</span></button></div>
+    <div class="cyber-session"><span aria-hidden="true">✓</span><p><strong>Acceso administrativo</strong><small>Sesión protegida para personal autorizado.</small></p></div>
+    <button class="cyber-submit" type="submit"><span>INICIAR SESIÓN</span><b aria-hidden="true">→</b></button>
+  </form>
+  <p class="cyber-secure"><span aria-hidden="true">▣</span> Acceso seguro y protegido</p><footer>ACCESO ADMINISTRATIVO · PERSONAL AUTORIZADO</footer>
+</div></section>
+<div class="cyber-reactor" aria-hidden="true"><span class="reactor-beam"></span><div class="reactor-deck"><i></i><b></b><em></em></div></div>
+<footer class="cyber-footer">PECHY PLAYERS © 2026 <span>|</span> TODOS LOS DERECHOS RESERVADOS</footer>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/reseller-login.js') }}?v=1" defer></script>{% endblock %}

@@ -12,6 +12,22 @@
         <input id="customerOrderLookupId" name="public_order_id" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="ORD-..." maxlength="76" required>
         <button type="submit">Consultar pedido</button>
       </form>
+      <section class="customer-order-recovery" data-customer-order-recovery hidden aria-live="polite">
+        <h3>Verifica tu identidad</h3>
+        <p data-customer-order-recovery-message></p>
+        <div class="customer-order-recovery__channels" data-customer-order-recovery-channels></div>
+      </section>
+      <form class="customer-order-otp" data-customer-order-otp-form hidden>
+        <fieldset>
+          <legend>Ingresa el código de 6 dígitos</legend>
+          <div class="customer-order-otp__digits" data-customer-order-otp-digits>
+            {% for digit in range(6) %}<input name="otp_digit" type="text" inputmode="numeric" autocomplete="{% if digit == 0 %}one-time-code{% else %}off{% endif %}" maxlength="1" pattern="[0-9]" aria-label="Dígito {{ digit + 1 }} del código" required>{% endfor %}
+          </div>
+        </fieldset>
+        <button type="submit">Verificar código</button>
+        <button type="button" class="customer-order-otp__resend" data-customer-order-otp-resend disabled>Reenviar código en 60 s</button>
+        <p data-customer-order-otp-message aria-live="polite"></p>
+      </form>
       <div class="customer-order-lookup__result" data-customer-order-lookup-result hidden aria-live="polite">
         <small data-customer-order-lookup-id></small><strong data-customer-order-lookup-state></strong><p data-customer-order-lookup-message></p><a data-customer-order-delivery-link hidden>Ver mi entrega</a>
       </div>

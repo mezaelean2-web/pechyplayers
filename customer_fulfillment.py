@@ -174,13 +174,18 @@ def get_admin(order_id):
     finally: conn.close()
 
 
-def get_customer_delivery(public_order_id, guest_session_hash):
+def get_customer_delivery(public_order_id, guest_session_hash, *, authorized_order_id=None):
     """Lee credenciales canonicas solo a traves del fulfillment propiedad del guest."""
     conn=_connect()
     try:
-        order=conn.execute("""SELECT id,public_order_id,status,item_count
-            FROM customer_orders WHERE public_order_id=? AND guest_session_hash=?""",
-            (str(public_order_id or ""),str(guest_session_hash or ""))).fetchone()
+        if authorized_order_id is None:
+            order=conn.execute("""SELECT id,public_order_id,status,item_count
+                FROM customer_orders WHERE public_order_id=? AND guest_session_hash=?""",
+                (str(public_order_id or ""),str(guest_session_hash or ""))).fetchone()
+        else:
+            order=conn.execute("""SELECT id,public_order_id,status,item_count
+                FROM customer_orders WHERE public_order_id=? AND id=?""",
+                (str(public_order_id or ""),int(authorized_order_id))).fetchone()
         if not order or order["status"]!="paid": raise CustomerDeliveryNotFound()
         header=conn.execute("""SELECT id,status,fulfilled_at FROM customer_order_fulfillments
             WHERE order_id=? AND status='fulfilled'""",(order["id"],)).fetchone()

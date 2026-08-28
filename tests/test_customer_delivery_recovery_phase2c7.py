@@ -93,8 +93,9 @@ class CustomerDeliveryRecoveryPhase2C7Test(unittest.TestCase):
         missing_cookie=app.test_client().post("/compras/pedidos/consultar",json={"public_order_id":"ORD-HISTORIC"})
         foreign=self._lookup("ORD-FOREIGN")
         missing=self._lookup("ORD-DOES-NOT-EXIST")
-        self.assertEqual((missing_cookie.status_code,foreign.status_code,missing.status_code),(404,404,404))
-        self.assertEqual(foreign.get_json(),missing.get_json())
+        self.assertEqual((missing_cookie.status_code,foreign.status_code,missing.status_code),(404,200,200))
+        self.assertTrue(foreign.get_json()["recovery_required"]);self.assertTrue(missing.get_json()["recovery_required"])
+        self.assertEqual(set(foreign.get_json()),set(missing.get_json()))
         for response in (missing_cookie,foreign,missing):self.assertNotIn("secret-password",response.get_data(as_text=True))
 
     def test_estados_seguros_no_exponen_credenciales_ni_error_interno(self):

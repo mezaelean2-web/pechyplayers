@@ -1,0 +1,43 @@
+{% extends "resellers/_dashboard_base.html" %}
+{% block title %}Buzón de correo{% endblock %}
+{% block section_title %}Buzón de correo{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-mailbox.css') }}?v=1">{% endblock %}
+{% block content %}
+<section class="mailbox-page" data-mailbox-root data-csrf-token="{{ csrf_token }}">
+  <header class="mailbox-heading">
+    <div><span>CENTRO DE CÓDIGOS</span><h2>Buzón de correo</h2><p>Consulta códigos y mensajes de tus cuentas</p></div>
+    <aside aria-label="Estado del buzón"><i data-lucide="shield-check"></i><span>Conexión simulada<strong>Protegida</strong></span></aside>
+  </header>
+
+  <form class="mailbox-search" data-mailbox-search novalidate>
+    <label class="sr-only" for="mailbox-email">Correo completo de la cuenta</label>
+    <i data-lucide="search" aria-hidden="true"></i>
+    <input id="mailbox-email" name="email" type="email" maxlength="254" autocomplete="off" spellcheck="false" placeholder="cuenta@dominio.com" required>
+    <button type="submit"><span>BUSCAR</span><i data-lucide="arrow-right" aria-hidden="true"></i></button>
+  </form>
+  <p class="mailbox-search-hint"><i data-lucide="info" aria-hidden="true"></i>Ingresa el correo completo. El correo sólo ayuda a localizar una adquisición propia; nunca concede acceso.</p>
+
+  <div class="mailbox-status" data-mailbox-status role="status" aria-live="polite">
+    <span class="mailbox-status-icon"><i data-lucide="mail-search"></i></span>
+    <div><strong>Busca un mensaje autorizado</strong><p>Cuando inicies una solicitud esperaremos únicamente un mensaje nuevo recibido después de ese momento.</p></div>
+  </div>
+
+  <div class="mailbox-workspace">
+    <section class="mailbox-inbox" aria-labelledby="mailbox-history-title">
+      <header><div><span>MENSAJES AUTORIZADOS</span><h3 id="mailbox-history-title">Bandeja e historial</h3></div><i data-lucide="history" aria-hidden="true"></i></header>
+      <div class="mailbox-history" data-mailbox-history>
+        <div class="mailbox-empty"><i data-lucide="inbox"></i><strong>Aún no hay mensajes</strong><p>Los mensajes que PECHY autorice y entregue aparecerán aquí.</p></div>
+      </div>
+    </section>
+
+    <section class="mailbox-viewer" aria-labelledby="mailbox-viewer-title">
+      <header><div><span>MENSAJE SELECCIONADO</span><h3 id="mailbox-viewer-title">Contenido autorizado</h3></div><i data-lucide="shield-check" aria-hidden="true"></i></header>
+      <div class="mailbox-message" data-mailbox-message>
+        <div class="mailbox-empty"><i data-lucide="mail-open"></i><strong>Selecciona un mensaje</strong><p>Sólo mostraremos contenido previamente autorizado para tu adquisición.</p></div>
+      </div>
+      <footer><i data-lucide="lock-keyhole"></i><span>Contenido aislado por reseller y adquisición.<small>No mostramos headers ni metadata del proveedor.</small></span></footer>
+    </section>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/reseller-mailbox.js') }}?v=1" defer></script>{% endblock %}

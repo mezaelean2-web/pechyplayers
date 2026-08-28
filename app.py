@@ -34,6 +34,10 @@ import customer_fulfillment_rules
 import customer_fulfillment
 import customer_delivery_access
 import customer_order_email
+import customer_order_recovery
+import reseller_mailbox
+import reseller_mailbox_persistence
+from mail_provider_factory import build_mail_provider
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -102,6 +106,11 @@ def _snapshot_preview_carrito(revendedor_id, preview):
 _intentos_login_reseller = {}
 _LOGIN_RESELLER_MAX_INTENTOS = 5
 _LOGIN_RESELLER_VENTANA = 15 * 60
+
+# Fase simulada del Buzón: estado efímero por proceso y cero conexiones externas.
+fake_mail_provider = build_mail_provider()
+reseller_mailbox_service = reseller_mailbox.ResellerMailboxService(
+    fake_mail_provider, reseller_mailbox_persistence.SQLiteMailboxRepository())
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -452,6 +461,16 @@ def _customer_delivery_telemetry_context():
     return guest_hash, fingerprint
 
 
+def _customer_order_access(public_order_id, guest_hash):
+    try:
+        return customer_delivery_access.lookup_owned_order(public_order_id, guest_hash), False
+    except customer_delivery_access.CustomerOrderLookupNotFound:
+        order_id = customer_order_recovery.authorized_order_id(session, public_order_id)
+        if order_id is None:
+            raise
+        return customer_delivery_access.lookup_recovered_order(public_order_id, order_id), True
+
+
 def _record_customer_delivery_event(order_id, event_type, source, http_status, safe_code, fingerprint):
     try:
         customer_delivery_access.record_event(
@@ -781,6 +800,69 @@ def mis_cuentas_revendedor():
         resumen=_resumen_privado_reseller(revendedor["id"]),
         filtros={"estado": estado, "tipo": tipo, "q": busqueda, "producto": producto},
         csrf_token=_csrf_reseller_token(), seccion_activa="mis_cuentas")
+
+
+def _reseller_mailbox_response(payload, status=200):
+    response = jsonify(payload)
+    response.status_code = status
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, private"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Vary"] = "Cookie"
+    return response
+
+
+@app.get("/revendedores/buzon")
+def buzon_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        session.setdefault("reseller_auth_error", "sesion")
+        return redirect("/revendedores/login")
+    return render_template(
+        "resellers/buzon.html", revendedor=revendedor,
+        resumen=_resumen_privado_reseller(revendedor["id"]),
+        csrf_token=_csrf_reseller_token(), seccion_activa="buzon")
+
+
+@app.post("/revendedores/buzon/solicitudes")
+def solicitar_mensaje_buzon_revendedor():
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return _reseller_mailbox_response(
+            {"ok": False, "status": "unavailable",
+             "message": "No hay mensajes disponibles para esta cuenta."}, 401)
+    if not _validar_csrf_reseller():
+        return _reseller_mailbox_response(
+            {"ok": False, "status": "unavailable",
+             "message": "No hay mensajes disponibles para esta cuenta."}, 403)
+    data = request.get_json(silent=True)
+    email = data.get("email") if isinstance(data, dict) and set(data) == {"email"} else None
+    return _reseller_mailbox_response(
+        reseller_mailbox_service.request_message(revendedor["id"], email))
+
+
+@app.get("/revendedores/buzon/solicitudes/<request_id>")
+def estado_mensaje_buzon_revendedor(request_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return _reseller_mailbox_response(
+            {"ok": False, "status": "unavailable",
+             "message": "No hay mensajes disponibles para esta cuenta."}, 401)
+    return _reseller_mailbox_response(
+        reseller_mailbox_service.poll_request(revendedor["id"], request_id))
+
+
+@app.get("/revendedores/buzon/mensajes/<delivery_id>")
+def leer_mensaje_buzon_revendedor(delivery_id):
+    revendedor = _revendedor_sesion_actual()
+    if not revendedor:
+        return _reseller_mailbox_response(
+            {"ok": False, "status": "unavailable",
+             "message": "No hay mensajes disponibles para esta cuenta."}, 401)
+    return _reseller_mailbox_response(
+        reseller_mailbox_service.read_delivery(revendedor["id"], delivery_id))
 
 
 @app.route("/revendedores/mis-cuentas/<int:purchase_id>")
@@ -1462,12 +1544,22 @@ def estado_pago_cliente(public_order_id):
         _record_customer_delivery_event(None, "delivery_request_denied", "server", 403, "invalid_csrf", fingerprint)
         return jsonify({"ok": False, "code": "invalid_csrf", "message": "La sesión de compra venció."}), 403
     try:
-        result = customer_bold_payments.get_status(
-            public_order_id, guest_hash, reconcile=True)
-    except customer_bold_payments.CustomerPaymentError as error:
-        _record_customer_delivery_event(None, "delivery_request_denied", "server", error.status, "order_not_found", fingerprint)
-        return jsonify({"ok": False, "code": error.reason, "message": str(error)}), error.status
-    order_id = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)["internal_id"]
+        access, recovered = _customer_order_access(public_order_id, guest_hash)
+        if recovered:
+            result = {"order_id": access["public_order_id"],
+                      "status": access["payment_status"], "payment_status": access["payment_status"],
+                      "fulfillment_status": access["state"],
+                      "fulfilled": access["delivery_available"]}
+        else:
+            result = customer_bold_payments.get_status(
+                public_order_id, guest_hash, reconcile=True)
+    except (customer_bold_payments.CustomerPaymentError,
+            customer_delivery_access.CustomerOrderLookupNotFound) as error:
+        status = getattr(error, "status", 404)
+        reason = getattr(error, "reason", "order_not_found")
+        _record_customer_delivery_event(None, "delivery_request_denied", "server", status, "order_not_found", fingerprint)
+        return jsonify({"ok": False, "code": reason, "message": "Pedido no encontrado."}), status
+    order_id = access["internal_id"]
     _record_customer_delivery_event(order_id, "delivery_status_checked", "server", 200, result["status"], fingerprint)
     if result["fulfilled"]:
         _record_customer_delivery_event(order_id, "delivery_fulfilled_observed", "server", 200, "fulfilled", fingerprint)
@@ -1491,9 +1583,20 @@ def consultar_pedido_cliente():
     try:
         result = customer_delivery_access.lookup_owned_order(data["public_order_id"], guest_hash)
     except customer_delivery_access.CustomerOrderLookupNotFound:
-        _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
-        return _customer_delivery_secure_response(
-            {"ok": False, "code": "not_found", "message": "No encontramos un pedido disponible para esta sesión."}, 404)
+        recovery = customer_order_recovery.prepare_recovery(data["public_order_id"])
+        recovery_id = secrets.token_urlsafe(24)
+        session[customer_order_recovery.RECOVERY_SESSION_KEY] = {
+            "id": recovery_id, "public_order_id": str(data["public_order_id"] or "").strip(),
+            "expires": time.time() + 600,
+        }
+        order_id = recovery["order"]["id"] if recovery["order"] else None
+        safe_code = "recovery_required" if order_id else "recovery_not_found"
+        _record_customer_delivery_event(order_id, "delivery_request_denied", "server", 200, safe_code, fingerprint)
+        return _customer_delivery_secure_response({
+            "ok": True, "recovery_required": True, "recovery_id": recovery_id,
+            "channels": recovery["channels"],
+            "message": "Verifica tu identidad para continuar. Si el pedido es válido, enviaremos el código al canal seleccionado.",
+        })
     _record_customer_delivery_event(result["internal_id"], "delivery_status_checked", "server", 200, result["state"], fingerprint)
     if result["delivery_available"]:
         _record_customer_delivery_event(result["internal_id"], "delivery_fulfilled_observed", "server", 200, "fulfilled", fingerprint)
@@ -1501,6 +1604,69 @@ def consultar_pedido_cliente():
         "public_order_id", "state", "payment_status", "delivery_available", "message")}
     public_result["delivery_url"] = url_for("resultado_pago_bold_cliente", order=result["public_order_id"])
     return _customer_delivery_secure_response({"ok": True, "order": public_result})
+
+
+def _customer_recovery_context(recovery_id):
+    context = session.get(customer_order_recovery.RECOVERY_SESSION_KEY)
+    if (not isinstance(context, dict) or not isinstance(recovery_id, str)
+            or not secrets.compare_digest(context.get("id", ""), recovery_id)
+            or float(context.get("expires", 0)) <= time.time()):
+        return None
+    return context
+
+
+@app.post("/compras/pedidos/recuperacion/otp/solicitar")
+def solicitar_otp_pedido_cliente():
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
+    if not _validar_csrf_customer_checkout():
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_request"}, 400)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"recovery_id", "channel"}:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_request"}, 400)
+    context = _customer_recovery_context(data["recovery_id"])
+    if context is None:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_request"}, 400)
+    requester = customer_order_recovery.requester_fingerprint(
+        fingerprint, request.remote_addr, app.secret_key)
+    result = customer_order_recovery.request_order_otp(
+        context["public_order_id"], data["channel"], requester, app.secret_key)
+    retry_after = int(result.get("retry_after", customer_order_recovery.OTP_RESEND_COOLDOWN_SECONDS))
+    return _customer_delivery_secure_response({
+        "ok": True, "accepted": True, "retry_after": retry_after,
+        "message": "Si el pedido y el canal son válidos, el código será enviado.",
+    }, 202)
+
+
+@app.post("/compras/pedidos/recuperacion/otp/verificar")
+def verificar_otp_pedido_cliente():
+    guest_hash, fingerprint = _customer_delivery_telemetry_context()
+    if not _validar_csrf_customer_checkout():
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_code"}, 400)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"recovery_id", "code"}:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_code"}, 400)
+    context = _customer_recovery_context(data["recovery_id"])
+    if context is None:
+        return _customer_delivery_secure_response({"ok": False, "code": "invalid_code"}, 400)
+    requester = customer_order_recovery.requester_fingerprint(
+        fingerprint, request.remote_addr, app.secret_key)
+    result = customer_order_recovery.verify_order_otp(
+        context["public_order_id"], data["code"], requester, app.secret_key)
+    if not result["verified"]:
+        return _customer_delivery_secure_response({
+            "ok": False, "code": "invalid_code",
+            "message": "El código no es válido, venció o alcanzó el límite de intentos.",
+        }, 400)
+    customer_order_recovery.authorize_order_access(
+        session, result["public_order_id"], result["order_id"])
+    access = customer_delivery_access.lookup_recovered_order(
+        result["public_order_id"], result["order_id"])
+    public_result = {key: access[key] for key in (
+        "public_order_id", "state", "payment_status", "delivery_available", "message")}
+    public_result["delivery_url"] = url_for(
+        "resultado_pago_bold_cliente", order=access["public_order_id"])
+    session.pop(customer_order_recovery.RECOVERY_SESSION_KEY, None)
+    return _customer_delivery_secure_response({"ok": True, "verified": True, "order": public_result})
 
 
 @app.route("/compras/pedidos/<public_order_id>/telemetria-entrega", methods=["POST"])
@@ -1514,7 +1680,7 @@ def telemetria_entrega_cliente(public_order_id):
     try:
         event_type, safe_code = customer_delivery_access.validate_client_event(
             data["event"], data["safe_code"])
-        order = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)
+        order, _ = _customer_order_access(public_order_id, guest_hash)
     except customer_delivery_access.CustomerOrderLookupNotFound:
         _record_customer_delivery_event(None, "delivery_request_denied", "server", 404, "not_found", fingerprint)
         return _customer_delivery_secure_response({"ok": False, "code": "not_found"}, 404)
@@ -1528,8 +1694,10 @@ def telemetria_entrega_cliente(public_order_id):
 def entrega_pedido_cliente(public_order_id):
     guest_hash, fingerprint = _customer_delivery_telemetry_context()
     order_id = None
+    recovered = False
     try:
-        order_id = customer_delivery_access.lookup_owned_order(public_order_id, guest_hash)["internal_id"]
+        access, recovered = _customer_order_access(public_order_id, guest_hash)
+        order_id = access["internal_id"]
     except customer_delivery_access.CustomerOrderLookupNotFound:
         pass
     _record_customer_delivery_event(order_id, "delivery_request_started", "server", None, "started", fingerprint)
@@ -1538,7 +1706,8 @@ def entrega_pedido_cliente(public_order_id):
         return _customer_delivery_secure_response({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)
     try:
         delivery=customer_fulfillment.get_customer_delivery(
-            public_order_id,guest_hash)
+            public_order_id,guest_hash,
+            authorized_order_id=order_id if recovered else None)
     except customer_fulfillment.CustomerDeliveryNotFound:
         _record_customer_delivery_event(order_id, "delivery_request_denied", "server", 404, "not_found", fingerprint)
         return _customer_delivery_secure_response({"ok":False,"code":"not_found","message":"Pedido no encontrado."},404)

@@ -1,1 +1,32 @@
-{% extends "resellers/_base.html" %}{% block title %}Iniciar sesión{% endblock %}{% block content %}<section class="reseller-auth-card"><span class="reseller-auth-eyebrow">PORTAL RESELLER</span><h1>Bienvenido de nuevo</h1><p>Accede al catálogo de siempre con tus precios reseller.</p>{% if error %}<div class="reseller-auth-message">{{ error }}</div>{% endif %}<form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><label>Correo<input name="correo" type="email" autocomplete="username" required autofocus></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label><button type="submit">Iniciar sesión</button></form><footer>¿Aún no tienes cuenta? <a href="/revendedores/registro">Crear cuenta de revendedor</a></footer></section>{% endblock %}
+{% extends "resellers/_base.html" %}
+{% block title %}Iniciar sesión{% endblock %}
+{% block body_class %}reseller-cyber-login{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/reseller-login.css') }}?v=1">{% endblock %}
+{% block content %}
+<div class="cyber-circuit" aria-hidden="true"><span class="circuit-trace trace-a"></span><span class="circuit-trace trace-b"></span><span class="circuit-trace trace-c"></span><span class="circuit-trace trace-d"></span><i class="circuit-node node-a"></i><i class="circuit-node node-b"></i><i class="circuit-node node-c"></i><i class="circuit-node node-d"></i></div>
+<svg class="cyber-energy-map" viewBox="0 0 1600 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+  <defs><linearGradient id="energy-red" x1="0" x2="1"><stop offset="0" stop-color="#550008"/><stop offset=".45" stop-color="#ff1827"/><stop offset="1" stop-color="#5b0008"/></linearGradient></defs>
+  <g class="energy-tracks"><path d="M0 118H142l52 52h178l45 45h102"/><path d="M0 306h115l64 64h190l70 70h85"/><path d="M0 706h160l55-55h155l68-68h88"/><path d="M1600 118h-142l-52 52h-178l-45 45h-102"/><path d="M1600 306h-115l-64 64h-190l-70 70h-85"/><path d="M1600 706h-160l-55-55h-155l-68-68h-88"/></g>
+  <g class="energy-pulses"><path class="pulse pulse-a" d="M0 118H142l52 52h178l45 45h102"/><path class="pulse pulse-b" d="M0 306h115l64 64h190l70 70h85"/><path class="pulse pulse-c" d="M0 706h160l55-55h155l68-68h88"/><path class="pulse pulse-d" d="M1600 118h-142l-52 52h-178l-45 45h-102"/><path class="pulse pulse-e" d="M1600 306h-115l-64 64h-190l-70 70h-85"/><path class="pulse pulse-f" d="M1600 706h-160l-55-55h-155l-68-68h-88"/></g>
+</svg>
+<div class="cyber-plates" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<header class="cyber-brand"><span class="cyber-emblem"><img src="{{ url_for('static', filename='img/logo.jpg') }}" alt=""></span><div><strong>PECHY</strong><span>PLAYERS</span></div><p>TU EXPERIENCIA GAMER</p></header>
+<section class="cyber-login-frame" aria-labelledby="reseller-login-title">
+  <div class="frame-hardware frame-hardware-top" aria-hidden="true"><i></i><span></span><b></b></div>
+  <div class="frame-hardware frame-hardware-bottom" aria-hidden="true"><i></i><span></span><b></b></div>
+  <div class="frame-rail frame-rail-left" aria-hidden="true"><i></i><i></i><i></i></div><div class="frame-rail frame-rail-right" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="cyber-login-card">
+  <span class="cyber-lock" aria-hidden="true">▣</span><h1 id="reseller-login-title">Bienvenido de vuelta</h1><p>Inicia sesión para continuar en tu plataforma</p>
+  {% if error %}<div class="reseller-auth-message" role="alert">{{ error }}</div>{% endif %}
+  <form method="POST"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label for="reseller-email">Correo electrónico</label><div class="cyber-field"><span aria-hidden="true">♙</span><input id="reseller-email" name="correo" type="email" autocomplete="username" placeholder="Ingresa tu correo electrónico" required autofocus></div>
+    <label for="reseller-password">Contraseña</label><div class="cyber-field"><span aria-hidden="true">▣</span><input id="reseller-password" name="password" type="password" autocomplete="current-password" placeholder="Ingresa tu contraseña" required><button type="button" aria-label="Mostrar contraseña" aria-pressed="false" data-password-toggle><span aria-hidden="true">◉</span></button></div>
+    <div class="cyber-session"><span aria-hidden="true">✓</span><p><strong>Sesión protegida</strong><small>Tu acceso está protegido por controles de seguridad.</small></p></div>
+    <button class="cyber-submit" type="submit"><span>INICIAR SESIÓN</span><b aria-hidden="true">→</b></button>
+  </form>
+  <p class="cyber-secure"><span aria-hidden="true">▣</span> Acceso seguro y protegido</p><footer>¿Aún no tienes cuenta? <a href="/revendedores/registro">Crear cuenta de revendedor</a></footer>
+</div></section>
+<div class="cyber-reactor" aria-hidden="true"><span class="reactor-beam"></span><div class="reactor-deck"><i></i><b></b><em></em></div></div>
+<footer class="cyber-footer">PECHY PLAYERS © 2026 <span>|</span> TODOS LOS DERECHOS RESERVADOS</footer>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='js/reseller-login.js') }}?v=1" defer></script>{% endblock %}

@@ -1957,7 +1957,7 @@ data-banner="{{ url_for('static', filename='img/cartelera/' + pelicula.poster) }
 <script src="{{ url_for('static', filename='js/components/carousel.js') }}"></script>
 <script src="{{ url_for('static', filename='js/cartelera.js') }}"></script>
 <script defer src="{{ url_for('static', filename='js/desktop-public.js') }}?v=1"></script>
-{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=6"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=6"></script>{% else %}{% include "_customer_cart.html" %}{% include "_customer_order_lookup.html" %}<script defer src="{{ url_for('static', filename='js/customer-cart.js') }}?v=8"></script><script defer src="{{ url_for('static', filename='js/customer-order-lookup.js') }}?v=2"></script>{% endif %}
+{% if es_catalogo_reseller %}{% include "resellers/_global_cart.html" %}<script defer src="{{ url_for('static', filename='js/reseller-cart.js') }}?v=6"></script><script defer src="{{ url_for('static', filename='js/reseller-products.js') }}?v=6"></script>{% else %}{% include "_customer_cart.html" %}{% include "_customer_order_lookup.html" %}<script defer src="{{ url_for('static', filename='js/customer-cart.js') }}?v=8"></script><script defer src="{{ url_for('static', filename='js/customer-order-lookup.js') }}?v=3"></script>{% endif %}
 
 <script>
 
