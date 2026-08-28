@@ -3,8 +3,9 @@ try:
 except ModuleNotFoundError:
     from _bootstrap import TEST_DB
 
-import imaplib,json,ssl,unittest
-from unittest.mock import Mock
+import contextlib,imaplib,io,json,os,ssl,tempfile,unittest
+from pathlib import Path
+from unittest.mock import Mock,patch
 
 from mail_message_parsers import ServiceAdapterRegistry
 from mail_provider_factory import build_mail_provider
@@ -13,7 +14,7 @@ from private_email_credentials import ProviderCredentialResolver,ProviderCredent
 from private_email_imap_transport import HOST,PORT,PrivateEmailIMAPTransport
 from private_email_provider import (PrivateEmailMailProvider,ProviderAuthenticationFailed,
     ProviderConfigurationError,ProviderMessageMalformed,ProviderProtocolError,ProviderTimeout)
-from private_email_smoke_test import run_smoke_test
+from private_email_smoke_test import load_project_environment,run_smoke_test
 
 FAKE_BUNDLE=json.dumps({"pilot":{"username":"fake@example.invalid","password":"FAKE_PASSWORD_DO_NOT_USE"}})
 
@@ -107,3 +108,51 @@ class FactoryAndSmokeTests(unittest.TestCase):
     def test_smoke_failure_is_redacted(self):
         transport=Mock(); transport.examine.side_effect=ProviderAuthenticationFailed("FAKE_PASSWORD_DO_NOT_USE")
         result=run_smoke_test("pilot",transport=transport); self.assertEqual(result["connection"],"failed")
+
+
+class SmokeDotenvTests(unittest.TestCase):
+    CONFIG_ID="pechy_pilot"
+    USERNAME="offline@example.invalid"
+    PASSWORD="OFFLINE_TEST_SECRET_DO_NOT_PRINT"
+
+    def write_dotenv(self,directory,bundle):
+        path=Path(directory)/".env"
+        path.write_text("PRIVATE_EMAIL_CREDENTIALS_BUNDLE='"+bundle+"'\n",encoding="utf-8")
+        return path
+
+    def test_controlled_dotenv_loads_and_resolves_without_output_or_imap(self):
+        bundle=json.dumps({self.CONFIG_ID:{"username":self.USERNAME,"password":self.PASSWORD}})
+        with tempfile.TemporaryDirectory() as directory:
+            dotenv_path=self.write_dotenv(directory,bundle)
+            stdout=io.StringIO(); stderr=io.StringIO(); client_factory=Mock()
+            with patch.dict(os.environ,{},clear=True),contextlib.redirect_stdout(stdout),contextlib.redirect_stderr(stderr):
+                self.assertTrue(load_project_environment(dotenv_path))
+                resolver=ProviderCredentialResolver()
+                credentials=resolver.resolve(self.CONFIG_ID)
+                transport=PrivateEmailIMAPTransport(resolver,client_factory=client_factory)
+                self.assertIsNotNone(transport)
+            output=stdout.getvalue()+stderr.getvalue()
+            self.assertNotIn(self.USERNAME,output); self.assertNotIn(self.PASSWORD,output)
+            self.assertEqual(credentials.username,self.USERNAME); self.assertEqual(credentials.password,self.PASSWORD)
+            client_factory.assert_not_called()
+
+    def test_missing_dotenv_and_invalid_configuration_fail_closed(self):
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{},clear=True):
+            self.assertFalse(load_project_environment(Path(directory)/"missing.env"))
+            with self.assertRaises(ProviderConfigurationError):
+                ProviderCredentialResolver().resolve(self.CONFIG_ID)
+        with tempfile.TemporaryDirectory() as directory,patch.dict(os.environ,{},clear=True):
+            dotenv_path=self.write_dotenv(directory,"not-json")
+            self.assertTrue(load_project_environment(dotenv_path))
+            with self.assertRaises(ProviderConfigurationError): ProviderCredentialResolver()
+
+    def test_dotenv_does_not_override_existing_environment(self):
+        existing=json.dumps({self.CONFIG_ID:{"username":self.USERNAME,"password":"EXISTING_SECRET"}})
+        from_file=json.dumps({self.CONFIG_ID:{"username":"other@example.invalid","password":"FILE_SECRET"}})
+        with tempfile.TemporaryDirectory() as directory:
+            dotenv_path=self.write_dotenv(directory,from_file)
+            with patch.dict(os.environ,{"PRIVATE_EMAIL_CREDENTIALS_BUNDLE":existing},clear=True):
+                self.assertTrue(load_project_environment(dotenv_path))
+                credentials=ProviderCredentialResolver().resolve(self.CONFIG_ID)
+                self.assertEqual(credentials.username,self.USERNAME)
+                self.assertEqual(credentials.password,"EXISTING_SECRET")

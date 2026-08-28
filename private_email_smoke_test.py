@@ -1,9 +1,23 @@
 """Smoke test administrativo read-only. NO ejecutarlo sin autorización humana."""
 
 import argparse
+from pathlib import Path
+
+from dotenv import load_dotenv
 
 from private_email_credentials import ProviderCredentialResolver
 from private_email_imap_transport import PrivateEmailIMAPTransport
+
+
+PROJECT_DOTENV = Path(__file__).with_name(".env")
+
+
+def load_project_environment(dotenv_path=PROJECT_DOTENV):
+    return load_dotenv(dotenv_path=dotenv_path, override=False)
+
+
+load_project_environment()
+
 
 def run_smoke_test(config_id,*,transport=None):
     result={"connection":"failed","authentication":"failed","folder":"failed",
