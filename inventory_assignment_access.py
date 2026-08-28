@@ -243,13 +243,15 @@ def _assignment_version(purchase, account, profile):
     return hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def authorize_reseller_message_access(reseller_id, reseller_purchase_id, *, now=None):
+def authorize_reseller_message_access(reseller_id, reseller_purchase_id, *, now=None,
+                                      connection=None):
     """Autoriza una adquisicion propia vigente sin exponer credenciales ni correo."""
     reseller_id = _parse_identifier(reseller_id)
     purchase_id = _parse_identifier(reseller_purchase_id)
     if reseller_id is None or purchase_id is None:
         return _denied("invalid_request")
-    conn = database.conectar()
+    own_connection = connection is None
+    conn = connection or database.conectar()
     try:
         cursor = conn.cursor()
         purchase = _load_purchase(cursor, purchase_id)
@@ -293,4 +295,5 @@ def authorize_reseller_message_access(reseller_id, reseller_purchase_id, *, now=
         # Una tabla/columna ausente o un dato historico inesperado nunca abre acceso.
         return _denied("invalid_request")
     finally:
-        conn.close()
+        if own_connection:
+            conn.close()
