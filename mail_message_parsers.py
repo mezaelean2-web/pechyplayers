@@ -16,14 +16,42 @@ class ParsedMessage:
     service: str
     kind: str
     value: str
+    safe_reason: str = ""
+    status: str = ""
+
+@dataclass(frozen=True)
+class DecodedMessage:
+    text: str
+    anchors: tuple
 
 class _TextOnly(HTMLParser):
-    def __init__(self): super().__init__(); self.parts=[]
-    def handle_data(self,data): self.parts.append(data)
+    def __init__(self,*,max_anchors=50):
+        super().__init__(convert_charrefs=True); self.parts=[]; self.anchors=[]
+        self._anchor=None; self._skip=0; self.max_anchors=max_anchors
+    def handle_starttag(self,tag,attrs):
+        tag=tag.lower()
+        if tag in {"script","style"}: self._skip+=1; return
+        if tag=="a" and not self._skip:
+            href=next((value for key,value in attrs if key.lower()=="href"),None)
+            self._anchor={"href":href,"text":[]}
+    def handle_endtag(self,tag):
+        tag=tag.lower()
+        if tag in {"script","style"} and self._skip: self._skip-=1; return
+        if tag=="a" and self._anchor is not None:
+            if len(self.anchors)>=self.max_anchors: raise ValueError("too_many_anchors")
+            text=" ".join(self._anchor["text"])[:512]
+            href=self._anchor["href"]
+            if href is not None and len(str(href))>2048: raise ValueError("href_too_large")
+            self.anchors.append((text,str(href) if href is not None else "")); self._anchor=None
+    def handle_data(self,data):
+        if self._skip:return
+        self.parts.append(data)
+        if self._anchor is not None:self._anchor["text"].append(data)
 
 class ServiceAdapter:
     service="Unknown"
     def parse(self, metadata, text): return ParsedMessage(self.service,"unsupported","")
+    def parse_decoded(self,metadata,decoded): return self.parse(metadata,decoded.text)
 
 class CodeServiceAdapter(ServiceAdapter):
     def __init__(self, service, *, senders, recipients, subject_tokens,
@@ -50,7 +78,7 @@ class ServiceAdapterRegistry:
         if len(raw)>self.max_message_bytes: raise ProviderMessageTooLarge()
         try: message=BytesParser(policy=policy.default).parsebytes(bytes(raw))
         except Exception as exc: raise ProviderMessageMalformed() from exc
-        parts=[]; count=0
+        parts=[]; anchors=[]; count=0
         def walk(node,depth=0):
             nonlocal count
             if depth>self.max_depth: raise ProviderMessageMalformed()
@@ -65,11 +93,14 @@ class ServiceAdapterRegistry:
             try: value=node.get_content()
             except (LookupError,UnicodeError) as exc: raise ProviderMessageMalformed() from exc
             if kind=="text/html":
-                parser=_TextOnly(); parser.feed(value); value=" ".join(parser.parts)
+                try:
+                    parser=_TextOnly(); parser.feed(value); parser.close()
+                except (ValueError,AssertionError) as exc: raise ProviderMessageMalformed() from exc
+                anchors.extend(parser.anchors); value=" ".join(parser.parts)
             parts.append(value)
         walk(message)
-        if not parts: return ""
-        return "\n".join(parts)[:self.max_message_bytes]
+        text="\n".join(parts)[:self.max_message_bytes] if parts else ""
+        return DecodedMessage(text,tuple(anchors))
 
     def classify(self, metadata, body_loader, *, requested_at):
         size=int(metadata.get("size",0) or 0)
@@ -81,11 +112,13 @@ class ServiceAdapterRegistry:
         if requested_at is not None and internaldate < requested_at:
             return ParsedMessage("Unknown","unsupported","")
         raw=body_loader(metadata.get("body_part","TEXT"))
-        text=self._decode(raw)
-        matches=[]
+        decoded=self._decode(raw)
+        matches=[]; results=[]
         for adapter in self.adapters:
-            result=adapter.parse(metadata,text)
+            result=adapter.parse_decoded(metadata,decoded)
+            results.append(result)
             if result.kind!="unsupported": matches.append(result)
         if len(matches)!=1 or matches[0].kind not in KINDS:
+            if not matches and len(results)==1:return results[0]
             return ParsedMessage("Unknown","unsupported","")
         return matches[0]

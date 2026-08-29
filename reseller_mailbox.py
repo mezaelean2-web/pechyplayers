@@ -9,6 +9,7 @@ from threading import RLock
 
 import database
 import inventory_assignment_access
+import mail_center
 import reseller_mailbox_persistence
 from mail_providers import SUPPORTED_MESSAGE_KINDS
 from mailbox_bindings import MailboxBindingDenied
@@ -70,11 +71,12 @@ class InMemoryMailboxRepository:
 
 class ResellerMailboxService:
     def __init__(self, provider, repository=None, clock=None, *, binding_resolver=None,
-                 private_email_provider=None, private_email_gate=None):
+                 private_email_provider=None, private_email_gate=None, action_catalog=None):
         self.provider = provider
         self.binding_resolver = binding_resolver
         self.private_email_provider = private_email_provider
         self.private_email_gate = private_email_gate
+        self.action_catalog = action_catalog
         self.repository = repository or reseller_mailbox_persistence.SQLiteMailboxRepository()
         self.clock = clock or utcnow
         self._lock = getattr(self.repository, "_lock", RLock())
@@ -114,8 +116,14 @@ class ResellerMailboxService:
                 or binding.binding_id != record.get("mailbox_binding_id")
                 or binding.binding_version != record.get("binding_version")):
             return None
-        return {"kind":"private_email","provider":self.private_email_provider,
-                "binding":binding,"cursor":record.get("provider_cursor")}
+        context={"kind":"private_email","provider":self.private_email_provider,
+                 "binding":binding,"cursor":record.get("provider_cursor")}
+        if self.action_catalog is not None:
+            action=self.action_catalog.get_action(record.get("action_id"),enabled_only=True)
+            runtime=self.action_catalog.action_runtime(action,record["unit"])
+            if runtime is None:return None
+            context["action"]=runtime
+        return context
 
     def _can_resume(self, record):
         if record.get("provider_kind") != "private_email":
@@ -203,7 +211,7 @@ class ResellerMailboxService:
         queue.append(now)
         return True
 
-    def request_message(self, reseller_id, email):
+    def request_message(self, reseller_id, email, action_id=None):
         now = self.clock()
         normalized = normalize_email_query(email)
         with self._lock:
@@ -219,6 +227,15 @@ class ResellerMailboxService:
                             result="denied", safe_code=safe_code, request_id=None)
                 return self._neutral()
             purchase_id = authorization["purchase_id"]
+            action=None
+            if self.action_catalog is not None:
+                action=self.action_catalog.get_action(action_id,enabled_only=True)
+                action=self.action_catalog.action_runtime(action,authorization["inventory_unit"])
+                if action is None:
+                    self._audit(reseller_id=reseller_id,purchase_id=purchase_id,
+                                unit=authorization["inventory_unit"],result="denied",
+                                safe_code="action_not_allowed",request_id=None)
+                    return self._neutral()
             if isinstance(self.repository, InMemoryMailboxRepository):
                 existing = next((item for item in self.repository.requests.values()
                     if item["reseller_id"] == int(reseller_id)
@@ -235,6 +252,8 @@ class ResellerMailboxService:
                                 request_id=existing["id"])
                     existing = None
             if existing:
+                if self.action_catalog is not None and existing.get("action_id")!=action["id"]:
+                    return self._neutral()
                 result = self._neutral("waiting", existing["id"], POLL_INTERVAL_SECONDS)
                 result["history"] = self._history_for(existing)
                 return result
@@ -250,6 +269,7 @@ class ResellerMailboxService:
                 "last_polled_at": None,
                 "status": "waiting",
                 "delivery_id": None,
+                "action_id": action["id"] if action else None,
             }
             context = self._select_provider_context(reseller_id, authorization)
             if context is None:
@@ -277,6 +297,9 @@ class ResellerMailboxService:
             self._audit(reseller_id=reseller_id, purchase_id=purchase_id,
                         unit=record["unit"], result="waiting", safe_code="authorized",
                         request_id=request_id)
+            if self.action_catalog is not None:
+                self.action_catalog.append_reseller_event("reseller_mail_action_requested",
+                    reseller_id,purchase_id,record["action_id"],"authorized")
             if context["kind"] == "fake":
                 self.provider.begin_request(
                     request_id=request_id, unit=record["unit"], requested_at=now)
@@ -324,13 +347,14 @@ class ResellerMailboxService:
                 "purchase_id":delivery["purchase_id"], "unit":delivery["unit"],
                 "assignment_version":delivery.get("assignment_version"),
                 "mailbox_binding_id":getattr(delivery.get("provider_locator"),"binding_id",None),
-                "binding_version":delivery.get("binding_version")}
+                "binding_version":delivery.get("binding_version"),"action_id":delivery.get("action_id")}
             context = self._private_context_for_record(record)
             if not context or delivery.get("provider_locator") is None:
                 return delivery
             try:
                 message = context["provider"].message_by_reference(
-                    binding=context["binding"], provider_locator=delivery["provider_locator"])
+                    binding=context["binding"], provider_locator=delivery["provider_locator"],
+                    action=context.get("action"))
             except ProviderError:
                 return delivery
         else:
@@ -412,7 +436,8 @@ class ResellerMailboxService:
                     return self._neutral()
                 try:
                     messages = context["provider"].messages_after(
-                        binding=context["binding"], cursor=context["cursor"])
+                        binding=context["binding"], cursor=context["cursor"],
+                        action=context.get("action"))
                 except ProviderError:
                     record["status"] = "denied"
                     if not isinstance(self.repository, InMemoryMailboxRepository):
@@ -421,8 +446,16 @@ class ResellerMailboxService:
             else:
                 messages = self.provider.messages_after(
                     unit=record["unit"], requested_at=record["requested_at"])
-            message = next((item for item in messages
-                            if item.kind in SUPPORTED_MESSAGE_KINDS), None)
+            if self.action_catalog is not None:
+                action=self.action_catalog.get_action(record.get("action_id"),enabled_only=True)
+                runtime=self.action_catalog.action_runtime(action,record["unit"])
+                expected_kind="action_link" if runtime and runtime["extractor_type"]=="password_reset_link" else None
+                message=max((item for item in messages if expected_kind and item.kind==expected_kind
+                            and item.service.casefold()==runtime["platform"].casefold()),
+                            key=lambda item:getattr(getattr(item,"locator",None),"uid",-1),default=None)
+            else:
+                message = next((item for item in messages
+                                if item.kind in SUPPORTED_MESSAGE_KINDS), None)
             if message is None:
                 return self._neutral("waiting", record["id"], POLL_INTERVAL_SECONDS)
             # Revalidación inmediatamente antes de conservar y revelar contenido.
@@ -451,6 +484,7 @@ class ResellerMailboxService:
                 "provider_kind": record.get("provider_kind", "fake"),
                 "binding_version": record.get("binding_version"),
                 "assignment_version": record["assignment_version"],
+                "action_id":record.get("action_id"),
             }
             if isinstance(self.repository, InMemoryMailboxRepository):
                 key = (record["reseller_id"], record["purchase_id"])
@@ -464,6 +498,9 @@ class ResellerMailboxService:
             self._audit(reseller_id=reseller_id, purchase_id=record["purchase_id"],
                         unit=record["unit"], result="delivered", safe_code="message_delivered",
                         request_id=record["id"], provider_reference=message.reference)
+            if self.action_catalog is not None:
+                self.action_catalog.append_reseller_event("reseller_mail_action_delivered",
+                    reseller_id,record["purchase_id"],record["action_id"],"message_delivered")
             return {"ok": True, "status": "found",
                     "message": self._public_delivery(delivery),
                     "history": self._history_for(record)}

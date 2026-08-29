@@ -112,6 +112,12 @@
 
     <div class="sidebar-group-title">SISTEMA</div>
 
+    <a href="/admin/centro-correo"
+       class="sidebar-link {% if request.path.startswith('/admin/centro-correo') %}active{% endif %}">
+        <i data-lucide="mail-check" class="sidebar-icon"></i>
+        <span>Centro de Correo</span>
+    </a>
+
     <a href="/admin/historial"
        class="sidebar-link {% if request.path == '/admin/historial' %}active{% endif %}">
         <i data-lucide="history" class="sidebar-icon"></i>

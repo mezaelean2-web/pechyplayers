@@ -72,7 +72,7 @@ class TransportTests(unittest.TestCase):
             with self.assertRaises(ProviderProtocolError): self.transport.examine("pilot","INBOX")
         with self.assertRaises(ProviderConfigurationError): self.transport.examine("pilot","Sent")
     def test_search_boundary_limit_and_malformed(self):
-        self.assertEqual(self.transport.search_uids("pilot","INBOX",100,1),[100])
+        self.assertEqual(self.transport.search_uids("pilot","INBOX",100,1),[101])
         search=[x for x in self.client.calls if x[0]=="UID SEARCH"][-1]; self.assertIn("UID 100:*",search)
         self.client.search=b"bad"
         with self.assertRaises(ProviderProtocolError): self.transport.search_uids("pilot","INBOX",100,20)

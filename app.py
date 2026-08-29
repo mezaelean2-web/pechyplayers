@@ -37,6 +37,8 @@ import customer_order_email
 import customer_order_recovery
 import reseller_mailbox
 import reseller_mailbox_persistence
+import mail_center
+import managed_secret_store
 from mail_provider_factory import build_mail_provider
 from mailbox_bindings import MailboxBindingResolver
 from pilot_private_email_gate import PilotPrivateEmailGate
@@ -126,7 +128,7 @@ reseller_mailbox_service = reseller_mailbox.ResellerMailboxService(
     fake_mail_provider, reseller_mailbox_persistence.SQLiteMailboxRepository(),
     binding_resolver=MailboxBindingResolver(),
     private_email_provider=_pilot_private_email_provider,
-    private_email_gate=PilotPrivateEmailGate())
+    private_email_gate=PilotPrivateEmailGate(),action_catalog=mail_center)
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -839,6 +841,7 @@ def buzon_revendedor():
     return render_template(
         "resellers/buzon.html", revendedor=revendedor,
         resumen=_resumen_privado_reseller(revendedor["id"]),
+        mail_actions=mail_center.available_actions_for_reseller(revendedor["id"]),
         csrf_token=_csrf_reseller_token(), seccion_activa="buzon")
 
 
@@ -854,9 +857,12 @@ def solicitar_mensaje_buzon_revendedor():
             {"ok": False, "status": "unavailable",
              "message": "No hay mensajes disponibles para esta cuenta."}, 403)
     data = request.get_json(silent=True)
-    email = data.get("email") if isinstance(data, dict) and set(data) == {"email"} else None
+    expected={"email","action_id"} if reseller_mailbox_service.action_catalog is not None else {"email"}
+    valid_payload=isinstance(data,dict) and set(data)==expected
+    email = data.get("email") if valid_payload else None
+    action_id = data.get("action_id") if valid_payload and "action_id" in data else None
     return _reseller_mailbox_response(
-        reseller_mailbox_service.request_message(revendedor["id"], email))
+        reseller_mailbox_service.request_message(revendedor["id"], email, action_id))
 
 
 @app.get("/revendedores/buzon/solicitudes/<request_id>")
@@ -1387,6 +1393,153 @@ def admin_productos():
         categorias=categorias,
         csrf_token=_csrf_revendedores_token()
     )
+
+
+def _mail_center_admin_actor():
+    return str(session.get("admin_usuario") or "admin")[:80]
+
+
+def _mail_center_secret_store():
+    return managed_secret_store.SQLiteEncryptedSecretStore.from_environment()
+
+
+@app.get("/admin/centro-correo")
+def admin_centro_correo():
+    if not session.get("admin"):
+        return redirect("/pechy-panel-seguro")
+    mail_center.initialize_schema()
+    return render_template("admin/centro_correo.html",
+        mailboxes=mail_center.list_mailboxes(), actions=mail_center.list_actions(),
+        plataformas=reseller_accounts.listar_plataformas_inventario(),
+        extractor_types=sorted(mail_center.EXTRACTOR_TYPES), csrf_token=_csrf_admin_token(),
+        secret_storage_requires_decision=True)
+
+
+def _mail_center_json(payload,status=200):
+    response=jsonify(payload); response.status_code=status
+    response.headers["Cache-Control"]="no-store"
+    response.headers["X-Content-Type-Options"]="nosniff"
+    return response
+
+
+@app.post("/admin/centro-correo/api/buzones")
+def admin_crear_buzon_correo():
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    data=request.get_json(silent=True)
+    allowed={"display_name","provider","host","port","tls_mode","username","password","folder_key","enabled"}
+    if not isinstance(data,dict) or set(data)!=allowed:
+        return _mail_center_json({"ok":False,"error":"invalid_mailbox_configuration"},400)
+    try:
+        mailbox_id=mail_center.save_managed_mailbox(data if isinstance(data,dict) else {},
+            _mail_center_secret_store(),actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True,"mailbox_id":mailbox_id})
+    except managed_secret_store.SecretStoreError:
+        return _mail_center_json({"ok":False,"error":"secret_store_unavailable"},503)
+    except mail_center.MailCenterError:
+        return _mail_center_json({"ok":False,"error":"invalid_mailbox_configuration"},400)
+
+
+@app.put("/admin/centro-correo/api/buzones/<int:mailbox_id>")
+def admin_editar_buzon_correo(mailbox_id):
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    data=request.get_json(silent=True)
+    allowed={"display_name","provider","host","port","tls_mode","folder_key","enabled"}
+    if not isinstance(data,dict) or set(data)!=allowed:
+        return _mail_center_json({"ok":False,"error":"invalid_mailbox_configuration"},400)
+    try:
+        mail_center.update_mailbox_configuration(mailbox_id,data,
+                                                 actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True,"mailbox_id":mailbox_id})
+    except mail_center.MailCenterError:
+        return _mail_center_json({"ok":False,"error":"invalid_mailbox_configuration"},400)
+
+
+@app.post("/admin/centro-correo/api/buzones/<int:mailbox_id>/probar")
+def admin_probar_buzon_correo(mailbox_id):
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    resolver=ProviderCredentialResolver()
+    result=mail_center.test_mailbox_connection(mailbox_id,resolver,
+        lambda value:PrivateEmailIMAPTransport(value),actor=_mail_center_admin_actor())
+    return _mail_center_json(result,200 if result.get("ok") else 400)
+
+
+@app.post("/admin/centro-correo/api/buzones/probar-credencial")
+def admin_probar_credencial_buzon_correo():
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    result=mail_center.test_unsaved_credentials(request.get_json(silent=True) or {},
+        lambda resolver:PrivateEmailIMAPTransport(resolver))
+    return _mail_center_json(result,200 if result.get("ok") else 400)
+
+
+@app.post("/admin/centro-correo/api/buzones/<int:mailbox_id>/credencial")
+def admin_rotar_credencial_buzon_correo(mailbox_id):
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    data=request.get_json(silent=True) or {}
+    if set(data)!={"username","password"}:
+        return _mail_center_json({"ok":False,"error":"invalid_credential"},400)
+    try:
+        mail_center.rotate_mailbox_credential(mailbox_id,data["username"],data["password"],
+            _mail_center_secret_store(),actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True,"mailbox_id":mailbox_id,"credential_configured":True})
+    except (mail_center.MailCenterError,managed_secret_store.SecretStoreError):
+        return _mail_center_json({"ok":False,"error":"credential_update_failed"},400)
+
+
+@app.delete("/admin/centro-correo/api/buzones/<int:mailbox_id>")
+def admin_eliminar_buzon_correo(mailbox_id):
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    try:
+        mail_center.delete_managed_mailbox(mailbox_id,_mail_center_secret_store(),
+                                           actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True})
+    except (mail_center.MailCenterError,managed_secret_store.SecretStoreError):
+        return _mail_center_json({"ok":False,"error":"mailbox_delete_denied"},409)
+
+
+@app.post("/admin/centro-correo/api/acciones")
+def admin_crear_accion_correo():
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    try:
+        action_id=mail_center.save_action(request.get_json(silent=True) or {},
+                                          actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True,"action_id":action_id})
+    except mail_center.MailCenterError:
+        return _mail_center_json({"ok":False,"error":"invalid_action_configuration"},400)
+
+
+@app.put("/admin/centro-correo/api/acciones/<int:action_id>")
+def admin_editar_accion_correo(action_id):
+    if not session.get("admin"):
+        return _mail_center_json({"ok":False,"error":"unauthorized"},401)
+    if not _validar_csrf_admin():
+        return _mail_center_json({"ok":False,"error":"invalid_csrf"},403)
+    try:
+        mail_center.save_action(request.get_json(silent=True) or {},action_id=action_id,
+                                actor=_mail_center_admin_actor())
+        return _mail_center_json({"ok":True,"action_id":action_id})
+    except mail_center.MailCenterError:
+        return _mail_center_json({"ok":False,"error":"invalid_action_configuration"},400)
 
 
 @app.route("/admin/productos/descuentos-carrito", methods=["POST"])

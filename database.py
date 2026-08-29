@@ -570,6 +570,8 @@ def inicializar_db():
     customer_fulfillment.initialize_schema(conn)
     import customer_delivery_access
     customer_delivery_access.initialize_schema(conn)
+    import mail_center
+    mail_center.initialize_schema(conn)
 
     cursor.execute("""
 CREATE TABLE IF NOT EXISTS promociones (

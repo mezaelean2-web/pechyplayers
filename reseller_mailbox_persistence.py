@@ -107,7 +107,7 @@ def initialize_schema(connection=None):
             safe_code TEXT NOT NULL CHECK (safe_code IN (
                 'authorized','invalid_or_limited','purchase_not_found',
                 'ambiguous_assignment','authorization_changed','request_expired',
-                'message_delivered','provider_state_unavailable','invalid_request')),
+                'message_delivered','provider_state_unavailable','invalid_request','action_not_allowed')),
             provider_reference_hash TEXT,
             created_at TEXT NOT NULL,
             FOREIGN KEY (reseller_id) REFERENCES revendedores(id)
@@ -130,7 +130,8 @@ def initialize_schema(connection=None):
             ("folder_key", "TEXT"), ("uidvalidity_at_t0", "INTEGER"),
             ("uidnext_at_t0", "INTEGER"), ("provider_cursor_captured_at", "TEXT"),
             ("initialization_state", "TEXT NOT NULL DEFAULT 'legacy'"),
-            ("lease_owner", "TEXT"), ("lease_expires_at", "TEXT")):
+            ("lease_owner", "TEXT"), ("lease_expires_at", "TEXT"),
+            ("mail_action_id", "INTEGER")):
             if name not in request_columns:
                 conn.execute(f"ALTER TABLE reseller_mailbox_requests ADD COLUMN {name} {definition}")
         delivery_columns = {row[1] for row in conn.execute("PRAGMA table_info(reseller_authorized_message_deliveries)")}
@@ -188,7 +189,7 @@ class SQLiteMailboxRepository:
                 "status": row["status"], "delivery_id": row["delivery_id"],
                 "provider_kind": "private_email" if row["mailbox_binding_id"] else "fake",
                 "mailbox_binding_id": row["mailbox_binding_id"],
-                "binding_version": row["binding_version"]}
+                "binding_version": row["binding_version"],"action_id":row["mail_action_id"]}
         if row["mailbox_binding_id"]:
             try:
                 record["provider_cursor"] = ProviderCursor(
@@ -233,8 +234,8 @@ class SQLiteMailboxRepository:
                 (request_id,reseller_id,reseller_purchase_id,inventory_type,inventory_account_id,
                  inventory_profile_id,requested_at,expires_at,status,assignment_version,updated_at,
                  mailbox_binding_id,binding_version,folder_key,uidvalidity_at_t0,uidnext_at_t0,
-                 provider_cursor_captured_at,initialization_state)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
+                 provider_cursor_captured_at,initialization_state,mail_action_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 record["id"], record["reseller_id"], record["purchase_id"], unit["type"],
                 unit["account_id"], unit.get("profile_id"), _iso(record["requested_at"]),
                 _iso(record["expires_at"]), "waiting", record["assignment_version"],
@@ -242,7 +243,7 @@ class SQLiteMailboxRepository:
                 getattr(cursor,"binding_version",None),getattr(cursor,"folder_key",None),
                 getattr(cursor,"uidvalidity",None),getattr(cursor,"uidnext_boundary",None),
                 _iso(cursor.captured_at) if cursor else None,
-                "ready" if cursor else "legacy"))
+                "ready" if cursor else "legacy",record.get("action_id")))
             conn.commit()
         finally: conn.close()
 
@@ -305,13 +306,14 @@ class SQLiteMailboxRepository:
                 "provider_locator": locator,
                 "provider_kind": "private_email" if row["mailbox_binding_id"] else "fake",
                 "binding_version": row["request_binding_version"],
-                "assignment_version": row["request_assignment_version"]}
+                "assignment_version": row["request_assignment_version"],
+                "action_id":row["request_action_id"]}
 
     def history_for(self, reseller_id, purchase_id, limit=20):
         conn = _connect()
         try:
             rows = conn.execute("""SELECT d.*,r.binding_version AS request_binding_version,
-                r.assignment_version AS request_assignment_version
+                r.assignment_version AS request_assignment_version,r.mail_action_id AS request_action_id
                 FROM reseller_authorized_message_deliveries d
                 JOIN reseller_mailbox_requests r ON r.request_id=d.request_id
                 WHERE d.reseller_id=? AND d.reseller_purchase_id=?
@@ -325,7 +327,7 @@ class SQLiteMailboxRepository:
         try:
             return self._delivery(conn.execute("""SELECT d.*,
                 r.binding_version AS request_binding_version,
-                r.assignment_version AS request_assignment_version
+                r.assignment_version AS request_assignment_version,r.mail_action_id AS request_action_id
                 FROM reseller_authorized_message_deliveries d
                 JOIN reseller_mailbox_requests r ON r.request_id=d.request_id
                 WHERE d.delivery_id=? AND d.reseller_id=?""",

@@ -9,8 +9,14 @@
   const history = root.querySelector("[data-mailbox-history]");
   const viewer = root.querySelector("[data-mailbox-message]");
   const csrf = root.dataset.csrfToken || "";
+  const actions = [...root.querySelectorAll("[data-action-id]")];
+  let selectedAction = null;
   let timer = null;
   let activeRequest = null;
+  actions.forEach(button => button.addEventListener("click", () => {
+    selectedAction = Number(button.dataset.actionId);
+    actions.forEach(item => item.classList.toggle("is-selected", item === button));
+  }));
 
   const icons = () => { if (window.lucide) window.lucide.createIcons(); };
   const element = (tag, className, text) => {
@@ -131,19 +137,23 @@
   };
   form.addEventListener("submit", async event => {
     event.preventDefault(); stopPolling(); submit.disabled = true;
+    if (!selectedAction) {
+      statusView("", "Selecciona una acción", "Elige primero qué tipo de mensaje necesitas.", "list-checks");
+      submit.disabled = false; return;
+    }
     statusView("waiting", "Validando la solicitud…",
       "Comprobamos la adquisición y la asignación actual sin usar el correo como autorización.", "loader-circle");
     try {
       const {data} = await request("/revendedores/buzon/solicitudes", {
         method: "POST",
         headers: {"Content-Type": "application/json", "X-CSRF-Token": csrf},
-        body: JSON.stringify({email: input.value})
+        body: JSON.stringify({email: input.value, action_id: selectedAction})
       });
       if (data.status === "waiting" && data.request_id) {
         activeRequest = data.request_id;
         if (Array.isArray(data.history)) renderHistory(data.history);
         statusView("waiting", "Esperando nuevo mensaje…",
-          "Sólo aceptaremos el primer mensaje válido posterior al inicio de esta solicitud.", "loader-circle");
+          "Aceptaremos únicamente el mensaje válido más reciente para la acción seleccionada.", "loader-circle");
         timer = window.setTimeout(poll, Math.max(1000, Number(data.retry_after || 1) * 1000));
       } else {
         submit.disabled = false;

@@ -18,8 +18,9 @@ class ProviderCredentials:
 
 
 class ProviderCredentialResolver:
-    def __init__(self,bundle=None,*,environ=None):
-        raw=bundle if bundle is not None else (environ or os.environ).get("PRIVATE_EMAIL_CREDENTIALS_BUNDLE")
+    def __init__(self,bundle=None,*,environ=None,secret_store=None):
+        self._environ=environ or os.environ; self._secret_store=secret_store
+        raw=bundle if bundle is not None else self._environ.get("PRIVATE_EMAIL_CREDENTIALS_BUNDLE")
         if not raw: self._configs={}; return
         try: data=json.loads(raw) if isinstance(raw,str) else raw
         except Exception as exc: raise ProviderConfigurationError() from exc
@@ -27,6 +28,14 @@ class ProviderCredentialResolver:
         self._configs=data
     def resolve(self,provider_config_id):
         key=str(provider_config_id or "").strip(); item=self._configs.get(key)
+        if item is None and key.startswith("ms1_"):
+            try:
+                if self._secret_store is None:
+                    from managed_secret_store import SQLiteEncryptedSecretStore
+                    self._secret_store=SQLiteEncryptedSecretStore.from_environment(self._environ)
+                item=self._secret_store.get(key)
+            except Exception as exc:
+                raise ProviderConfigurationError() from exc
         if not key or not isinstance(item,dict) or set(item)!={"username","password"}:
             raise ProviderConfigurationError()
         return ProviderCredentials(item["username"],item["password"])

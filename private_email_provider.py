@@ -11,6 +11,7 @@ from mail_providers import MailProvider, ProviderMessage
 class ProviderError(Exception):
     safe_code = "provider_error"
 class ProviderUnavailable(ProviderError): safe_code = "provider_unavailable"
+class ProviderTLSFailed(ProviderError): safe_code = "provider_tls_failed"
 class ProviderTimeout(ProviderError): safe_code = "provider_timeout"
 class ProviderAuthenticationFailed(ProviderError): safe_code = "provider_auth_failed"
 class ProviderConfigurationError(ProviderError): safe_code = "provider_config_invalid"
@@ -80,30 +81,54 @@ class PrivateEmailMailProvider(MailProvider):
         if (cursor.binding_id != binding.binding_id or cursor.binding_version != binding.binding_version
                 or cursor.folder_key != binding.folder_key): raise ProviderCursorInvalid()
 
-    def messages_after(self, *, binding, cursor, limit=None):
+    def messages_after(self, *, binding, cursor, limit=None, action=None):
         self._validate(binding, cursor)
         state = self.transport.examine(binding.provider_config_id, binding.folder_key)
         if int(state["uidvalidity"]) != cursor.uidvalidity: raise ProviderCursorInvalid()
         uids = self.transport.search_uids(binding.provider_config_id, binding.folder_key,
             cursor.uidnext_boundary, min(limit or self.limit, self.limit))
-        results=[]
-        for uid in sorted({int(x) for x in uids if int(x) >= cursor.uidnext_boundary}):
-            meta=self.transport.fetch_metadata(binding.provider_config_id,binding.folder_key,uid)
-            parsed=self.parsers.classify(meta, lambda part: self.transport.fetch_body_peek(
+        results=[]; candidates=[]
+        registry=self.parsers
+        if action is not None:
+            from mail_center import action_metadata_matches, build_action_registry
+            registry=build_action_registry(action)
+        if action is not None:
+            for uid in sorted({int(x) for x in uids if int(x) >= cursor.uidnext_boundary},reverse=True):
+                meta=self.transport.fetch_metadata(binding.provider_config_id,binding.folder_key,uid)
+                if not action_metadata_matches(action,meta):
+                    continue
+                candidates.append((uid,meta))
+                break
+        for uid,meta in candidates if action is not None else []:
+            parsed=registry.classify(meta, lambda part: self.transport.fetch_body_peek(
                 binding.provider_config_id,binding.folder_key,uid,part), requested_at=cursor.captured_at)
             if parsed.kind == "unsupported": continue
             locator=ProviderLocator(binding.binding_id,binding.folder_key,cursor.uidvalidity,uid)
             results.append(ProviderMessage(locator.canonical(),f"binding:{binding.binding_id}",
                 parsed.service,parsed.kind,parsed.value,meta["internaldate"],locator))
+        if action is None:
+            for uid in sorted({int(x) for x in uids if int(x) >= cursor.uidnext_boundary}):
+                meta=self.transport.fetch_metadata(binding.provider_config_id,binding.folder_key,uid)
+                parsed=registry.classify(meta, lambda part: self.transport.fetch_body_peek(
+                    binding.provider_config_id,binding.folder_key,uid,part), requested_at=cursor.captured_at)
+                if parsed.kind == "unsupported": continue
+                locator=ProviderLocator(binding.binding_id,binding.folder_key,cursor.uidvalidity,uid)
+                results.append(ProviderMessage(locator.canonical(),f"binding:{binding.binding_id}",
+                    parsed.service,parsed.kind,parsed.value,meta["internaldate"],locator))
         return results
 
-    def message_by_reference(self, *, binding, provider_locator):
+    def message_by_reference(self, *, binding, provider_locator, action=None):
         locator = provider_locator if isinstance(provider_locator, ProviderLocator) else None
         if not locator or locator.binding_id != binding.binding_id: raise ProviderCursorInvalid()
         state=self.transport.examine(binding.provider_config_id,binding.folder_key)
         if int(state["uidvalidity"]) != locator.uidvalidity: return None
         meta=self.transport.fetch_metadata(binding.provider_config_id,binding.folder_key,locator.uid)
-        parsed=self.parsers.classify(meta,lambda part:self.transport.fetch_body_peek(
+        registry=self.parsers
+        if action is not None:
+            from mail_center import action_metadata_matches, build_action_registry
+            if not action_metadata_matches(action,meta): return None
+            registry=build_action_registry(action)
+        parsed=registry.classify(meta,lambda part:self.transport.fetch_body_peek(
             binding.provider_config_id,binding.folder_key,locator.uid,part),requested_at=None)
         if parsed.kind == "unsupported": return None
         return ProviderMessage(locator.canonical(),f"binding:{binding.binding_id}",parsed.service,

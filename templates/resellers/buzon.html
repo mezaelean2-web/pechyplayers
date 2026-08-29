@@ -9,11 +9,18 @@
     <aside aria-label="Estado del buzón"><i data-lucide="shield-check"></i><span>Conexión simulada<strong>Protegida</strong></span></aside>
   </header>
 
+  <section class="mailbox-actions" aria-labelledby="mailbox-actions-title">
+    <header><span>¿QUÉ NECESITAS?</span><h3 id="mailbox-actions-title">Selecciona una acción autorizada</h3></header>
+    <div class="mailbox-action-options" data-mailbox-actions>
+      {% for action in mail_actions %}<button type="button" data-action-id="{{ action.id }}" data-platform="{{ action.platform }}"><i data-lucide="{{ 'key-round' if action.extractor_type == 'password_reset_link' else 'mail-check' }}"></i><span>{{ action.display_name }}<small>{{ action.platform }}</small></span></button>{% else %}<p>No hay acciones habilitadas para tus adquisiciones actuales.</p>{% endfor %}
+    </div>
+  </section>
+
   <form class="mailbox-search" data-mailbox-search novalidate>
     <label class="sr-only" for="mailbox-email">Correo completo de la cuenta</label>
     <i data-lucide="search" aria-hidden="true"></i>
     <input id="mailbox-email" name="email" type="email" maxlength="254" autocomplete="off" spellcheck="false" placeholder="cuenta@dominio.com" required>
-    <button type="submit"><span>BUSCAR</span><i data-lucide="arrow-right" aria-hidden="true"></i></button>
+    <button type="submit" {% if not mail_actions %}disabled{% endif %}><span>BUSCAR</span><i data-lucide="arrow-right" aria-hidden="true"></i></button>
   </form>
   <p class="mailbox-search-hint"><i data-lucide="info" aria-hidden="true"></i>Ingresa el correo completo. El correo sólo ayuda a localizar una adquisición propia; nunca concede acceso.</p>
 
