@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 
 import database
 import mailbox_bindings
+from private_email_provider import ProviderCursor, ProviderLocator
 
 
 REQUEST_STATUSES = frozenset({"waiting", "found", "expired", "denied"})
@@ -178,13 +179,26 @@ class SQLiteMailboxRepository:
             return None
         unit = {"type": row["inventory_type"], "account_id": row["inventory_account_id"],
                 "profile_id": row["inventory_profile_id"]}
-        return {"id": row["request_id"], "reseller_id": row["reseller_id"],
+        record = {"id": row["request_id"], "reseller_id": row["reseller_id"],
                 "purchase_id": row["reseller_purchase_id"], "unit": unit,
                 "assignment_version": row["assignment_version"],
                 "requested_at": _moment(row["requested_at"]),
                 "expires_at": _moment(row["expires_at"]),
                 "last_polled_at": _moment(row["last_polled_at"]) if row["last_polled_at"] else None,
-                "status": row["status"], "delivery_id": row["delivery_id"]}
+                "status": row["status"], "delivery_id": row["delivery_id"],
+                "provider_kind": "private_email" if row["mailbox_binding_id"] else "fake",
+                "mailbox_binding_id": row["mailbox_binding_id"],
+                "binding_version": row["binding_version"]}
+        if row["mailbox_binding_id"]:
+            try:
+                record["provider_cursor"] = ProviderCursor(
+                    int(row["mailbox_binding_id"]), row["folder_key"],
+                    int(row["uidvalidity_at_t0"]), int(row["uidnext_at_t0"]),
+                    _moment(row["provider_cursor_captured_at"]),
+                    int(row["binding_version"]))
+            except Exception:
+                record["provider_cursor"] = None
+        return record
 
     def get_request(self, request_id, reseller_id=None):
         conn = _connect()
@@ -214,13 +228,21 @@ class SQLiteMailboxRepository:
             conn.execute("""UPDATE reseller_mailbox_requests SET status='expired',updated_at=?
                 WHERE reseller_id=? AND reseller_purchase_id=? AND status='waiting' AND expires_at<=?""",
                 (_iso(record["requested_at"]), record["reseller_id"], record["purchase_id"], _iso(record["requested_at"])))
+            cursor = record.get("provider_cursor")
             conn.execute("""INSERT INTO reseller_mailbox_requests
                 (request_id,reseller_id,reseller_purchase_id,inventory_type,inventory_account_id,
-                 inventory_profile_id,requested_at,expires_at,status,assignment_version,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)""", (
+                 inventory_profile_id,requested_at,expires_at,status,assignment_version,updated_at,
+                 mailbox_binding_id,binding_version,folder_key,uidvalidity_at_t0,uidnext_at_t0,
+                 provider_cursor_captured_at,initialization_state)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", (
                 record["id"], record["reseller_id"], record["purchase_id"], unit["type"],
                 unit["account_id"], unit.get("profile_id"), _iso(record["requested_at"]),
-                _iso(record["expires_at"]), "waiting", record["assignment_version"], _iso(record["requested_at"])))
+                _iso(record["expires_at"]), "waiting", record["assignment_version"],
+                _iso(record["requested_at"]), getattr(cursor,"binding_id",None),
+                getattr(cursor,"binding_version",None),getattr(cursor,"folder_key",None),
+                getattr(cursor,"uidvalidity",None),getattr(cursor,"uidnext_boundary",None),
+                _iso(cursor.captured_at) if cursor else None,
+                "ready" if cursor else "legacy"))
             conn.commit()
         finally: conn.close()
 
@@ -266,20 +288,34 @@ class SQLiteMailboxRepository:
     @staticmethod
     def _delivery(row):
         if not row: return None
+        locator = None
+        if row["mailbox_binding_id"]:
+            try:
+                locator = ProviderLocator(int(row["mailbox_binding_id"]), row["folder_key"],
+                                          int(row["imap_uidvalidity"]), int(row["imap_uid"]))
+            except Exception:
+                locator = None
         return {"id": row["delivery_id"], "reseller_id": row["reseller_id"],
                 "purchase_id": row["reseller_purchase_id"],
                 "unit": {"type": row["inventory_type"], "account_id": row["inventory_account_id"],
                          "profile_id": row["inventory_profile_id"]},
                 "service": row["service"], "kind": row["message_type"], "value": None,
                 "received_at": _moment(row["received_at"]),
-                "provider_reference": row["provider_reference_opaca"]}
+                "provider_reference": row["provider_reference_opaca"],
+                "provider_locator": locator,
+                "provider_kind": "private_email" if row["mailbox_binding_id"] else "fake",
+                "binding_version": row["request_binding_version"],
+                "assignment_version": row["request_assignment_version"]}
 
     def history_for(self, reseller_id, purchase_id, limit=20):
         conn = _connect()
         try:
-            rows = conn.execute("""SELECT * FROM reseller_authorized_message_deliveries
-                WHERE reseller_id=? AND reseller_purchase_id=?
-                ORDER BY received_at DESC,id DESC LIMIT ?""",
+            rows = conn.execute("""SELECT d.*,r.binding_version AS request_binding_version,
+                r.assignment_version AS request_assignment_version
+                FROM reseller_authorized_message_deliveries d
+                JOIN reseller_mailbox_requests r ON r.request_id=d.request_id
+                WHERE d.reseller_id=? AND d.reseller_purchase_id=?
+                ORDER BY d.received_at DESC,d.id DESC LIMIT ?""",
                 (int(reseller_id), int(purchase_id), int(limit))).fetchall()
             return [self._delivery(row) for row in rows]
         finally: conn.close()
@@ -287,8 +323,13 @@ class SQLiteMailboxRepository:
     def get_delivery(self, delivery_id, reseller_id):
         conn = _connect()
         try:
-            return self._delivery(conn.execute("""SELECT * FROM reseller_authorized_message_deliveries
-                WHERE delivery_id=? AND reseller_id=?""", (str(delivery_id), int(reseller_id))).fetchone())
+            return self._delivery(conn.execute("""SELECT d.*,
+                r.binding_version AS request_binding_version,
+                r.assignment_version AS request_assignment_version
+                FROM reseller_authorized_message_deliveries d
+                JOIN reseller_mailbox_requests r ON r.request_id=d.request_id
+                WHERE d.delivery_id=? AND d.reseller_id=?""",
+                (str(delivery_id), int(reseller_id))).fetchone())
         finally: conn.close()
 
     def append_audit(self, event):

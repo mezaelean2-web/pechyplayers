@@ -97,7 +97,7 @@ class PrivateEmailIMAPTransport(IMAPTransport):
 
     def fetch_metadata(self,provider_config_id,folder_key,uid):
         uid=self._positive(uid)
-        query="(UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT MESSAGE-ID AUTHENTICATION-RESULTS CONTENT-TYPE)])"
+        query="(UID INTERNALDATE RFC822.SIZE BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT AUTHENTICATION-RESULTS CONTENT-TYPE CONTENT-TRANSFER-ENCODING)])"
         with self._session(provider_config_id) as client:
             self._examine(client,folder_key); typ,data=client.uid("FETCH",str(uid),query)
             if typ!="OK" or not data or not isinstance(data[0],tuple) or len(data[0])!=2: raise ProviderMessageMalformed()
@@ -108,7 +108,9 @@ class PrivateEmailIMAPTransport(IMAPTransport):
             parsed=email.message_from_bytes(headers)
             return {"uid":uid,"internaldate":internal,"size":self._positive(match.group(3)),
                 "from":parsed.get("From",""),"to":parsed.get("To",""),"subject":parsed.get("Subject",""),
-                "message_id":parsed.get("Message-ID",""),"authentication_results":parsed.get("Authentication-Results",""),
+                "authentication_results":parsed.get("Authentication-Results",""),
+                "content_type":parsed.get("Content-Type","text/plain"),
+                "content_transfer_encoding":parsed.get("Content-Transfer-Encoding",""),
                 "body_part":"TEXT"}
 
     def fetch_body_peek(self,provider_config_id,folder_key,uid,part):

@@ -38,6 +38,12 @@ import customer_order_recovery
 import reseller_mailbox
 import reseller_mailbox_persistence
 from mail_provider_factory import build_mail_provider
+from mailbox_bindings import MailboxBindingResolver
+from pilot_private_email_gate import PilotPrivateEmailGate
+from pilot_message_adapter import build_pilot_message_registry
+from private_email_credentials import ProviderCredentialResolver
+from private_email_imap_transport import PrivateEmailIMAPTransport
+from private_email_provider import PrivateEmailMailProvider
 from database import conectar, obtener_productos, obtener_estadisticas, obtener_info_sistema, inicializar_db, obtener_config, actualizar_config, registrar_historial, obtener_historial, obtener_promociones, obtener_categorias, obtener_categorias_cartelera, obtener_categoria_cartelera_por_id, obtener_cartelera, obtener_historial, obtener_resumen_historial, obtener_cuentas_nube, obtener_estadisticas_nube, obtener_plataformas_nube, obtener_tipos_cuenta_nube, crear_cuenta_nube, actualizar_perfil_nube, renovar_perfil_nube, marcar_perfil_caido_nube, obtener_perfiles_disponibles_reemplazo, reemplazar_perfil_nube, obtener_contexto_liberacion_perfil_nube, liberar_o_trasladar_perfil_nube, registrar_no_renovacion_perfil_nube, obtener_historial_completo_perfil_nube, obtener_alertas_operativas_nube, obtener_detalle_alerta_nube, registrar_pago_pin_nube, mover_cuenta_papelera_nube, obtener_cuentas_papelera_nube, obtener_detalle_papelera_nube, restaurar_cuenta_papelera_nube, asignar_cuenta_completa_nube, crear_cuentas_nube_lote, obtener_detalle_drawer_cuenta_nube, actualizar_notas_cuenta_nube
 from datetime import timedelta
 from collections import defaultdict
@@ -107,10 +113,20 @@ _intentos_login_reseller = {}
 _LOGIN_RESELLER_MAX_INTENTOS = 5
 _LOGIN_RESELLER_VENTANA = 15 * 60
 
-# Fase simulada del Buzón: estado efímero por proceso y cero conexiones externas.
-fake_mail_provider = build_mail_provider()
+# Gate temporal 5B.4A: construir transporte no abre red; solo el piloto exacto puede usarlo.
+fake_mail_provider = build_mail_provider(environ={"MAIL_PROVIDER_MODE": "fake"})
+try:
+    _pilot_credentials = ProviderCredentialResolver()
+    _pilot_private_email_provider = PrivateEmailMailProvider(
+        PrivateEmailIMAPTransport(_pilot_credentials),
+        build_pilot_message_registry(_pilot_credentials))
+except Exception:
+    _pilot_private_email_provider = None
 reseller_mailbox_service = reseller_mailbox.ResellerMailboxService(
-    fake_mail_provider, reseller_mailbox_persistence.SQLiteMailboxRepository())
+    fake_mail_provider, reseller_mailbox_persistence.SQLiteMailboxRepository(),
+    binding_resolver=MailboxBindingResolver(),
+    private_email_provider=_pilot_private_email_provider,
+    private_email_gate=PilotPrivateEmailGate())
 
 UPLOAD_FOLDER = "static/img/platforms"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)

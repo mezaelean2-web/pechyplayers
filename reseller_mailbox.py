@@ -11,6 +11,8 @@ import database
 import inventory_assignment_access
 import reseller_mailbox_persistence
 from mail_providers import SUPPORTED_MESSAGE_KINDS
+from mailbox_bindings import MailboxBindingDenied
+from private_email_provider import ProviderError
 
 
 REQUEST_TTL_SECONDS = 90
@@ -67,13 +69,60 @@ class InMemoryMailboxRepository:
 
 
 class ResellerMailboxService:
-    def __init__(self, provider, repository=None, clock=None):
+    def __init__(self, provider, repository=None, clock=None, *, binding_resolver=None,
+                 private_email_provider=None, private_email_gate=None):
         self.provider = provider
+        self.binding_resolver = binding_resolver
+        self.private_email_provider = private_email_provider
+        self.private_email_gate = private_email_gate
         self.repository = repository or reseller_mailbox_persistence.SQLiteMailboxRepository()
         self.clock = clock or utcnow
         self._lock = getattr(self.repository, "_lock", RLock())
         self._rate = defaultdict(deque)
         self.worker_id = secrets.token_urlsafe(12)
+
+    def _select_provider_context(self, reseller_id, authorization):
+        if self.binding_resolver is None or self.private_email_gate is None:
+            return {"kind": "fake", "provider": self.provider}
+        try:
+            binding = self.binding_resolver.resolve(
+                authorization["inventory_unit"], authorization["purchase_id"],
+                authorization["assignment_version"])
+        except MailboxBindingDenied:
+            return {"kind": "fake", "provider": self.provider}
+        if not self.private_email_gate.allows(
+                reseller_id=reseller_id, purchase_id=authorization["purchase_id"],
+                unit=authorization["inventory_unit"], binding=binding):
+            return {"kind": "fake", "provider": self.provider}
+        if self.private_email_provider is None:
+            return None
+        return {"kind": "private_email", "provider": self.private_email_provider,
+                "binding": binding}
+
+    def _private_context_for_record(self, record):
+        if record.get("provider_kind") != "private_email" or self.binding_resolver is None:
+            return None
+        try:
+            binding = self.binding_resolver.resolve(
+                record["unit"], record["purchase_id"], record["assignment_version"])
+        except MailboxBindingDenied:
+            return None
+        if (self.private_email_provider is None or self.private_email_gate is None
+                or not self.private_email_gate.allows(
+                    reseller_id=record["reseller_id"], purchase_id=record["purchase_id"],
+                    unit=record["unit"], binding=binding)
+                or binding.binding_id != record.get("mailbox_binding_id")
+                or binding.binding_version != record.get("binding_version")):
+            return None
+        return {"kind":"private_email","provider":self.private_email_provider,
+                "binding":binding,"cursor":record.get("provider_cursor")}
+
+    def _can_resume(self, record):
+        if record.get("provider_kind") != "private_email":
+            return self.provider.can_resume_request(record["id"])
+        context = self._private_context_for_record(record)
+        return bool(context and context["cursor"] and context["provider"].can_resume_request(
+            binding=context["binding"], cursor=context["cursor"]))
 
     def _audit(self, *, reseller_id, purchase_id, unit, result, safe_code,
                request_id, provider_reference=None):
@@ -177,7 +226,7 @@ class ResellerMailboxService:
                     and item["expires_at"] > now), None)
             else:
                 existing = self.repository.active_request(reseller_id, purchase_id, now)
-                if existing and not self.provider.can_resume_request(existing["id"]):
+                if existing and not self._can_resume(existing):
                     existing["status"] = "expired"
                     self.repository.update_request(existing)
                     self._audit(reseller_id=reseller_id, purchase_id=purchase_id,
@@ -202,6 +251,25 @@ class ResellerMailboxService:
                 "status": "waiting",
                 "delivery_id": None,
             }
+            context = self._select_provider_context(reseller_id, authorization)
+            if context is None:
+                self._audit(reseller_id=reseller_id, purchase_id=purchase_id,
+                            unit=record["unit"], result="denied",
+                            safe_code="provider_state_unavailable", request_id=None)
+                return self._neutral()
+            record["provider_kind"] = context["kind"]
+            if context["kind"] == "private_email":
+                try:
+                    cursor = context["provider"].begin_request(
+                        request_id=request_id, binding=context["binding"], requested_at=now)
+                except ProviderError:
+                    self._audit(reseller_id=reseller_id, purchase_id=purchase_id,
+                                unit=record["unit"], result="denied",
+                                safe_code="provider_state_unavailable", request_id=None)
+                    return self._neutral()
+                record.update(provider_cursor=cursor,
+                              mailbox_binding_id=context["binding"].binding_id,
+                              binding_version=context["binding"].binding_version)
             if isinstance(self.repository, InMemoryMailboxRepository):
                 self.repository.requests[request_id] = record
             else:
@@ -209,8 +277,9 @@ class ResellerMailboxService:
             self._audit(reseller_id=reseller_id, purchase_id=purchase_id,
                         unit=record["unit"], result="waiting", safe_code="authorized",
                         request_id=request_id)
-            self.provider.begin_request(
-                request_id=request_id, unit=record["unit"], requested_at=now)
+            if context["kind"] == "fake":
+                self.provider.begin_request(
+                    request_id=request_id, unit=record["unit"], requested_at=now)
             return {
                 "ok": True, "status": "waiting", "request_id": request_id,
                 "retry_after": POLL_INTERVAL_SECONDS,
@@ -250,8 +319,23 @@ class ResellerMailboxService:
     def _restore_content(self, delivery):
         if delivery.get("value") is not None:
             return delivery
-        message = self.provider.message_by_reference(
-            unit=delivery["unit"], opaque_reference=delivery["provider_reference"])
+        if delivery.get("provider_kind") == "private_email":
+            record = {"provider_kind":"private_email", "reseller_id":delivery["reseller_id"],
+                "purchase_id":delivery["purchase_id"], "unit":delivery["unit"],
+                "assignment_version":delivery.get("assignment_version"),
+                "mailbox_binding_id":getattr(delivery.get("provider_locator"),"binding_id",None),
+                "binding_version":delivery.get("binding_version")}
+            context = self._private_context_for_record(record)
+            if not context or delivery.get("provider_locator") is None:
+                return delivery
+            try:
+                message = context["provider"].message_by_reference(
+                    binding=context["binding"], provider_locator=delivery["provider_locator"])
+            except ProviderError:
+                return delivery
+        else:
+            message = self.provider.message_by_reference(
+                unit=delivery["unit"], opaque_reference=delivery["provider_reference"])
         if message is None or message.kind != delivery["kind"]:
             return delivery
         restored = dict(delivery)
@@ -319,14 +403,36 @@ class ResellerMailboxService:
             record["last_polled_at"] = now
             if not isinstance(self.repository, InMemoryMailboxRepository):
                 self.repository.update_request(record)
-            messages = self.provider.messages_after(
-                unit=record["unit"], requested_at=record["requested_at"])
+            if record.get("provider_kind") == "private_email":
+                context = self._private_context_for_record(record)
+                if not context or context["cursor"] is None:
+                    record["status"] = "denied"
+                    if not isinstance(self.repository, InMemoryMailboxRepository):
+                        self.repository.update_request(record)
+                    return self._neutral()
+                try:
+                    messages = context["provider"].messages_after(
+                        binding=context["binding"], cursor=context["cursor"])
+                except ProviderError:
+                    record["status"] = "denied"
+                    if not isinstance(self.repository, InMemoryMailboxRepository):
+                        self.repository.update_request(record)
+                    return self._neutral()
+            else:
+                messages = self.provider.messages_after(
+                    unit=record["unit"], requested_at=record["requested_at"])
             message = next((item for item in messages
                             if item.kind in SUPPORTED_MESSAGE_KINDS), None)
             if message is None:
                 return self._neutral("waiting", record["id"], POLL_INTERVAL_SECONDS)
             # Revalidación inmediatamente antes de conservar y revelar contenido.
             if not self._current_authorization(record, now):
+                record["status"] = "denied"
+                if not isinstance(self.repository, InMemoryMailboxRepository):
+                    self.repository.update_request(record)
+                return self._neutral()
+            if (record.get("provider_kind") == "private_email"
+                    and self._private_context_for_record(record) is None):
                 record["status"] = "denied"
                 if not isinstance(self.repository, InMemoryMailboxRepository):
                     self.repository.update_request(record)
@@ -342,6 +448,9 @@ class ResellerMailboxService:
                 "received_at": message.received_at,
                 "provider_reference": _opaque_reference(message.reference),
                 "provider_locator": getattr(message, "locator", None),
+                "provider_kind": record.get("provider_kind", "fake"),
+                "binding_version": record.get("binding_version"),
+                "assignment_version": record["assignment_version"],
             }
             if isinstance(self.repository, InMemoryMailboxRepository):
                 key = (record["reseller_id"], record["purchase_id"])
@@ -369,7 +478,10 @@ class ResellerMailboxService:
                 authorization = inventory_assignment_access.authorize_reseller_message_access(
                     reseller_id, delivery["purchase_id"], now=now)
                 if (authorization.get("authorized") is not True
-                        or authorization.get("inventory_unit") != delivery["unit"]):
+                        or authorization.get("inventory_unit") != delivery["unit"]
+                        or (delivery.get("provider_kind") == "private_email"
+                            and authorization.get("assignment_version")
+                            != delivery.get("assignment_version"))):
                     return self._neutral()
                 return {"ok": True, "status": "found",
                         "message": self._public_delivery(self._restore_content(delivery))}
@@ -382,7 +494,10 @@ class ResellerMailboxService:
                 authorization = inventory_assignment_access.authorize_reseller_message_access(
                     reseller_id, purchase_id, now=now)
                 if (authorization.get("authorized") is not True
-                        or authorization.get("inventory_unit") != delivery["unit"]):
+                        or authorization.get("inventory_unit") != delivery["unit"]
+                        or (delivery.get("provider_kind") == "private_email"
+                            and authorization.get("assignment_version")
+                            != delivery.get("assignment_version"))):
                     return self._neutral()
                 return {"ok": True, "status": "found",
                         "message": self._public_delivery(delivery)}
